@@ -1,0 +1,62 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "//": [
+      "APK PROFİLLERİ — ikisi de 'internal' dağıtım, yani doğrudan kurulabilen .apk üretir.",
+      "Play Store'un istediği .aab yalnızca production profilinde; internal profillerde",
+      "android.buildType 'apk' olmadan EAS varsayılan olarak .aab üretir ve telefona kurulamaz."
+    ],
+
+    "onizleme": {
+      "//": [
+        "BACKEND'SİZ ÇALIŞAN DEMO APK'sı. EXPO_PUBLIC_ONIZLEME derleme anında gömülür;",
+        "uygulama sunucuya hiç gitmez, veriler src/lib/onizleme.js'ten gelir (bkz. o dosyanın",
+        "başlığı). Tasarımı ve akışları gerçek cihazda gezmek için — sunucu, ağ, giriş gerekmez."
+      ],
+      "extends": "preview",
+      "env": {
+        "EXPO_PUBLIC_ONIZLEME": "1"
+      }
+    },
+
+    "preview": {
+      "//": [
+        "GERÇEK APK — backend'e bağlanır. EXPO_PUBLIC_API_URL ŞART: bağımsız derlemede",
+        "Constants.expoConfig.hostUri null gelir (Metro yok) ve api.js emülatör adresine",
+        "(10.0.2.2) düşer; gerçek telefonda o adres anlamsızdır. Değer, backend'in LAN",
+        "adresidir — ağ değişirse burası da güncellenmeli."
+      ],
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://192.168.1.111:5000"
+      }
+    },
+
+    "development": {
+      "//": [
+        "Geliştirme istemcisi: içinde Metro'ya bağlanan bir kabuk taşır (Expo Go'nun",
+        "projeye özel hâli). Expo Go'nun SDK uyuşmazlığı sorununu kalıcı olarak çözer —",
+        "bir kez kurulur, sonra 'npx expo start' ile canlı geliştirme yapılır."
+      ],
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+
+    "production": {
+      "//": "Play Store yüklemesi için .aab (varsayılan). Şimdilik kullanılmıyor.",
+      "autoIncrement": true
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
