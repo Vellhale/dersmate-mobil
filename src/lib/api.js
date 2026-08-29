@@ -43,6 +43,23 @@ function resolveApiBase() {
     }
   }
 
+  /*
+    GELİŞTİRME YEDEĞİ — ve YALNIZCA geliştirmede geçerli.
+
+    Bağımsız derlemede (APK/IPA) Metro yoktur, yani hostUri null gelir ve buradaki
+    emülatör adresi devreye girerdi: kullanıcının telefonu 10.0.2.2'ye istek atar,
+    her çağrı sessizce "sunucuya ulaşılamadı"ya düşer. Sessiz yanlış adres yerine
+    gürültülü bir uyarı: __DEV__ kapalıyken adres BOŞ kalır ve istekler açık bir
+    yapılandırma hatası verir. (Web tarafı aynı kararı import.meta.env.DEV ile aldı.)
+  */
+  if (!__DEV__) {
+    console.error(
+      '[api] EXPO_PUBLIC_API_URL tanımlı değil. Üretim derlemesinde API adresi ' +
+        'derleme anında gömülmeli (bkz. eas.json build profilleri).',
+    )
+    return ''
+  }
+
   return Platform.OS === 'android' ? 'http://10.0.2.2:5000' : 'http://localhost:5000'
 }
 
@@ -217,6 +234,15 @@ export const api = {
     request('/api/auth/resend-verification', { method: 'POST', body: { email } }),
   login: (payload) => request('/api/auth/login', { method: 'POST', body: payload }),
 
+  /** Parola sıfırlama bağlantısı ister. Yanıt, adres kayıtlı olsun olmasın AYNI (204) —
+      farklı yanıt vermek "bu e-posta kayıtlı mı" sorusunu herkese yanıtlardı. */
+  forgotPassword: (email) =>
+    request('/api/auth/forgot-password', { method: 'POST', body: { email } }),
+
+  /** Bağlantıdaki token'la yeni parolayı yazar. Token tek kullanımlık, 1 saat geçerli. */
+  resetPassword: (token, newPassword) =>
+    request('/api/auth/reset-password', { method: 'POST', body: { token, newPassword } }),
+
   // --- Katalog ---
   topics: () => request('/api/catalog/topics'),
   categories: () => request('/api/catalog/categories'),
@@ -349,16 +375,169 @@ export const api = {
    * Profil ucundan AYRI: rozet şeridi daha seyrek değişiyor ve gecikmeli yüklenebiliyor.
    */
   userSubjectBadges: (userId) => request(`/api/users/${userId}/subject-badges`),
+
+  /*
+    KULLANICI ŞİKAYETİ — ders bağlamı olmadan.
+
+    Şikayet açmanın tek yolu bir ders üzerindenken, sohbette taciz eden ama henüz
+    tamamlanmış dersi olmayan biri hiçbir şekilde bildirilemiyordu. Aynı moderasyon
+    kuyruğuna düşer (moderation.Reports).
+  */
+  reportUser: (userId, reason, description) =>
+    request(`/api/users/${userId}/report`, { method: 'POST', body: { reason, description } }),
+
   createReview: (sessionId, payload) =>
     request(`/api/sessions/${sessionId}/review`, { method: 'POST', body: payload }),
 
+  /*
+    ─── TOPLULUK (FORUM) ──────────────────────────────────────────────────────
+
+    SIRALAMA, TARİH PENCERESİ VE ETİKET FİLTRESİ SUNUCUDA uygulanıyor — istemcide
+    yapılsaydı sayfalama anlamsız olurdu (ikinci sayfayı verebilmek için tüm
+    gönderileri indirmek gerekirdi).
+
+    sort / range / tag SUNUCU ENUM ADLARI ile gider ("Newest", "Day", "ExamStress");
+    Türkçe arayüz anahtarlarından çeviri ekran tarafında tek tabloda durur ki kablo
+    sözleşmesi tek anlamlı kalsın.
+  */
+  forumFeed: ({ sort = 'Newest', range = 'All', tag = null, page = 1, pageSize = 20 } = {}, signal) => {
+    const q = new URLSearchParams({ sort, range, page: String(page), pageSize: String(pageSize) })
+    // Etiket yoksa parametre HİÇ gönderilmez: boş bir `tag=` değeri sunucuda geçersiz
+    // enum olarak bağlanır ve akış 400 döner.
+    if (tag) q.set('tag', tag)
+    return request(`/api/community/posts?${q}`, { signal })
+  },
+
+  createForumPost: (tag, title, body) =>
+    request('/api/community/posts', { method: 'POST', body: { tag, title, body } }),
+
+  forumComments: (postId, signal) => request(`/api/community/posts/${postId}/comments`, { signal }),
+
+  createForumComment: (postId, body) =>
+    request(`/api/community/posts/${postId}/comments`, { method: 'POST', body: { body } }),
+
+  /**
+   * Oy. value yalnızca 1 ya da -1; SIFIR GÖNDERİLMEZ — geri almak, aynı yöne ikinci kez
+   * oy vermektir (sunucu satırı siler). Ayrı bir "oyu kaldır" ucu yok çünkü kullanıcı
+   * için de tek bir jest: aynı oka tekrar basmak.
+   *
+   * Dönen değer sunucunun SON sayaçları: { upvoteCount, downvoteCount, myVote }.
+   * İstemci optimistik gösterip bu yanıtla düzeltir.
+   */
+  voteForumPost: (postId, value) =>
+    request(`/api/community/posts/${postId}/vote`, { method: 'POST', body: { value } }),
+  voteForumComment: (commentId, value) =>
+    request(`/api/community/comments/${commentId}/vote`, { method: 'POST', body: { value } }),
+
+  /**
+   * Şikayet aynı moderasyon kuyruğuna düşer — ders, sohbet ve forum şikayetleri
+   * moderatör için tek yerde. reason: ReportReason enum adı. Açıklama sunucuda en az
+   * 15 karakter; arayüz aynı sınırı uygular ki kullanıcı gönderdikten sonra 400 görmesin.
+   */
+  reportForumPost: (postId, reason, description) =>
+    request(`/api/community/posts/${postId}/report`, {
+      method: 'POST',
+      body: { reason, description },
+    }),
+  reportForumComment: (commentId, reason, description) =>
+    request(`/api/community/comments/${commentId}/report`, {
+      method: 'POST',
+      body: { reason, description },
+    }),
+
   // --- Tercihler ---
   myPreferences: () => request('/api/preferences'),
+
+  /*
+    Uç adı "cookie-consent" ama MOBİLDE ÇEREZ YOK: taşıdığı şey analitik ve işlevsel
+    veri toplama izni. Ad sunucuyla sözleşme olduğu için korunuyor (yeniden adlandırma,
+    karşılığı olan bir uç değişikliğiyle birlikte yapılmalı).
+  */
+  saveCookieConsent: (analytics, functional, consentVersion) =>
+    request('/api/preferences/cookie-consent', {
+      method: 'PUT',
+      body: { analytics, functional, consentVersion },
+    }),
+
   saveOnboarding: (lastStep, completed, suppressed) =>
     request('/api/preferences/onboarding', {
       method: 'PUT',
       body: { lastStep, completed, suppressed },
     }),
+
+  /*
+    ─── YÖNETİM ───────────────────────────────────────────────────────────────
+    Yetki kontrolü SUNUCUDA (403). Arayüz bu ayrımı taklit etmez — yetki kontrolünü
+    iki yerde tutmak, birinin unutulduğu gün sessizce açık bırakır.
+  */
+  disputes: () => request('/api/admin/disputes'),
+  disputeDetail: (disputeId) => request(`/api/admin/disputes/${disputeId}`),
+  resolveDispute: (disputeId, resolution, note) =>
+    request(`/api/admin/disputes/${disputeId}/resolve`, { method: 'POST', body: { resolution, note } }),
+
+  /** Açık şikayet kuyruğu (yalnızca yönetim). */
+  reports: (onlyOpen = true) => request(`/api/admin/reports?onlyOpen=${onlyOpen}`),
+  resolveReport: (reportId, actionTaken, note) =>
+    request(`/api/admin/reports/${reportId}/resolve`, { method: 'POST', body: { actionTaken, note } }),
+
+  /**
+   * Forum içeriğini kaldırır (remove=true) ya da geri getirir (remove=false).
+   *
+   * ŞİKAYETİ KAPATMAKTAN AYRI: resolveReport yalnızca kuyruktaki kaydı kapatır,
+   * içeriğe dokunmaz. Bu uç olmadan üç şikayet alıp otomatik perdelenen bir gönderi
+   * sonsuza kadar perdeli kalırdı. Gerekçe zorunlu (en az 10 karakter), denetim izine yazılır.
+   */
+  moderateForumContent: ({ postId = null, commentId = null, remove, reason }) =>
+    request('/api/admin/community/moderate', {
+      method: 'POST',
+      body: { postId, commentId, remove, reason },
+    }),
+
+  adminSessionProofs: (sessionId) => request(`/api/admin/sessions/${sessionId}/proofs`),
+  /** Yönetici, katılımcı olmadığı derslerin kanıtını kendi ucundan görür. */
+  adminProofImageSource: (sessionId, proofId) =>
+    authImageSource(`/api/admin/sessions/${sessionId}/proofs/${proofId}/content`),
+
+  banUser: (userId, reason) =>
+    request(`/api/admin/users/${userId}/ban`, { method: 'POST', body: { reason } }),
+  unbanUser: (userId, reason) =>
+    request(`/api/admin/users/${userId}/unban`, { method: 'POST', body: { reason } }),
+
+  /** @param type 'Warning' | 'TemporaryBan' — durationHours yalnızca TemporaryBan'de anlamlı. */
+  sanctionUser: (userId, type, reason, durationHours = null) =>
+    request(`/api/admin/users/${userId}/sanction`, {
+      method: 'POST',
+      body: { type, reason, durationHours },
+    }),
+
+  teacherCandidates: (status = 'Pending', page = 1, pageSize = 25) =>
+    request(`/api/admin/teacher-candidates?status=${status}&page=${page}&pageSize=${pageSize}`),
+  /** decision: Verify | Reject | Revert. Gerekçe zorunlu (sunucu da doğruluyor). */
+  reviewTeacherCandidate: (profileId, decision, note) =>
+    request(`/api/admin/teacher-candidates/${profileId}/review`, {
+      method: 'POST',
+      body: { decision, note },
+    }),
+
+  economyMetrics: () => request('/api/admin/metrics'),
+
+  /**
+   * Yönetim eliyle puan tanımlama/düzeltme. Pozitif ekler, negatif düşer; gerekçe zorunlu.
+   *
+   * idempotencyKey ZORUNLU ve ÇAĞIRANIN sorumluluğunda: aynı düzeltmenin TEKRAR
+   * DENEMELERİ aynı anahtarla gitmeli, yeni bir düzeltme yeni anahtar almalı. Burada
+   * üretilseydi her çağrı yeni anahtar alır ve koruma hiçbir şey yapmazdı — tam olarak
+   * ağ hatasından sonraki tekrar denemede korunması gereken durumda.
+   */
+  adjustCredits: (userId, amount, reason, idempotencyKey) =>
+    request(`/api/admin/users/${userId}/credits`, {
+      method: 'POST',
+      body: { amount, reason },
+      headers: { 'Idempotency-Key': idempotencyKey },
+    }),
+
+  auditLog: (page = 1, pageSize = 25) =>
+    request(`/api/admin/audit-log?page=${page}&pageSize=${pageSize}`),
 }
 
 /*

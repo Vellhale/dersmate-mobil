@@ -7,6 +7,8 @@ import { seviyeEtiketi, seviyeHesapla, seviyeIlerlemeMetni } from '../lib/seviye
 import { brand } from '../lib/theme'
 import { Avatar } from './Avatar'
 import { SubjectBadges } from './SubjectBadges'
+import { UniversiteRozetleri } from './UniversiteRozetleri'
+import { ToplulukRozetleri } from './ToplulukRozetleri'
 import { GrafikIkonu, KepIkonu, TakvimIkonu, YildizIkonu } from './Ikonlar'
 import { Badge, Button, Card, EmptyState, ErrorBox, Loading } from './ui'
 
@@ -30,8 +32,14 @@ import { Badge, Button, Card, EmptyState, ErrorBox, Loading } from './ui'
   akar, uzunluk sayfalamayla (Önceki/Sonraki) sınırlanır — "kaydırılabilir liste"
   işlevi sayfanın kendisinde.
 
-  Üniversite/Topluluk rozet şeritleri BİLİNÇLİ eksik: web'de ayrı modüllerden geliyor
-  ve mobil kapsamın bu adımı branş rozetleri; eklendiklerinde buraya aynı sırayla girer.
+  ROZET ŞERİTLERİ web'dekiyle AYNI SIRADA: branş (SubjectBadges) → görüşme
+  (UniversiteRozetleri) → topluluk (ToplulukRozetleri). Üçü de "bu kişi ne yapmış"
+  sorusunu yanıtlıyor ve konu panellerinden ("ne yapabilir") önce geliyor; üçü de
+  gösterecek bir şey yoksa kendini tamamen gizliyor.
+
+  YÖNETİM ROZETİ BURADA YOK ve bu bir eksik değil: profil ucu rolü bilerek sızdırmıyor
+  (bkz. YonetimRozeti.jsx). Rozetin işi forumda/Keşfet'te resmi cevabı ayırt etmek,
+  profilde kişi etiketlemek değil.
 */
 
 export function ProfilGorunumu({ userId, kendiProfilim = false }) {
@@ -45,6 +53,11 @@ export function ProfilGorunumu({ userId, kendiProfilim = false }) {
 
   const p = profile.data
 
+  /* Kendi profilim mi: asıl kaynak SUNUCUNUN `isSelf` alanı (web de onu kullanıyor).
+     Çağıranın verdiği prop yalnızca yedek — merdiven/ilerleme metinleri "burada ne
+     kazanabilirsin" diyor ve bunu kime söylediğine sunucu karar vermeli. */
+  const benimProfilim = p.isSelf ?? kendiProfilim
+
   return (
     <View className="gap-3">
       <ProfilBasligi profile={p} />
@@ -52,7 +65,27 @@ export function ProfilGorunumu({ userId, kendiProfilim = false }) {
       {/* Branş rozetleri istatistiklerin hemen altında: ikisi de "bu kişi ne yapmış"
           sorusunu yanıtlıyor, konu panellerinden ("ne yapabilir") önce gelmeli.
           Bileşen, rozet de ilerleme de yoksa kendini tamamen gizler. */}
-      <SubjectBadges userId={userId} kendiProfilim={kendiProfilim} />
+      <SubjectBadges userId={userId} kendiProfilim={benimProfilim} />
+
+      {/*
+        GÖRÜŞME ROZETLERİ yalnızca üniversite bilgisi olan profilde.
+
+        İki şerit birden görünebilir ve bu bir tutarsızlık değil: branş rozetleri "hangi
+        derste ne kadar anlattı", görüşme rozeti "toplamda ne kadar görüştü" diyor. Aynı
+        kişide ikisi de doğru olabilir. Üniversite bilgisi olmayan profilde ikinci şerit
+        hiç çizilmiyor; üniversite bilgisi olup hiç oturumu olmayanda ise bileşen kendini
+        gizliyor (bkz. UniversiteRozetleri).
+      */}
+      {p.university ? <UniversiteRozetleri userId={userId} kendiProfilim={benimProfilim} /> : null}
+
+      {/*
+        TOPLULUK ROZETLERİ — forumda alınan toplam yukarı oy (100/500/1000).
+
+        Sayaç SUNUCUDAN geliyor ve kaldırılmış/perdeli içeriğin oyunu saymıyor — yani
+        kural ihlaliyle toplanan oy rozet kazandırmıyor (bkz. ProfileQueries).
+        Kazanılmamış kademelerin merdiveni yalnızca kendi profilinde çiziliyor.
+      */}
+      <ToplulukRozetleri oy={p.communityUpvotes} kendiProfilim={benimProfilim} />
 
       <KonuPaneli title="Anlatabilirim" tone="brand" topics={p.canTeach} emptyText="Henüz konu eklenmemiş." />
       <KonuPaneli

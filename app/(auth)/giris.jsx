@@ -93,7 +93,19 @@ export default function Giris() {
         </Button>
       </View>
 
+      {/* Parola sıfırlama bağlantısı FORMUN HEMEN ALTINDA, "Kayıt ol"dan da ÖNCE (web
+          kararı): buraya gelip giremeyen kullanıcının ilk ihtiyacı yeni hesap açmak
+          değil, kendi hesabına dönmek. Sıfırlama yolu gelene kadar parolasını unutan
+          kullanıcı hesabını kalıcı kaybediyordu. */}
       <View className="mt-4 flex-row justify-center">
+        <Link href="/sifre-sifirla" asChild>
+          <Pressable accessibilityRole="link" hitSlop={12}>
+            <Text className="text-sm font-medium text-brand-600">Şifreni mi unuttun?</Text>
+          </Pressable>
+        </Link>
+      </View>
+
+      <View className="mt-2 flex-row justify-center">
         <Text className="text-sm text-slate-600">Hesabın yok mu? </Text>
         <Link href="/kayit" asChild>
           <Pressable accessibilityRole="link" hitSlop={12}>

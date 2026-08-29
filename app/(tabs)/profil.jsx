@@ -9,6 +9,8 @@ import { useAuth } from '../../src/state/AuthContext'
 import { EkranBasligi } from '../../src/components/EkranBasligi'
 import { ProfilGorunumu } from '../../src/components/ProfilGorunumu'
 import { Button, ErrorBox, Field, Girdi, Loading, Modal, Notice } from '../../src/components/ui'
+import { RehberiTekrarIzle } from '../../src/components/UrunTuru'
+import { VeriTercihleriBaglantisi } from '../../src/components/IzinSayfasi'
 
 /*
   PROFİLİM SEKMESİ — web'deki Profile.jsx'in "kendi profilim" hâli. Başkasının profili
@@ -103,11 +105,42 @@ export default function Profil() {
           </Pressable>
         </View>
 
+        {/* Yönetim girişi YALNIZCA yetkili hesapta çizilir. Asıl kapı sunucuda (403);
+            buradaki koşul, yetkisi olmayana çalışmayan bir düğme göstermemek için. */}
+        {session?.isAdmin && (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/yonetim')}
+            className="min-h-[44px] items-center justify-center rounded-xl border border-brand-200 bg-brand-50"
+          >
+            <Text className="text-sm font-medium text-brand-700">Yönetim paneli</Text>
+          </Pressable>
+        )}
+
         <ProfilGorunumu key={version} userId={session?.userId} kendiProfilim />
 
         <Button variant="secondary" onPress={logout}>
           Çıkış yap
         </Button>
+
+        {/*
+          ALTBİLGİ — web'deki Layout altbilgisinin karşılığı.
+
+          Yasal metinlere uygulama İÇİNDEN erişim mağaza incelemesinin de beklediği bir
+          şey; ayrıca kayıt ekranındaki onay bağlantıları buraya değil, doğrudan
+          sayfalara gidiyor — kullanıcı sonradan da okuyabilmeli.
+        */}
+        <View className="mt-2 items-center gap-1 border-t border-slate-200 pt-4">
+          <View className="flex-row flex-wrap items-center justify-center gap-x-4">
+            <AltBaglanti onPress={() => router.push('/hakkimizda')}>Hakkımızda</AltBaglanti>
+            <AltBaglanti onPress={() => router.push('/kosullar')}>Kullanım koşulları</AltBaglanti>
+            <AltBaglanti onPress={() => router.push('/gizlilik')}>Gizlilik</AltBaglanti>
+          </View>
+          <View className="flex-row flex-wrap items-center justify-center gap-x-4">
+            <VeriTercihleriBaglantisi />
+            <RehberiTekrarIzle />
+          </View>
+        </View>
       </ScrollView>
 
       <ProfilDuzenleModali
@@ -121,6 +154,15 @@ export default function Profil() {
         }}
       />
     </SafeAreaView>
+  )
+}
+
+/** Altbilgi bağlantısı — 44px dokunma hedefi, ikincil ton. */
+function AltBaglanti({ onPress, children }) {
+  return (
+    <Pressable accessibilityRole="link" onPress={onPress} className="min-h-[44px] justify-center">
+      <Text className="text-sm text-slate-500">{children}</Text>
+    </Pressable>
   )
 }
 

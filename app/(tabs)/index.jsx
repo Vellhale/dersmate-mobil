@@ -6,7 +6,8 @@ import { api } from '../../src/lib/api'
 import { useAsync } from '../../src/state/useAsync'
 import { brand, slate } from '../../src/lib/theme'
 import { EkranBasligi } from '../../src/components/EkranBasligi'
-import { KepIkonu, KisilerIkonu } from '../../src/components/Ikonlar'
+import { KepIkonu, KisilerIkonu, ToplulukIkonu } from '../../src/components/Ikonlar'
+import { useTurCipasi } from '../../src/lib/tur'
 import { IlanKarti } from '../../src/components/IlanKarti'
 import { EslesmeIstegiModali } from '../../src/components/EslesmeIstegiModali'
 import { EmptyState, ErrorBox, Loading, Notice } from '../../src/components/ui'
@@ -32,6 +33,8 @@ import { EmptyState, ErrorBox, Loading, Notice } from '../../src/components/ui'
 */
 export default function Akis() {
   const router = useRouter()
+  const eslesmelerCipasi = useTurCipasi('eslesmeler')
+  const derslerCipasi = useTurCipasi('dersler')
   const suggestions = useAsync(() => api.suggestions(20), [])
   const portfolio = useAsync(() => api.myPortfolio(), [])
 
@@ -67,16 +70,29 @@ export default function Akis() {
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
-      {/* Instagram düzeninde tab çubuğuna girmeyen iki bölüm başlıktan açılır:
-          Eşleşmeler (istek kabul/ret) ve Derslerim (rezervasyon + kanıt akışı). */}
+      {/* Instagram düzeninde tab çubuğuna girmeyen bölümler başlıktan açılır:
+          Topluluk (forum), Eşleşmeler (istek kabul/ret) ve Derslerim (rezervasyon +
+          kanıt akışı). Üçü de sekme olmadı çünkü alt bar beşten fazlasını taşıyamaz;
+          sıra kullanma sıklığına göre. */}
       <EkranBasligi
         sag={
-          <View className="flex-row items-center gap-1">
+          <View className="flex-row items-center">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Topluluk"
+              onPress={() => router.push('/topluluk')}
+              className="h-11 w-11 items-center justify-center rounded-lg"
+            >
+              <ToplulukIkonu renk={slate[700]} boy={24} />
+            </Pressable>
+            {/* Tur çıpaları: bu iki ikon turun "eslesmeler" ve "dersler" adımlarının
+                ışık tuttuğu öğeler (bkz. src/lib/tur.js TUR_ADIMLARI). */}
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Eşleşmeler"
               onPress={() => router.push('/eslesmeler')}
               className="h-11 w-11 items-center justify-center rounded-lg"
+              {...eslesmelerCipasi}
             >
               <KisilerIkonu renk={slate[700]} boy={24} />
             </Pressable>
@@ -85,6 +101,7 @@ export default function Akis() {
               accessibilityLabel="Derslerim"
               onPress={() => router.push('/dersler')}
               className="h-11 w-11 items-center justify-center rounded-lg"
+              {...derslerCipasi}
             >
               <KepIkonu renk={slate[700]} boy={24} />
             </Pressable>

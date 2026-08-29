@@ -86,3 +86,29 @@ Metro hostUri'sinden kendisi türetir; başka ortam için `.env` → `EXPO_PUBLI
   şikayet/iptal, puan geçmişi); Eşleşmeler (`app/eslesmeler.jsx` — kabul/ret/sonlandır).
   Derslerim ve Eşleşmeler tab DEĞİL: Akış başlığındaki ikonlardan ve Profil
   kısayollarından açılan yığın ekranları.
+- **ADIM 5 (tamam):** web'in `7f140a9` sonrası tüm işi mobile taşındı — Topluluk forumu
+  (`app/topluluk.jsx`), yönetim kuyrukları (`app/yonetim.jsx`), yasal metinler
+  (hakkimizda/gizlilik/kosullar + `yasalMetinler.js`), parola sıfırlama, kayıt onayı,
+  sohbette taciz bildirimi, üç rozet şeridi, ürün turu, analitik + veri izni.
+  `api.js` yüzeyi web ile eşit (71 metot).
+
+## Web ile senkron tutma
+
+Web projesi ilerlemeye devam ediyor. Fark almanın en hızlı yolu, mobilin port edildiği
+commit'ten diff çekmek:
+
+```bash
+cd C:/projeler/dersmate && git diff <baseline>..HEAD --stat -- frontend/src
+```
+
+Son senkron baseline'ı: **`7f140a9`** (2026-08-25). Bir sonraki senkronda buradaki
+değeri güncelle, yoksa aynı diff iki kez uygulanır.
+
+⚠️ `api.js` yüzeyini karşılaştırmak için metot adlarını çıkarıp kümeleri karşılaştır;
+mobilde bilinçli olarak FARKLI olan üç metot var (`proofContentUrl` → `proofImageSource`,
+`avatarObjectUrl` → `avatarImageSource`, `adminProofContentUrl` → `adminProofImageSource`)
+— blob/object-URL yerine `<Image source={{uri, headers}}>` kullanıldığı için.
+
+⚠️ `SOZLESME_SURUMU` artık ÜÇ yerde: sunucu (`LegalDocuments.cs`), web ve mobil
+(`src/lib/yasalMetinler.js`). Sürüm artarken mağazadaki eski mobil sürüm kendi eski
+sabitini göndereceği için kayıt kırılır — sürüm artışı, mobil yayınla birlikte planlanmalı.

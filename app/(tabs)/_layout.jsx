@@ -1,5 +1,6 @@
-import { View } from 'react-native'
+import { Pressable, View } from 'react-native'
 import { Tabs } from 'expo-router'
+import { useTurCipasi } from '../../src/lib/tur'
 import { brand, beyaz, rose, slate, zemin } from '../../src/lib/theme'
 import { AramaIkonu, ArtiIkonu, EvIkonu, KisiIkonu, MesajIkonu } from '../../src/components/Ikonlar'
 import { useInbox } from '../../src/state/InboxContext'
@@ -26,6 +27,30 @@ import { useInbox } from '../../src/state/InboxContext'
   farklı olmalı (Instagram'ın + kutusu gibi). Dolgu brand-600: beyaz artı 4.90:1,
   brand-500 zeminde 3.89:1 kalırdı (web'deki buton kuralıyla aynı gerekçe).
 */
+
+/*
+  TUR ÇIPALI SEKME DÜĞMESİ.
+
+  Ürün turu bir adımı "şuraya bak" diye gösterebilmek için öğenin ekrandaki ölçüsünü
+  bilmek zorunda (bkz. lib/tur.js). Sekme düğmelerini React Navigation çiziyor, yani
+  ölçüm defterine kaydolabilmelerinin tek yolu tabBarButton'ı sarmalamak.
+
+  Sarmalayıcı düğmenin İŞİNİ değiştirmiyor: gelen props (onPress, erişilebilirlik
+  durumu, çocuklar) olduğu gibi Pressable'a geçiyor. Çıpa kaydı başarısız olursa tur
+  yalnızca spot ışığını kaybeder — adım ortada kart olarak yine çıkar (lib/tur.js'in
+  yedek davranışı), sekme çubuğu etkilenmez.
+*/
+function turluDugme(cipaAdi) {
+  function TurluTabDugmesi({ children, style, ...props }) {
+    const cipa = useTurCipasi(cipaAdi)
+    return (
+      <Pressable {...props} style={style} {...cipa}>
+        {children}
+      </Pressable>
+    )
+  }
+  return TurluTabDugmesi
+}
 
 function OlusturDugmesi({ focused }) {
   return (
@@ -64,10 +89,21 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: 'Akış', tabBarIcon: ikon(EvIkonu) }} />
-      <Tabs.Screen name="kesfet" options={{ title: 'Keşfet', tabBarIcon: ikon(AramaIkonu) }} />
+      <Tabs.Screen
+        name="kesfet"
+        options={{
+          title: 'Keşfet',
+          tabBarIcon: ikon(AramaIkonu),
+          tabBarButton: turluDugme('kesfet'),
+        }}
+      />
       <Tabs.Screen
         name="olustur"
-        options={{ title: 'Ders İlanı Oluştur', tabBarIcon: OlusturDugmesi }}
+        options={{
+          title: 'Ders İlanı Oluştur',
+          tabBarIcon: OlusturDugmesi,
+          tabBarButton: turluDugme('portfoy'),
+        }}
       />
       <Tabs.Screen
         name="mesajlar"
@@ -78,9 +114,17 @@ export default function TabsLayout() {
           // çizilmez — boş kırmızı nokta "bir şey var" yalanı söylerdi.
           tabBarBadge: unreadTotal > 0 ? (unreadTotal > 99 ? '99+' : unreadTotal) : undefined,
           tabBarBadgeStyle: { backgroundColor: rose[600], color: beyaz, fontSize: 11 },
+          tabBarButton: turluDugme('sohbet'),
         }}
       />
-      <Tabs.Screen name="profil" options={{ title: 'Profil', tabBarIcon: ikon(KisiIkonu) }} />
+      <Tabs.Screen
+        name="profil"
+        options={{
+          title: 'Profil',
+          tabBarIcon: ikon(KisiIkonu),
+          tabBarButton: turluDugme('rutbe'),
+        }}
+      />
     </Tabs>
   )
 }

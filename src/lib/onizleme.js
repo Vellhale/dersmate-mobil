@@ -465,7 +465,13 @@ export const onizlemeApi = {
   uploadAvatar: () => gecikme({}),
   uploadTeacherDocument: () => gecikme({}),
   declareTeacherCandidate: () => gecikme({}),
-  avatarImageSource: () => ({ uri: 'about:blank' }), // 404 muadili → baş harf yer tutucusu
+  /*
+    Avatar YOK muamelesi: bileşen onError ile baş harflere düşsün diye kasıtlı olarak
+    çözülemeyen bir kaynak veriliyor. 'about:blank' de işi görüyordu ama tarayıcı
+    konsoluna ERR_UNKNOWN_URL_SCHEME yazıyor ve gerçek hataların arasına karışıyordu;
+    boş bir data URI aynı sonucu sessizce veriyor.
+  */
+  avatarImageSource: () => ({ uri: 'data:image/png;base64,' }),
   forgetAvatar: () => {},
   userReviews: (userId, page = 1) =>
     gecikme({ ...DEGERLENDIRMELER, reviews: { ...DEGERLENDIRMELER.reviews, page } }),
@@ -474,4 +480,137 @@ export const onizlemeApi = {
 
   myPreferences: () => gecikme({}),
   saveOnboarding: () => gecikme(null),
+  saveCookieConsent: () => gecikme(null),
+
+  // Parola sıfırlama: iki uç da 204 döner ve yanıt adres kayıtlı olsun olmasın AYNIDIR
+  // (gerçek uçların sözleşmesi de bu).
+  forgotPassword: () => gecikme(null),
+  resetPassword: () => gecikme(null),
+
+  reportUser: () => gecikme({}),
+
+  /* ── Forum ────────────────────────────────────────────────────────────────
+     Oy ve sayaçlar bellekte tutulur ki önizlemede oy verme gerçekten çalışsın:
+     sunucu davranışı (üç durumlu oy + son sayaçların dönmesi) taklit ediliyor. */
+  forumFeed: ({ sort = 'Newest', tag = null, page = 1, pageSize = 20 } = {}) => {
+    let liste = FORUM_GONDERILERI.filter((g) => !tag || g.tag === tag)
+    if (sort === 'Top') liste = [...liste].sort((a, b) => b.upvoteCount - a.upvoteCount)
+    else if (sort === 'Discussed') liste = [...liste].sort((a, b) => b.commentCount - a.commentCount)
+    return gecikme(sayfala(liste, page, pageSize))
+  },
+  createForumPost: () => gecikme('yeni-gonderi'),
+  forumComments: (postId) => gecikme(FORUM_YORUMLARI[postId] ?? []),
+  createForumComment: () => gecikme('yeni-yorum'),
+  voteForumPost: (postId, value) => gecikme(oyUygula(FORUM_GONDERILERI, 'postId', postId, value)),
+  voteForumComment: (commentId, value) =>
+    gecikme(oyUygula(Object.values(FORUM_YORUMLARI).flat(), 'commentId', commentId, value)),
+  reportForumPost: () => gecikme({}),
+  reportForumComment: () => gecikme({}),
+
+  /* ── Yönetim ──────────────────────────────────────────────────────────── */
+  disputes: () => gecikme([]),
+  disputeDetail: () => gecikme(null),
+  resolveDispute: () => gecikme({}),
+  reports: () => gecikme(YONETIM_SIKAYETLERI),
+  resolveReport: () => gecikme({}),
+  moderateForumContent: () => gecikme({}),
+  adminSessionProofs: () => gecikme([]),
+  adminProofImageSource: () => ({ uri: KANIT_GORSELI }),
+  banUser: () => gecikme({}),
+  unbanUser: () => gecikme({}),
+  sanctionUser: () => gecikme({}),
+  teacherCandidates: () => gecikme(sayfala([], 1, 25)),
+  reviewTeacherCandidate: () => gecikme({}),
+  economyMetrics: () => gecikme({ openReports: YONETIM_SIKAYETLERI.length, openDisputes: 0, pendingTeacherCandidates: 0 }),
+  adjustCredits: () => gecikme({}),
+  auditLog: () => gecikme(sayfala([], 1, 25)),
 }
+
+/* ── Forum verisi ─────────────────────────────────────────────────────────── */
+
+const FORUM_GONDERILERI = [
+  {
+    postId: 'f-1', tag: 'ExamStress', title: 'Deneme sonuçlarım düştü, nasıl toparlanırım?',
+    body: 'Son üç denemede netlerim ciddi düştü. Çalışma düzenim aynı ama motivasyonum kalmadı. Benzer şeyi yaşayan var mı, nasıl çıktınız?',
+    author: { userId: KISILER.can.userId, displayName: KISILER.can.displayName, level: 2, isStaff: false },
+    createdAtUtc: dknOnce(45), upvoteCount: 24, downvoteCount: 1, commentCount: 2,
+    myVote: 0, underReview: false, reportCount: 0,
+  },
+  {
+    postId: 'f-2', tag: 'StudyTips', title: 'Türev çalışırken işe yarayan üç alışkanlık',
+    body: 'Bir yıldır türev anlatıyorum ve öğrencilerde en çok işe yarayan üç şeyi yazayım: (1) önce grafik sezgisi, (2) zincir kuralını ayrı bir güne bırakmak, (3) her konu sonunda 10 çıkmış soru.',
+    author: { userId: KISILER.elif.userId, displayName: KISILER.elif.displayName, level: 6, isStaff: false },
+    createdAtUtc: dknOnce(60 * 8), upvoteCount: 87, downvoteCount: 3, commentCount: 1,
+    myVote: 1, underReview: false, reportCount: 0,
+  },
+  {
+    postId: 'f-3', tag: 'Announcement', title: 'Topluluk kuralları ve moderasyon hakkında',
+    body: 'Merhaba! Forumda kişisel bilgi paylaşımı ve telifli materyal yasak. Üç şikayet alan içerik otomatik olarak incelemeye alınır — silinmez, perdelenir.',
+    author: { userId: 'u-yonetim', displayName: 'dersmate ekibi', level: 10, isStaff: true },
+    createdAtUtc: dknOnce(60 * 24 * 2), upvoteCount: 142, downvoteCount: 0, commentCount: 0,
+    myVote: 0, underReview: false, reportCount: 0,
+  },
+  {
+    postId: 'f-4', tag: 'Motivation', title: 'Bu paylaşım incelemede',
+    body: 'Üç şikayet alan içeriğin akışta nasıl perdelendiğini göstermek için duruyor.',
+    author: { userId: KISILER.mert.userId, displayName: KISILER.mert.displayName, level: 4, isStaff: false },
+    createdAtUtc: dknOnce(60 * 30), upvoteCount: 3, downvoteCount: 9, commentCount: 0,
+    myVote: 0, underReview: true, reportCount: 3,
+  },
+]
+
+const FORUM_YORUMLARI = {
+  'f-1': [
+    {
+      commentId: 'y-1', body: 'Aynısını geçen yıl yaşadım. Bir hafta deneme çözmeyi bırakıp konu tekrarına dönmek işe yaramıştı.',
+      author: { userId: KISILER.elif.userId, displayName: KISILER.elif.displayName, level: 6, isStaff: false },
+      createdAtUtc: dknOnce(30), upvoteCount: 12, downvoteCount: 0, myVote: 0, underReview: false,
+    },
+    {
+      commentId: 'y-2', body: 'Uyku düzenine de bak — netlerimdeki düşüşün yarısı oradan geliyormuş.',
+      author: { userId: KISILER.zeynep.userId, displayName: KISILER.zeynep.displayName, level: 8, isStaff: false },
+      createdAtUtc: dknOnce(20), upvoteCount: 5, downvoteCount: 0, myVote: 0, underReview: false,
+    },
+  ],
+  'f-2': [
+    {
+      commentId: 'y-3', body: 'Grafik sezgisi kısmı gerçekten fark yaratıyor, teşekkürler!',
+      author: { userId: BEN.userId, displayName: BEN.displayName, level: 4, isStaff: false },
+      createdAtUtc: dknOnce(60 * 6), upvoteCount: 3, downvoteCount: 0, myVote: 0, underReview: false,
+    },
+  ],
+}
+
+/* Sunucunun üç durumlu oy davranışını taklit eder ve SON sayaçları döndürür —
+   gerçek uçla aynı sözleşme, böylece optimistik güncelleme mantığı önizlemede de sınanır. */
+function oyUygula(liste, anahtar, id, value) {
+  const kayit = liste.find((x) => x[anahtar] === id)
+  if (!kayit) return { upvoteCount: 0, downvoteCount: 0, myVote: 0 }
+
+  const onceki = kayit.myVote ?? 0
+  if (onceki === 1) kayit.upvoteCount -= 1
+  if (onceki === -1) kayit.downvoteCount -= 1
+
+  kayit.myVote = onceki === value ? 0 : value // aynı yöne ikinci oy = geri alma
+  if (kayit.myVote === 1) kayit.upvoteCount += 1
+  if (kayit.myVote === -1) kayit.downvoteCount += 1
+
+  return { upvoteCount: kayit.upvoteCount, downvoteCount: kayit.downvoteCount, myVote: kayit.myVote }
+}
+
+const YONETIM_SIKAYETLERI = [
+  {
+    reportId: 'r-1', reason: 'Abuse',
+    description: 'Sohbette ısrarla telefon numaramı istedi, reddedince hakaret etti.',
+    reporterDisplayName: 'Deniz Arslan', reportedUserId: KISILER.mert.userId,
+    reportedDisplayName: KISILER.mert.displayName, createdAtUtc: dknOnce(120),
+    status: 'Open', sessionId: null, postId: null, commentId: null,
+  },
+  {
+    reportId: 'r-2', reason: 'Copyright',
+    description: 'Forum gönderisinde izinsiz yayınevi PDF bağlantısı paylaşılmış.',
+    reporterDisplayName: 'Elif Yılmaz', reportedUserId: KISILER.can.userId,
+    reportedDisplayName: KISILER.can.displayName, createdAtUtc: dknOnce(300),
+    status: 'Open', sessionId: null, postId: 'f-4', commentId: null,
+  },
+]

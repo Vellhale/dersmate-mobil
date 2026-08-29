@@ -1013,6 +1013,19 @@ function ApproveModal({ session, onClose, onApproved, onReport }) {
 
 /* ── ŞİKAYET ─────────────────────────────────────────────────────────────── */
 
+/*
+  DERS ŞİKAYETİNİN SEBEP ALT KÜMESİ.
+
+  Eskiden bu liste REPORT_REASON_LABELS tablosunun tamamını döküyordu. Tablo o gün
+  yalnızca ders sebeplerinden ibaret olduğu için sorun görünmüyordu; forum şikayetleri
+  eklenince (Spam, Telif, Kişisel bilgi, Konu dışı) ders formunda bağlamsız seçenekler
+  belirecekti. Alt küme artık BURADA yazılı: tabloya sebep eklemek bir daha bu formu
+  sessizce değiştirmiyor.
+
+  Sıra bilinçli: en sık şikayet edilen ilk sırada, "Diğer" en sonda.
+*/
+const DERS_SIKAYET_SEBEPLERI = ['SessionNotHeld', 'FakeProof', 'DurationMismatch', 'Abuse', 'Other']
+
 function ReportModal({ session, onClose, onDone }) {
   const [reason, setReason] = useState('SessionNotHeld')
   const [description, setDescription] = useState('')
@@ -1060,16 +1073,19 @@ function ReportModal({ session, onClose, onDone }) {
       }
     >
       <View className="gap-4 pb-2">
+        {/* "Yönetim gerekli görürse uyarı, askı ya da ban uygular" cümlesi bilinçli
+            olarak YOK: yaptırımın uygulanıp uygulanmayacağı moderatörün kararıdır,
+            şikayet edene verilebilecek bir söz değil. Metin yalnızca KESİN olanı söyler. */}
         <Notice tone="info">
           Şikayetin yalnızca yönetime gider. Karşı taraf ne şikayeti görür, ne bildirim alır, ne
           de yanıt verebilir. Dersin akışı değişmez — bu bir itiraz değil, kişi hakkında
-          bildirimdir.
+          bildirimdir. Şikayetin yönetim tarafından incelenir.
         </Notice>
 
         <View>
           <Text className="mb-2 text-sm font-medium text-slate-700">Sebep</Text>
           <View className="gap-2">
-            {Object.entries(REPORT_REASON_LABELS).map(([value, label]) => {
+            {DERS_SIKAYET_SEBEPLERI.map((value) => {
               const secili = reason === value
               return (
                 <Pressable
@@ -1081,7 +1097,7 @@ function ReportModal({ session, onClose, onDone }) {
                               ${secili ? 'border-brand-500 bg-brand-50' : 'border-slate-200 bg-white'}`}
                 >
                   <Text className={`text-sm ${secili ? 'font-medium text-brand-800' : 'text-slate-700'}`}>
-                    {label}
+                    {REPORT_REASON_LABELS[value]}
                   </Text>
                 </Pressable>
               )

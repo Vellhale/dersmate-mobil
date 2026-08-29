@@ -6,6 +6,9 @@ import * as SplashScreen from 'expo-splash-screen'
 import { AuthProvider, useAuth } from '../src/state/AuthContext'
 import { WalletProvider } from '../src/state/WalletContext'
 import { InboxProvider } from '../src/state/InboxContext'
+import { IzinProvider } from '../src/state/IzinContext'
+import { UrunTuru } from '../src/components/UrunTuru'
+import { IzinSayfasi } from '../src/components/IzinSayfasi'
 
 /*
   KÖK KABUK — web'deki App.jsx'in karşılığı.
@@ -44,6 +47,8 @@ function RootNavigator() {
         <Stack.Screen name="sohbet/[conversationId]" />
         <Stack.Screen name="eslesmeler" />
         <Stack.Screen name="dersler" />
+        <Stack.Screen name="topluluk" />
+        <Stack.Screen name="yonetim" />
       </Stack.Protected>
       <Stack.Protected guard={!isAuthenticated}>
         <Stack.Screen name="(auth)" />
@@ -65,7 +70,12 @@ function RootNavigator() {
 
   return (
     <WalletProvider>
-      <InboxProvider>{stack}</InboxProvider>
+      <InboxProvider>
+        {stack}
+        {/* Ürün turu YALNIZCA oturumlu dalda: ilerlemeyi api.myPreferences'tan okuyor
+            ve o uç oturum istiyor. Hiçbir ekranı değiştirmiyor, kökte tek satır. */}
+        <UrunTuru />
+      </InboxProvider>
     </WalletProvider>
   )
 }
@@ -75,7 +85,18 @@ export default function RootLayout() {
     <AuthProvider>
       {/* Sayfalar açık zeminli (slate-50); durum çubuğu koyu simgelerle okunur. */}
       <StatusBar style="dark" />
-      <RootNavigator />
+      {/*
+        İzin sağlayıcısı AuthProvider'ın İÇİNDE (oturumu okuyor) ama HER İKİ dalı da
+        sarıyor: izin durumu oturumsuz da anlamlı (uygulama ilk açılışta analitik
+        toplamadan önce sormalı) ve giriş ekranından da ayarlara ulaşılabilmeli.
+      */}
+      <IzinProvider>
+        <RootNavigator />
+        {/* İzin sayfası kökte: ilk açılışta kapatılamaz alt sayfa olarak çıkar,
+            sonrasında Profil'deki "Veri tercihleri" bağlantısıyla açılır. Oturumsuz
+            dalda da gerekli — analitik giriş ekranında da toplanabilirdi. */}
+        <IzinSayfasi />
+      </IzinProvider>
     </AuthProvider>
   )
 }

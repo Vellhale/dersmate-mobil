@@ -203,6 +203,74 @@ export function GrafikIkonu(props) {
   )
 }
 
+/** Yönetim rozeti: kalkan. Resmi hesabı ayırt eden işaret. */
+export function KalkanIkonu(props) {
+  return (
+    <Cizgi {...props}>
+      <Path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </Cizgi>
+  )
+}
+
+/**
+ * Oy oku — YUKARI çizilir, aşağı oy 180° döndürülerek gösterilir.
+ *
+ * OkAsagiIkonu'ndan (saf chevron) AYRI ve sebebi kavramsal: chevron bir AÇILIR
+ * BÖLÜMÜN durumunu söyler, bu ise bir EYLEM. Gövdeli ok basılabilir bir düğme gibi
+ * okunur; çıplak chevron oy düğmesinde "aşağı kaydır" gibi durur.
+ */
+export function OyOkuIkonu(props) {
+  return (
+    <Cizgi {...props}>
+      <Path d="M12 19V5" />
+      <Path d="m5 12 7-7 7 7" />
+    </Cizgi>
+  )
+}
+
+/** Şikayet: bayrak. UyariIkonu bilerek kullanılmaz — o SİSTEMİN kullanıcıya verdiği
+    uyarı, bayrak ise kullanıcının sisteme verdiği işaret. İkisi aynı ekranda yan yana
+    görünür ve aynı çizimle gösterilseler hangisinin basılabilir olduğu anlaşılmazdı. */
+export function BayrakIkonu(props) {
+  return (
+    <Cizgi {...props}>
+      <Path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+      <Path d="M4 22v-7" />
+    </Cizgi>
+  )
+}
+
+/** Tartışmalı: alev. ArtanIkonu "en çok oy alan"ı anlatır; tartışmalı olan ise ÇOK
+    oy alan değil, ZIT oy alan — yükseliş çizgisi bunu yanlış söylerdi. */
+export function AlevIkonu(props) {
+  return (
+    <Cizgi {...props}>
+      <Path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.1-2.1-.2-4.1 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+    </Cizgi>
+  )
+}
+
+export function BilgiIkonu(props) {
+  return (
+    <Cizgi {...props}>
+      <Circle cx="12" cy="12" r="10" />
+      <Path d="M12 16v-4" />
+      <Path d="M12 8h.01" />
+    </Cizgi>
+  )
+}
+
+/** Bina: üniversite/okul bilgisi. */
+export function BinaIkonu(props) {
+  return (
+    <Cizgi {...props}>
+      <Path d="M3 21h18" />
+      <Path d="M5 21V7l7-4 7 4v14" />
+      <Path d="M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01" />
+    </Cizgi>
+  )
+}
+
 export function TakvimIkonu(props) {
   return (
     <Cizgi {...props}>

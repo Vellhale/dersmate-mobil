@@ -2,6 +2,7 @@ import { Pressable, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Avatar } from './Avatar'
 import { SeviyeRozeti } from './SeviyeRozeti'
+import { YonetimRozeti } from './YonetimRozeti'
 import { KepIkonu, KitapIkonu, TakasIkonu, YildizIkonu } from './Ikonlar'
 import { Button, Card } from './ui'
 import { amber, brand, emerald, slate } from '../lib/theme'
@@ -108,6 +109,8 @@ export function IlanKarti({ kisi, onIstek }) {
             <Text className="shrink text-base font-semibold text-brand-700" numberOfLines={2}>
               {kisi.displayName}
             </Text>
+            {/* İşaret SUNUCUDAN (isStaff): resmi hesabı sıradan hesaptan ayırır. */}
+            {kisi.isStaff && <YonetimRozeti kucuk />}
             <SeviyeRozeti kaynak={{ level: kisi.level }} boyut="sm" ton="acik" />
           </View>
 

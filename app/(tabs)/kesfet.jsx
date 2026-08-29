@@ -7,6 +7,7 @@ import { useAsync } from '../../src/state/useAsync'
 import { useDebounced } from '../../src/hooks/useDebounced'
 import { Avatar } from '../../src/components/Avatar'
 import { SeviyeRozeti } from '../../src/components/SeviyeRozeti'
+import { YonetimRozeti } from '../../src/components/YonetimRozeti'
 import { EslesmeIstegiModali } from '../../src/components/EslesmeIstegiModali'
 import { EkranBasligi } from '../../src/components/EkranBasligi'
 import { KepIkonu, SaatIkonu, YildizIkonu } from '../../src/components/Ikonlar'
@@ -388,6 +389,8 @@ function IlanSonucKarti({ offer, onIstek }) {
             <Text className="shrink text-base font-semibold text-brand-700" numberOfLines={2}>
               {offer.tutorDisplayName}
             </Text>
+            {/* İşaret SUNUCUDAN (tutorIsStaff) — resmi hesap ayırt edilebilmeli. */}
+            {offer.tutorIsStaff && <YonetimRozeti kucuk />}
             {offer.tutorRatingCount === 0 && <Badge tone="neutral">Yeni</Badge>}
           </View>
 
@@ -477,6 +480,7 @@ function UniversiteKarti({ kisi, onSohbet }) {
             <Text className="shrink text-base font-semibold text-brand-700" numberOfLines={2}>
               {kisi.displayName}
             </Text>
+            {kisi.isStaff && <YonetimRozeti kucuk />}
             <SeviyeRozeti kaynak={{ level: kisi.level }} boyut="sm" ton="acik" />
           </View>
 
