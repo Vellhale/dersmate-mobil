@@ -161,6 +161,36 @@ client.interceptors.request.use((config) => {
   return config
 })
 
+/**
+ * Sunucu GÖVDESİZ bir hata döndürdüğünde gösterilecek metin.
+ *
+ * ⚠️ 403 BURADA ÖZEL OLARAK ELE ALINIYOR ve sebebi web'de ölçüldü: ASP.NET'in yetki
+ * politikası (RequireRole) reddettiğinde **gövdesi tamamen boş** bir 403 dönüyor —
+ * AppException'daki gibi Türkçe bir `detail` yok. Eski yedek metin "Beklenmeyen hata
+ * (HTTP 403)" idi ve kullanıcıya hiçbir şey anlatmıyordu: yetkisinin olmadığını mı,
+ * bir arıza mı olduğunu, ne yapması gerektiğini bilemiyordu.
+ *
+ * İki gerçek durum bu yanıtı üretiyor ve metin ikisini de karşılıyor:
+ *   • Moderatör, yalnızca Admin'e açık bir işlemi denedi (doğru davranış).
+ *   • Rolü giriş yaptıktan SONRA değişti. JWT durumsuz ve 2 saat geçerli; yönetim
+ *     ekranının kapısı da oturumdaki `isAdmin` değerine bakıyor (app/yonetim.jsx).
+ *     İkisi de eski kalıyor, yani ekran açılıyor ama her istek reddediliyor. Çare
+ *     çıkış/giriş — metin de tam olarak bunu söylüyor.
+ */
+function varsayilanHataMetni(status) {
+  if (status === 403) {
+    return (
+      'Bu işlem için yetkin yok. Yetkilerin yakın zamanda değiştiyse ' +
+      'çıkış yapıp tekrar giriş yapman gerekebilir.'
+    )
+  }
+
+  if (status === 404) return 'Aradığın kayıt bulunamadı.'
+  if (status >= 500) return 'Sunucuda bir hata oluştu. Biraz sonra tekrar dene.'
+
+  return `Beklenmeyen hata (HTTP ${status}).`
+}
+
 client.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -191,7 +221,7 @@ client.interceptors.response.use(
         )
       }
       throw new ApiError(
-        data?.detail ?? `Beklenmeyen hata (HTTP ${status}).`,
+        data?.detail ?? varsayilanHataMetni(status),
         data?.title ?? 'UNKNOWN',
         status,
       )
@@ -330,9 +360,17 @@ function avatarPath(userId) {
 export const api = {
   // --- Kimlik ---
   register: (payload) => request('/api/v1/auth/register', { method: 'POST', body: payload }),
-  verifyEmail: (token) => request('/api/v1/auth/verify-email', { method: 'POST', body: { token } }),
+  /**
+   * E-postayı 6 haneli KODLA doğrular (bağlantı yerine — 2026-09-02).
+   *
+   * E-POSTA DA GÖNDERİLİYOR: 6 hane kullanıcıya özgü değil, aynı anda yüzlerce hesapta
+   * aynı kod olabilir. Kod tek başına kabul edilseydi rastgele kod deneyen biri er ya
+   * da geç BİRİNİN hesabını doğrulardı.
+   */
+  verifyEmail: (email, code) =>
+    request('/api/v1/auth/verify-email', { method: 'POST', body: { email, code } }),
 
-  /** Doğrulama bağlantısını yeniden gönderir. Yanıt, adres kayıtlı olsun olmasın aynıdır. */
+  /** Yeni doğrulama kodu gönderir. Yanıt, adres kayıtlı olsun olmasın aynıdır. */
   resendVerification: (email) =>
     request('/api/v1/auth/resend-verification', { method: 'POST', body: { email } }),
   login: (payload) => request('/api/v1/auth/login', { method: 'POST', body: payload }),

@@ -299,6 +299,15 @@ const PROFILLER = {
     taughtSessionCount: 14, averageRating: 4.6, ratingCount: 11,
     level: 4, nextLevelAt: 2500, totalEarnedCredits: 1850,
     joinedAtUtc: '2025-11-08T10:00:00Z',
+    /*
+      TOPLULUK SAYAÇLARI — kendi profilim olduğu için katkı kartı, rozet ve "puana
+      kalan" satırı hep birlikte görünüyor. 412 net oy BRONZ kademede (100) ve gümüşe
+      (500) yolda; 412 % 300 = 112, yani bir sonraki 100 puana 188 oy kalıyor. Sayı
+      eşiğin katı SEÇİLMEDİ: tam katta kalan hesabı 300 çıkar ve satır "300 oy kaldı"
+      diye okunur — demo o kenar durumu değil, olağan hâli göstermeli.
+    */
+    communityUpvotes: 412, communityPostCount: 7, communityCommentCount: 23,
+    isStaff: false,
     canTeach: [
       { topicId: 't-problemler', topicName: 'Problemler', subjectName: 'Matematik' },
       { topicId: 't-ucgen', topicName: 'Üçgende Alan', subjectName: 'Geometri' },
@@ -315,11 +324,30 @@ const PROFILLER = {
     taughtSessionCount: 38, averageRating: 4.8, ratingCount: 23,
     level: 6, nextLevelAt: 5000, totalEarnedCredits: 3900,
     joinedAtUtc: '2025-09-14T10:00:00Z',
+    communityUpvotes: 1240, communityPostCount: 19, communityCommentCount: 64,
+    isStaff: false,
     canTeach: [
       { topicId: 't-turev', topicName: 'Türev', subjectName: 'Matematik' },
       { topicId: 't-limit', topicName: 'Limit ve Süreklilik', subjectName: 'Matematik' },
     ],
     wantsToLearn: [{ topicId: 't-problemler', topicName: 'Problemler', subjectName: 'Matematik' }],
+  },
+  /*
+    RESMİ HESAP. Forumdaki 'dersmate ekibi' gönderisinin yazarı bu id; profili olmasa
+    VARSAYILAN_PROFIL'e düşer ve "dersmate Kullanıcısı" diye açılırdı. Demo modunun işi
+    tam olarak bu yolu yürünebilir kılmak: rozetli bir gönderi görüp adına dokunmak ve
+    profilde aynı rozeti bulmak — yönetim rozetinin profile eklenme gerekçesi buydu.
+  */
+  'u-yonetim': {
+    userId: 'u-yonetim', displayName: 'dersmate ekibi',
+    bio: 'Resmi hesap. Platformla ilgili duyurular ve sorularınızın yanıtları burada.',
+    university: null, department: null,
+    taughtSessionCount: 0, averageRating: 0, ratingCount: 0,
+    level: 10, nextLevelAt: null, totalEarnedCredits: 0,
+    joinedAtUtc: '2025-08-01T10:00:00Z',
+    canTeach: [], wantsToLearn: [],
+    communityUpvotes: 2680, communityPostCount: 41, communityCommentCount: 152,
+    isStaff: true,
   },
 }
 
@@ -393,7 +421,15 @@ const tr = (s) => String(s ?? '').toLocaleLowerCase('tr')
 
 export const onizlemeApi = {
   login: () => gecikme({ ...ONIZLEME_OTURUMU }),
-  register: () => gecikme({ verificationToken: 'onizleme-dogrulama-tokeni' }),
+  /*
+    Doğrulama kodu 6 HANE OLMALI, temsili bir metin değil: doğrulama ekranı rakam
+    dışı karakterleri siliyor ve düğmeyi tam 6 hanede açıyor. Buraya harf içeren bir
+    değer konursa demo modunda kutu boş kalır ve akış denenemez.
+
+    Baştaki sıfır bilerek: gerçek sunucu D6 ile üretiyor ve "0" ile başlayan kodlar
+    değerin string tutulduğunu demo modunda da sınıyor.
+  */
+  register: () => gecikme({ verificationToken: '042713' }),
   verifyEmail: () => gecikme({}),
   resendVerification: () => gecikme({}),
 

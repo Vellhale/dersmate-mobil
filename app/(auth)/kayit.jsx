@@ -37,10 +37,13 @@ function OnayKutusu({ secili, onToggle, children }) {
 /*
   KAYIT — web'deki Register.jsx'in portu.
 
-  Kayıt sonrası iki dal (web ile aynı):
-  • Geliştirme ortamında sunucu verificationToken döner — kullanıcı tek dokunuşla
-    doğrulama ekranına token'la gider (üretimde alan gelmez, dal hiç görünmez).
-  • Üretimde e-postadaki token doğrulama ekranına elle yapıştırılır.
+  Kayıt sonrası doğrulama ekranına geçiliyor ve ADRES PARAMETREYLE TAŞINIYOR: o ekran
+  kodun yanında e-posta da istiyor (6 hane kullanıcıya özgü değil, aynı anda yüzlerce
+  hesapta aynı kod olabilir) ve kullanıcıya az önce yazdığı adresi ikinci kez
+  yazdırmak, hiçbir şey kazandırmayan bir sürtünme olurdu.
+
+  Geliştirme ortamında sunucu kodu da `verificationToken` alanında döndürüyor ve kod
+  parametreyle taşınıyor — üretimde o alan boş gelir, yalnızca adres taşınır.
 */
 export default function Kayit() {
   const router = useRouter()
@@ -117,27 +120,35 @@ export default function Kayit() {
       <AuthKabuk title="Kayıt alındı" subtitle="Son adım: e-postanı doğrula." altBilgi={false}>
         <View className="gap-4">
           <Notice tone="info">
-            Doğrulama bağlantısı {form.email} adresine gönderildi. Doğrulamayı tamamlayınca
-            hesabın etkinleşir ve eşleşme isteği gönderebilirsin.
+            <Text className="font-semibold">6 haneli doğrulama kodu</Text> {form.email} adresine
+            gönderildi. Kodu girince hesabın etkinleşir ve eşleşme isteği gönderebilirsin.
           </Notice>
 
-          {result.verificationToken ? (
-            <>
-              <Text className="text-sm text-slate-600">
-                Geliştirme ortamında token doğrudan burada gösterilir (gerçek kurulumda
-                yalnızca e-postaya gider):
-              </Text>
-              <Button
-                onPress={() =>
-                  router.push({ pathname: '/dogrula', params: { token: result.verificationToken } })
-                }
-              >
-                E-postamı şimdi doğrula
-              </Button>
-            </>
-          ) : (
-            <Text className="text-sm text-slate-600">
-              E-postandaki doğrulama token'ını doğrulama ekranına yapıştır.
+          {/*
+            DÜĞME HER DURUMDA VAR. Önce yalnızca `verificationToken` dönen (geliştirme)
+            dalda gösteriliyordu; üretimde kullanıcı bu ekranda kalıyor ve doğrulama
+            ekranına gidecek hiçbir yol bulamıyordu — tek çıkışı "Giriş sayfasına dön"
+            düğmesiydi, oysa doğrulanmamış hesapla giriş kapalı. Yani kayıt olan
+            kullanıcı çıkmaz sokağa giriyordu.
+          */}
+          <Button
+            onPress={() =>
+              router.push({
+                pathname: '/dogrula',
+                params: {
+                  email: form.email.trim(),
+                  ...(result.verificationToken ? { kod: result.verificationToken } : null),
+                },
+              })
+            }
+          >
+            Kodu gir ve doğrula
+          </Button>
+
+          {result.verificationToken && (
+            <Text className="text-center text-sm text-slate-600">
+              Geliştirme ortamında kod doğrudan taşınır (gerçek kurulumda yalnızca e-postaya
+              gider): <Text className="font-semibold">{result.verificationToken}</Text>
             </Text>
           )}
 

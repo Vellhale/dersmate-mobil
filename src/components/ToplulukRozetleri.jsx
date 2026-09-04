@@ -6,7 +6,7 @@ import { Card } from './ui'
 /*
   TOPLULUK ROZETLERİ — web'deki components/ToplulukRozetleri.jsx'in RN portu.
 
-  Forumda alınan toplam YUKARI OY'a bağlı üç kademe:
+  Forumda alınan toplam NET OY'a bağlı üç kademe:
 
     100 oy  → Bronz
     500 oy  → Gümüş
@@ -24,6 +24,13 @@ import { Card } from './ui'
   gelmezse (eski sunucu) bileşen durumu UYDURMUYOR: rozet kazanılmış gibi
   gösterilmiyor, yerine kademe MERDİVENİ çiziliyor — "burada ne kazanabilirsin"
   ekranı, "ne kazandın" değil.
+
+  ⚠️ SAYI NET OY: artı − eksi, yalnızca GÖRÜNÜR içerikte (2026-08-29'da değişti).
+  Ham artıyla sayılsaydı 300 artı / 400 eksi alan bir gönderi — topluluğun değersiz
+  bulduğu bir katkı — hem rozet hem PUAN üretirdi; oy artık puana dönüştüğü için
+  (CommunityRewardRules: 300 net oy → 100 puan) bu fark önemli hâle geldi. Bu
+  dosyadaki metinler bu yüzden "yukarı oy" değil "net oy" diyor: sayının anlamı
+  değişince eski metin yanıltıcı kalıyordu.
 
   Merdiven YALNIZCA KENDİ PROFİLİNDE görünüyor. Başkasının profilinde "kazanabileceği
   rozetler" listesi, o kişi hakkında hiçbir şey söylemeyen bir reklam olurdu.
@@ -119,7 +126,7 @@ function Rozet({ kademe, oy }) {
   return (
     <View
       accessible
-      accessibilityLabel={`${ROZET_ADI} — ${oy} yukarı oy (${kademe.metal} kademe)`}
+      accessibilityLabel={`${ROZET_ADI} — ${oy} net oy (${kademe.metal} kademe)`}
       className={`flex-row items-center gap-2 rounded-full border py-1.5 pl-2.5 pr-3.5 ${kademe.hap}`}
     >
       <MadalyaIkonu kademe={kademe} />
@@ -152,8 +159,8 @@ function KademeMerdiveni({ oy }) {
           key={kademe.metal}
           accessible
           accessibilityLabel={
-            `${kademe.oy} oy — ${ROZET_ADI}, ${kademe.metal} kademe, henüz kazanılmadı` +
-            (oy > 0 ? `; şu an ${oy} oy` : '')
+            `${kademe.oy} net oy — ${ROZET_ADI}, ${kademe.metal} kademe, henüz kazanılmadı` +
+            (oy > 0 ? `; şu an ${oy} net oy` : '')
           }
           className="flex-row items-center gap-2 rounded-full border border-slate-200 bg-white py-1.5 pl-2.5 pr-3.5"
         >
@@ -172,17 +179,85 @@ function KademeMerdiveni({ oy }) {
 }
 
 /**
+ * Topluluk katkısının sayıları: gönderi, yorum, net oy ve puana kalan.
+ *
+ * ⚠️ ÜST SAYAÇ ŞERİDİNE EKLENMEDİ, bilerek. ProfilGorunumu'ndaki şerit TAM DÖRT kalem
+ * için yazılmış 2×2 ızgara ve beşinci kalem düzeni bozuyor. Ama asıl gerekçe yerleşim
+ * değil ANLAM: üstteki şerit kişinin DERS kimliğini anlatıyor (kaç ders anlattı, puanı,
+ * seviyesi). Topluluk katkısı ayrı bir eksen ve kendi kartında, rozetin hemen yanında
+ * okunması daha doğru.
+ *
+ * PUANA KALAN da yazılıyor: rozet merdiveni "hangi madalyaya ne kadar kaldı" diyor, bu
+ * satır "kaç oyda 100 puan" diyor. İkisi farklı sorular ve kullanıcı ikincisini ancak
+ * burada görebiliyor — puan kazanmanın ders dışında bir yolu olduğunu öğrendiği tek yer.
+ */
+function KatkiSayaclari({ gonderi, yorum, oy, puanEsigi, puanOdul }) {
+  // Bir sonraki ödüle kalan oy. Sıfır olamaz: eşiği tam dolduran an zaten ödenmiş olur.
+  const kalan = puanEsigi - (oy % puanEsigi)
+
+  const kalemler = [
+    { deger: gonderi, etiket: 'gönderi' },
+    { deger: yorum, etiket: 'yorum' },
+    { deger: oy, etiket: 'net oy' },
+  ]
+
+  return (
+    <View className="mt-4 border-t border-slate-100 pt-4">
+      {/* Web'in grid-cols-3'ü yerine eşit paylı satır: RN'de ızgara yok ve üç kalem
+          dar ekranda da yan yana sığıyor (tek başına sayı + kısa etiket). */}
+      <View className="flex-row gap-2">
+        {kalemler.map((k) => (
+          <View key={k.etiket} className="flex-1 rounded-lg bg-slate-50 p-2.5">
+            <Text
+              className="text-center text-base font-bold text-slate-900"
+              style={{ fontVariant: ['tabular-nums'] }}
+            >
+              {k.deger}
+            </Text>
+            <Text className="mt-0.5 text-center text-[11px] text-slate-600">{k.etiket}</Text>
+          </View>
+        ))}
+      </View>
+
+      <Text className="mt-3 text-xs leading-relaxed text-slate-600">
+        Her <Text className="font-semibold">{puanEsigi}</Text> net oy{' '}
+        <Text className="font-semibold">{puanOdul}</Text> puan kazandırıyor — ders anlatmadan
+        da seviye atlayabilirsin.
+        {oy > 0 ? (
+          <Text className="text-slate-600">
+            {' '}
+            Bir sonraki <Text className="font-semibold">{puanOdul}</Text> puana{' '}
+            <Text className="font-semibold">{kalan}</Text> oy kaldı.
+          </Text>
+        ) : null}
+      </Text>
+    </View>
+  )
+}
+
+/**
  * Profildeki topluluk rozeti şeridi.
  *
- * @param oy             Toplam yukarı oy (sunucudan). undefined/null geldiğinde
- *                       bileşen merdiven kipine düşüyor.
+ * @param oy             Toplam NET oy (artı − eksi, görünür içerikte). undefined/null
+ *                       geldiğinde bileşen merdiven kipine düşüyor.
  * @param kendiProfilim  Merdiven yalnızca kendi profilinde çiziliyor.
+ * @param gonderiSayisi  Görünür forum gönderisi sayısı (profil ucundan).
+ * @param yorumSayisi    Görünür forum yorumu sayısı (profil ucundan).
+ * @param puanEsigi      Sunucudaki CommunityRewardRules ile aynı olmalı.
+ * @param puanOdul       Sunucudaki CommunityRewardRules ile aynı olmalı.
  *
  * SubjectBadges ile aynı yüzey ve aynı gizlenme kuralı: gösterecek bir şey yoksa
  * bileşen hiç çizilmiyor. Boş bir "rozetin yok" kutusu, henüz başlamamış birine
  * eksiklik gibi okunuyor.
  */
-export function ToplulukRozetleri({ oy, kendiProfilim = false }) {
+export function ToplulukRozetleri({
+  oy,
+  kendiProfilim = false,
+  gonderiSayisi = 0,
+  yorumSayisi = 0,
+  puanEsigi = 300,
+  puanOdul = 100,
+}) {
   const sayacVar = typeof oy === 'number'
   const toplam = sayacVar ? oy : 0
   const kademe = sayacVar ? kademeBul(toplam) : null
@@ -201,7 +276,7 @@ export function ToplulukRozetleri({ oy, kendiProfilim = false }) {
       {kademe ? (
         <View className="flex-row flex-wrap items-center gap-3">
           <Rozet kademe={kademe} oy={toplam} />
-          <Text className="text-xs text-slate-600">{toplam} yukarı oy</Text>
+          <Text className="text-xs text-slate-600">{toplam} net oy</Text>
         </View>
       ) : (
         <>
@@ -210,10 +285,22 @@ export function ToplulukRozetleri({ oy, kendiProfilim = false }) {
               0 oydasın" demek, olmayan bir sayacı varmış gibi göstermek olurdu. */}
           <Text className="mt-3 text-xs leading-relaxed text-slate-600">
             {sayacVar
-              ? `Gönderi ve yorumlarına gelen yukarı oylar burada sayılıyor — şu an ${toplam} oydasın.`
-              : 'Topluluktaki gönderi ve yorumlarına gelen yukarı oylar burada madalyaya dönüşür.'}
+              ? `Gönderi ve yorumlarına gelen oylar (artı − eksi) burada sayılıyor — şu an ${toplam} net oydasın.`
+              : 'Topluluktaki gönderi ve yorumlarına gelen oylar (artı − eksi) burada madalyaya dönüşür.'}
           </Text>
         </>
+      )}
+
+      {/* Katkı sayaçları yalnızca sayaç varken: sunucu bu alanları göndermiyorsa
+          "0 gönderi / 0 yorum" yazmak, olmayan bir veriyi sıfır diye göstermek olurdu. */}
+      {sayacVar && (
+        <KatkiSayaclari
+          gonderi={gonderiSayisi}
+          yorum={yorumSayisi}
+          oy={toplam}
+          puanEsigi={puanEsigi}
+          puanOdul={puanOdul}
+        />
       )}
 
       {/* İlerleme çubuğu yalnızca sayaç VARKEN ve zirvede DEĞİLKEN. Sayaç yokken
