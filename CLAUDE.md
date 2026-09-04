@@ -215,6 +215,15 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
   göre kendisi geçiş yapar (`app/_layout.jsx`).
 - Ders geçmişi sayfa boyutu **5** ve FlatList `onEndReached` ile yüklenir (mobil iş
   kuralı); web 20 kullanıyor.
+- **"Yeni kod gönder" beklemesi damgadan hesaplanır**, web'deki gibi sayaçtan
+  düşülmez (`src/lib/dogrulamaKodu.js`). Web'de doğrulama sayfasına yalnızca kayıt
+  ekranından geliniyor, o yüzden "sayacı 60'tan başlat" doğru cevabı veriyor.
+  Mobilde ekranın **üç girişi** var (kayıt, girişteki `EMAIL_NOT_VERIFIED` kısayolu,
+  giriş altındaki bağlantı) ve ikisinde hiç kod gönderilmiyor — nereden gelindiğine
+  bakan bir sayaç, kodu çoktan ölmüş kullanıcıyı 60 saniye boşuna bekletiyordu.
+  Kalan süre artık kodun gerçekten gönderildiği andan türüyor. Damga **diske
+  yazılmaz**: yazılsaydı `IzinContext` kuralı gereği `ISLEVSEL_DEPOLAMA`ya girip
+  `IZIN_SURUMU`nü artırmak ve izin bildirimini herkese yeniden göstermek gerekirdi.
 
 ## Korunan iş kuralları (backend'de yaşar, arayüz ihlal etmez)
 

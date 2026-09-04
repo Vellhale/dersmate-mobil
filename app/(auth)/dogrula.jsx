@@ -1,14 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useReducer, useState } from 'react'
 import { Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { api } from '../../src/lib/api'
+import { kalanBeklemeSn, kodGonderildiIsaretle } from '../../src/lib/dogrulamaKodu'
 import { AuthKabuk } from '../../src/components/AuthKabuk'
 import { Button, ErrorBox, Field, Girdi, Notice } from '../../src/components/ui'
 
 /** Sunucudaki EmailVerificationRules ile aynı olmalı. */
 const KOD_UZUNLUK = 6
 const KOD_DAKIKA = 15
-const YENIDEN_BEKLEME_SN = 60
 
 /*
   E-POSTA DOĞRULAMA — web'deki VerifyEmail.jsx'in portu.
@@ -34,6 +34,13 @@ export default function Dogrula() {
   const router = useRouter()
   const params = useLocalSearchParams()
 
+  /*
+    Parametre YALNIZCA kutuyu ön-doldurur; başka hiçbir şeye karar vermez. Bir ara
+    geri sayımı da bu değer belirliyordu — bkz. aşağıdaki uyarı.
+
+    expo-router bir parametreyi iki kez taşıyan adreste dizi döndürebiliyor; tür
+    kontrolü o yüzden var, `String(params.email)` yeterli değil (dizi "a,b" olurdu).
+  */
   const kayittanGeldi = typeof params.email === 'string' && params.email.length > 0
 
   const [email, setEmail] = useState(kayittanGeldi ? params.email : '')
@@ -49,28 +56,35 @@ export default function Dogrula() {
   /*
     ─── GERİ SAYIM: SUNUCUNUN SESSİZ BEKLEMESİNİ GÖRÜNÜR KILIYOR ────────────────
 
-    ⚠️ BU BİR SÜS DEĞİL, GERÇEK BİR KUSURUN ÇARESİ. Sunucu aynı adrese dakikada
-    birden fazla doğrulama postası göndermiyor (EmailVerificationRules
-    .ResendCooldownSeconds) ve bunu SESSİZCE yapıyor — hata döndürmüyor, çünkü
-    "biraz bekle" demek o adresin kayıtlı olduğunu söylerdi (bu ucun tüm tasarımı
-    varlık sızdırmamak üzerine kurulu).
+    ⚠️ BU BİR SÜS DEĞİL, GERÇEK BİR KUSURUN ÇARESİ. Gerekçenin tamamı
+    src/lib/dogrulamaKodu.js başında; özeti: sunucu dakikada bir posta gönderiyor ve
+    sınırı SESSİZCE uyguluyor, o yüzden kalan süreyi yalnızca istemci bilebilir.
 
-    Kullanıcı açısından sonuç şuydu: kodu göremeyen kişi "Yeni kod gönder"e basıyor,
-    arayüz "gönderdik" diyor ve HİÇBİR ŞEY GÖNDERİLMİYOR. Kayıttan sonraki ilk
-    dakika, tam olarak bu düğmeye basılma olasılığının en yüksek olduğu an.
+    ⚠️ SAYAÇ "NEREDEN GELDİĞİNE" DEĞİL, KODUN GERÇEKTEN GÖNDERİLDİĞİ ANA BAĞLI.
+    Bir ara `kayittanGeldi` (yani yalnızca `email` parametresinin varlığı) sayacı
+    doldurmak için kullanılıyordu ve YANLIŞTI: giriş ekranı da EMAIL_NOT_VERIFIED
+    dalında bu ekrana `email` yollayor ama o yolda HİÇBİR kod gönderilmiyor
+    (Login.cs yalnızca hata fırlatıyor). Sonuç, kodu bir hafta önce ölmüş kullanıcının
+    60 saniye boşuna bekletilmesiydi — hem de "Yeni kod gönder (60 sn)" etiketi kod az
+    önce gönderilmiş gibi dururken.
 
-    Çare düğmeyi İSTEMCİDE kilitlemek: sayaç cihazda tutuluyor, sunucuya hiç
-    sorulmuyor, yani varlık bilgisi sızmıyor.
-
-    Kayıttan geliniyorsa sayaç DOLU başlıyor: kod az önce gönderildi.
+    Kalan süre her render'da damgadan HESAPLANIYOR, bir sayaçtan düşülmüyor. Böylece
+    kullanıcı adresi elle değiştirdiğinde de doğru cevap çıkıyor: damga o adrese
+    aitse kalan süre görünür, değilse bekleme yok.
   */
-  const [bekleme, setBekleme] = useState(kayittanGeldi ? YENIDEN_BEKLEME_SN : 0)
+  const [tik, tikla] = useReducer((n) => n + 1, 0)
+  const bekleme = kalanBeklemeSn(email)
 
+  /*
+    Tetikleyici `tik`, `bekleme` DEĞİL: iki ardışık ölçüm aynı tam sayıya yuvarlanırsa
+    (yarım saniyelik kayma) `bekleme`ye bağlı bir effect yeniden koşmaz ve geri sayım
+    ekranda donardı. 500 ms, saniyelik değişimi kaçırmayacak kadar sık.
+  */
   useEffect(() => {
     if (bekleme <= 0) return
-    const t = setTimeout(() => setBekleme((s) => s - 1), 1000)
+    const t = setTimeout(tikla, 500)
     return () => clearTimeout(t)
-  }, [bekleme])
+  }, [tik, bekleme])
 
   const gonderilebilir = email.trim().length >= 5 && kod.trim().length === KOD_UZUNLUK
 
@@ -94,7 +108,8 @@ export default function Dogrula() {
     try {
       const r = await api.resendVerification(email.trim())
       setResendDone(true)
-      setBekleme(YENIDEN_BEKLEME_SN)
+      // Gönderim GERÇEKLEŞTİ: damga buradan atılıyor, geri sayım damgadan türüyor.
+      kodGonderildiIsaretle(email.trim())
       // Geliştirmede sunucu kodu yanıtta döndürüyor; kullanıcı e-postaya bakmasın diye
       // doğrudan kutuya yazılıyor. Üretimde bu alan BOŞ gelir ve hiçbir şey değişmez.
       if (r?.verificationToken) setKod(r.verificationToken)
@@ -137,26 +152,49 @@ export default function Dogrula() {
                 "004271" geçerli bir koddur (sunucu D6 ile üretiyor) ve kırpılırsa
                 eşleşme tutmaz.
 
-                Rakam dışı her karakter anında siliniyor: bazı Android klavyeleri sayı
-                tuş takımında da boşluk/virgül verebiliyor ve kullanıcı fark etmediği
-                bir karakter yüzünden "kod yanlış" alırdı — üstelik yanlış deneme
-                sayacı (5 hakta kod iptal) o denemeyi de sayardı.
+                ⚠️ SINIR `maxLength` İLE DEĞİL, SÜZGECİN İÇİNDE. maxLength yerli
+                katmanda uygulanıyor (iOS RCTBaseTextInputView, Android
+                InputFilter.LengthFilter) ve metni onChangeText'e ULAŞMADAN kırpıyor.
+                İkisi birlikte kullanılınca yapıştırma sessizce bozuluyordu:
 
-                textContentType="oneTimeCode": iOS kodu klavyenin üstünde önerip tek
-                dokunuşla dolduruyor. Android tarafında karşılığı YOK ve bilerek
-                eklenmedi: autoComplete="sms-otp" SMS dinler, bu kod ise e-postayla
-                geliyor — çalışmayacak bir ipucu vermek yerine kapatıldı.
+                  pano " 042713" → maxLength 6'ya kırpar → " 04271" → süzgeç → "04271"
+
+                Kutuda beş hane kalıyor, "Doğrula" kapalı ve kullanıcıya neyin eksik
+                olduğunu söyleyen hiçbir şey yok. Kod e-postada kendi satırında durduğu
+                için baştaki boşluğu da kapan seçim OLAĞAN durum. Önce rakamları süz,
+                SONRA altıya in.
+
+                Rakam dışı her karakter siliniyor: bazı Android klavyeleri sayı tuş
+                takımında da boşluk/virgül verebiliyor ve kullanıcı fark etmediği bir
+                karakter yüzünden "kod yanlış" alırdı — üstelik yanlış deneme sayacı
+                (5 hakta kod iptal) o denemeyi de sayardı.
+
+                OTOMATİK DOLDURMA İKİ PLATFORMDA DA AÇIK:
+                  • textContentType="oneTimeCode" → iOS
+                  • autoComplete="email-otp"      → Android
+                `email-otp` tam olarak "e-postayla gelen tek kullanımlık kod" demek
+                (RN 0.86'da Android'e özgü değerler arasında). Bir ara burada "off"
+                yazıyordu ve gerekçesi "Android'de karşılığı yok" idi — YANLIŞTI;
+                "off" Android'in otomatik doldurmasını kapatıyordu. `sms-otp` ise
+                gerçekten yanlış olurdu: o, SMS dinler.
+
+                inputAccessoryViewButtonLabel: iOS'un sayı tuş takımında return tuşu
+                yok, RN returnKeyType verilince üstte bir araç çubuğu çiziyor ve
+                düğme metnini İngilizce "Done" olarak SABİT yazıyor. Klavyeyi
+                kapatmanın tek yolu o düğme; etiketi Türkçeleştirilmezse ekrandaki tek
+                İngilizce metin olurdu. (Android'de bu prop yok sayılıyor; orada IME
+                tuşu zaten sistem dilinde.)
               */}
               <Girdi
                 value={kod}
-                onChangeText={(v) => setKod(v.replace(/\D/g, ''))}
+                onChangeText={(v) => setKod(v.replace(/\D/g, '').slice(0, KOD_UZUNLUK))}
                 keyboardType="number-pad"
-                maxLength={KOD_UZUNLUK}
                 textContentType="oneTimeCode"
-                autoComplete="off"
+                autoComplete="email-otp"
                 autoCorrect={false}
                 placeholder="000000"
                 returnKeyType="done"
+                inputAccessoryViewButtonLabel="Bitti"
                 onSubmitEditing={onSubmit}
                 className="text-center text-lg font-semibold tracking-[0.3em]"
               />

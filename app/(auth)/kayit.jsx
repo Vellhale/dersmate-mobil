@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { Link, useRouter } from 'expo-router'
 import { api } from '../../src/lib/api'
+import { kodGonderildiIsaretle } from '../../src/lib/dogrulamaKodu'
 import { SOZLESME_SURUMU } from '../../src/lib/yasalMetinler'
 import { AuthKabuk } from '../../src/components/AuthKabuk'
 import { Button, ErrorBox, Field, Girdi, Notice } from '../../src/components/ui'
@@ -108,6 +109,14 @@ export default function Kayit() {
           ageConfirmed: yasBeyani,
         }),
       )
+
+      /*
+        Kayıt başarılıysa sunucu doğrulama kodunu GÖNDERDİ (Register.cs). Damga,
+        doğrulama ekranındaki "yeni kod gönder" beklemesinin tek doğru kaynağı —
+        kullanıcı oraya buradan da gitse, önce giriş ekranına uğrayıp oradan da
+        gitse, kalan süre aynı hesaplanır. Ayrıntısı: src/lib/dogrulamaKodu.js
+      */
+      kodGonderildiIsaretle(form.email.trim())
     } catch (err) {
       setError(err)
     } finally {
