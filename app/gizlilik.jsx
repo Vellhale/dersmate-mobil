@@ -35,13 +35,23 @@ import { ILETISIM_EPOSTA, SOZLESME_TARIHI } from '../src/lib/yasalMetinler'
      ve bir denetimde bulunamayan bir ekran, metni tümden şüpheli hâle getirir.
      Bölüm NUMARASI korundu: yasal metinlere "§4" diye atıf yapılabiliyor.
 
-  §6 ÜÇÜNCÜ TARAF. Mobil pakette reklam veya analitik SDK'sı YOK (package.json).
-     Bu, mağaza veri güvenliği formunda (Google Play Data safety / Apple Privacy
-     Nutrition Label) beyan edilecek bilgiyle birebir aynı olmalı.
+  §6 ÜÇÜNCÜ TARAF. Mobil PAKETTE reklam veya analitik SDK'sı YOK (package.json) ve bu
+     cümle aynen kalıyor — web'de Google Analytics var, burada yok. Bu, mağaza veri
+     güvenliği formunda (Google Play Data safety / Apple Privacy Nutrition Label)
+     beyan edilecek bilgiyle birebir aynı olmalı.
 
-  ⚠️ EKSİK OLDUĞU BİLİNEN NOKTA (web ile ortak): hesap silme ucu YOK. Metin bunu
-  gizlemiyor — silme talebinin e-postayla yapılacağını söylüyor. Uç yazıldığında §7
-  hem burada hem web'de güncellenmeli.
+     ⚠️ AMA "üçüncü taraf yok" cümlesi TEK BAŞINA EKSİKTİ (2026-09-05'te tamamlandı).
+     Uygulama doğrudan kimseye bağlanmıyor, doğru; ancak kullanıcının sunucumuza
+     gönderdiği veri orada Resend (e-posta) ve Google Drive (yedek) tarafından
+     işleniyor. KVKK m.10 "kimlere aktarılabileceğini" soruyor ve cevap yalnızca
+     istemci paketine bakarak verilemez. §6 artık sunucu tarafını da sayıyor.
+
+  ─── 2026-09-05'te DÜZELTİLEN YANLIŞ BEYAN ─────────────────────────────────
+  §7 "hesabını kendi başına silebileceğin bir düğme YOK, e-posta at" diyordu. Uç ve
+  ekran ÇOKTAN eklenmişti (app/(tabs)/profil.jsx → "Hesabımı sil"), metin güncellenmemişti.
+  Bir gizlilik metninin yapabileceği en kötü hatalardan biri: kullanıcıya, yapabildiği
+  bir şeyi yapamadığını söylemek. Silme hakkını kullanmak isteyen kişi ya haftalarca
+  e-posta bekler ya vazgeçer.
 */
 export default function Gizlilik() {
   return (
@@ -160,6 +170,16 @@ export default function Gizlilik() {
           <Madde>
             <Kalin>Mesajlar:</Kalin> konuşma silinene kadar.
           </Madde>
+          <Madde>
+            <Kalin>Yedekler.</Kalin> Sistemi bir arıza ya da veri kaybından geri
+            getirebilmek için düzenli yedek alıyoruz. Bir veri canlı sistemden silindiğinde{' '}
+            <Kalin>o an</Kalin> silinir, ama daha önce alınmış yedeklerde bir süre daha
+            durur. Sunucudaki yedekler <Kalin>en fazla 14 gün</Kalin> saklanır ve süresi
+            dolanlar kendiliğinden silinir. Yedeklerin bir kopyası, sunucunun tümden
+            kaybolduğu durumlara karşı ayrı bir bulut deposunda tutulur. Yedekler{' '}
+            <Kalin>yalnızca</Kalin> geri yükleme amacıyla kullanılır; içlerinde arama
+            yapmıyor, analiz etmiyor, kimseyle paylaşmıyoruz.
+          </Madde>
         </Maddeler>
       </Bolum>
 
@@ -171,9 +191,43 @@ export default function Gizlilik() {
           <Kalin>hiçbir kullanıcıya gösterilmez</Kalin>.
         </Paragraf>
         <Paragraf>
-          Verini pazarlama amacıyla üçüncü taraflara aktarmıyoruz. Mobil uygulama, verini
-          dışarı taşıyan hiçbir üçüncü taraf bileşen (reklam ağı, analitik, çökme raporlama)
-          içermez; uygulamanın konuştuğu tek sunucu dersmate’in kendi sunucusudur.
+          Verini pazarlama amacıyla üçüncü taraflara <Kalin>aktarmıyoruz</Kalin> ve
+          satmıyoruz. Mobil uygulama, verini dışarı taşıyan hiçbir üçüncü taraf bileşen
+          (reklam ağı, analitik, çökme raporlama) <Kalin>içermez</Kalin>; uygulamanın
+          konuştuğu tek sunucu dersmate’in kendi sunucusudur.
+        </Paragraf>
+        <Paragraf>
+          <Kalin>Sunucu tarafındaki hizmet sağlayıcılarımız (veri işleyenler).</Kalin>{' '}
+          Uygulama doğrudan hiçbir üçüncü tarafa bağlanmasa da, dersmate’in sunucusu
+          platformu çalıştırabilmek için birkaç dış hizmetten yararlanıyor. Bunlar verini{' '}
+          <Kalin>bizim adımıza ve yalnızca aşağıdaki amaçla</Kalin> işler; kendi amaçları
+          için kullanamazlar.
+        </Paragraf>
+        <Maddeler>
+          <Madde>
+            <Kalin>Sunucu barındırma.</Kalin> Platformun sunucusunu ve veritabanını
+            barındıran hizmet sağlayıcı. Hesap verilerinin tamamı burada tutulur.
+          </Madde>
+          <Madde>
+            <Kalin>E-posta gönderimi — Resend.</Kalin> Doğrulama kodu, parola sıfırlama ve
+            bildirim e-postalarını iletir. Ona giden veri: e-posta adresin ve iletinin
+            içeriği.
+          </Madde>
+          <Madde>
+            <Kalin>Yedek deposu — Google Drive.</Kalin> Yedeklerin sunucu dışındaki kopyası
+            burada tutulur (bkz. §5).
+          </Madde>
+        </Maddeler>
+        <Paragraf>
+          <Kalin>Yurt dışına aktarım.</Kalin> Bu sağlayıcıların bir kısmı sunucularını{' '}
+          <Kalin>Türkiye dışında</Kalin> işletiyor. Bu, KVKK m.9 anlamında yurt dışına
+          aktarım sayılır ve hesap açarken verdiğin onay bunu da kapsar. Aktarılan veri,
+          her sağlayıcı için yalnızca o hizmetin gerektirdiği kadarıdır: e-posta gönderimi
+          için adresin ve iletinin içeriği, yedekleme için yedek dosyalarının kendisi.
+        </Paragraf>
+        <Paragraf>
+          Bu listeyi değiştirdiğimizde metni günceller ve üstteki tarihi değiştiririz
+          (bkz. §9).
         </Paragraf>
       </Bolum>
 
@@ -188,9 +242,17 @@ export default function Gizlilik() {
             ekranından değiştirebilirsin.
           </Madde>
           <Madde>
-            <Kalin>Silme ve erişim:</Kalin> şu an hesabını kendi başına silebileceğin bir düğme{' '}
-            <Kalin>yok</Kalin>. Silme ya da verinin bir kopyasını alma talebini aşağıdaki
-            adrese ilettiğinde işleme alıyoruz. Bu düğmeyi eklemek geliştirme listemizde.
+            <Kalin>Silme:</Kalin> hesabını <Kalin>kendin silebilirsin</Kalin> — Profil
+            sekmesinin en altındaki “Hesabımı sil”. Onay için parolan yeniden sorulur ve
+            işlem geri alınamaz. Kimlik bilgilerin siliniyor; ders geçmişi, kazandırdığın
+            puanlar ve değerlendirmeler karşı tarafa ait olduğu için kalıyor ve orada adın
+            yerine “Silinmiş kullanıcı” görünüyor. Yedeklerdeki kopyaların ne zaman
+            düştüğü §5’te yazılı.
+          </Madde>
+          <Madde>
+            <Kalin>Erişim ve hesabına giremiyorsan:</Kalin> verinin bir kopyasını alma
+            talebini ya da hesabına hiç erişemediğin durumda silme talebini aşağıdaki
+            adrese ilettiğinde işleme alıyoruz.
           </Madde>
         </Maddeler>
         <MetinBaglantisi
