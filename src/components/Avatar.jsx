@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Image, Text, View } from 'react-native'
 import { api } from '../lib/api'
+import { useYetkiliGorsel } from './YetkiliGorsel'
 
 /**
  * Profil fotoğrafı — web'deki components/Avatar.jsx'in portu. Yoksa baş harflerden
@@ -49,8 +50,32 @@ const BOYUTLAR = {
 export function Avatar({ userId, name, size = 'md', className = '' }) {
   const [dustu, setDustu] = useState(false)
   const b = BOYUTLAR[size] ?? BOYUTLAR.md
+  const kaynak = userId ? api.avatarImageSource(userId) : null
 
-  if (!userId || dustu) {
+  /*
+    Görsel BAŞLIKLI İSTEKLE indiriliyor, Image'a doğrudan adres verilmiyor: RN Image
+    Authorization başlığını göndermiyor ve avatar istekleri sessizce 401 alıyordu
+    (bkz. YetkiliGorsel). Yükleme bitene kadar baş harfler görünür.
+  */
+  const { uri: gorselUri, hata: gorselHatasi } = useYetkiliGorsel(kaynak)
+
+  /*
+    DÜŞMÜŞ DURUMU KAYNAK DEĞİŞİNCE SIFIRLA.
+
+    Eskiden `dustu` bir kez true olduğunda o bileşen örneği KALICI olarak baş harflere
+    düşüyordu. Fotoğrafı olmayan kullanıcıda uç 404 döner ve onError hemen çalışır; o
+    andan sonra kullanıcı fotoğraf yüklese ve URI değişse bile Image bir daha hiç
+    denenmezdi. Ekran yeniden kurulduğunda düzeliyordu, ama kurulmayan her yerde
+    (liste satırları, başlıklar) fotoğraf hiç görünmüyordu.
+
+    Bağımlılık URI: yalnızca gösterilecek görsel değiştiğinde yeniden denenir, her
+    render'da değil.
+  */
+  useEffect(() => {
+    setDustu(false)
+  }, [gorselUri])
+
+  if (!userId || dustu || gorselHatasi || !gorselUri) {
     return (
       <View
         accessible
@@ -64,7 +89,7 @@ export function Avatar({ userId, name, size = 'md', className = '' }) {
 
   return (
     <Image
-      source={api.avatarImageSource(userId)}
+      source={{ uri: gorselUri }}
       accessibilityLabel={name ?? 'Profil fotoğrafı'}
       onError={() => setDustu(true)}
       className={`${b.kutu} shrink-0 bg-slate-100 ${className}`}

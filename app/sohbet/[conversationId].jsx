@@ -109,6 +109,24 @@ export default function Konusma() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, tarihce])
 
+  /*
+    (1b) YENİDEN BAĞLANINCA GEÇMİŞİ TAZELE.
+
+    Bağlantı koptuğu sırada karşı tarafın yazdığı mesajlar canlı olarak gelemiyor;
+    yeniden bağlanınca da yalnızca gruba KATILINIYOR, geçmiş yeniden okunmuyordu.
+    Sonuç: başlıktaki nokta yeşile dönüp "Canlı bağlantı" yazıyor — yani kullanıcı her
+    şeyin yolunda olduğunu sanıyor — ama kopukluk sırasındaki mesajlar sohbette hiç
+    görünmüyor. Ancak ekran kapatılıp yeniden açılırsa ortaya çıkıyorlardı.
+
+    İlk bağlantıda tazeleme YAPILMIYOR: geçmiş zaten (1) numaralı efektte okundu.
+  */
+  const baglanmisti = useRef(false)
+  useEffect(() => {
+    if (hub.status !== 'connected') return
+    if (baglanmisti.current) setTarihce((v) => v + 1)
+    baglanmisti.current = true
+  }, [hub.status])
+
   // (2) Gruba katılma — yalnızca bağlantı gerçekten kuruluyken.
   useEffect(() => {
     if (!conversationId || hub.status !== 'connected') return

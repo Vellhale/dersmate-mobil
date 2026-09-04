@@ -26,6 +26,12 @@ import * as SecureStore from 'expo-secure-store'
 export const KEYS = {
   session: 'peerlearn.session',
   hwid: 'peerlearn.hwid',
+  /* Avatar önbellek sayaçları. KALICI olmak ZORUNDA: RN Image (Android'de Fresco)
+     disk önbelleğini uygulama yeniden başlatmalarını AŞARAK saklıyor ve HTTP yeniden
+     doğrulaması yapmıyor. Sayaç yalnızca bellekte tutulduğunda açılışta sıfırlanıyor,
+     adres temel URI'ye dönüyor ve Fresco o anahtarın altındaki ESKİ görseli ağa hiç
+     çıkmadan sunuyor — yüklenen yeni fotoğraf kalıcı olarak görünmez oluyordu. */
+  avatarSurumleri: 'peerlearn.avatarSurumleri',
 }
 
 /* SecureStore anahtarlarında nokta geçersiz ([A-Za-z0-9._-] izinli aslında; nokta

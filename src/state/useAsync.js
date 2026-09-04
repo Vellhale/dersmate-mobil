@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 /**
  * Basit veri çekme kancası: { data, error, loading, reload }.
@@ -11,9 +11,24 @@ import { useCallback, useEffect, useState } from 'react'
 export function useAsync(loader, deps = []) {
   const [state, setState] = useState({ data: null, error: null, loading: true })
 
+  /*
+    NESİL SAYACI — geç dönen ESKİ yanıt yeniyi ezmesin.
+
+    `cancelled` bayrağı yalnızca useEffect'in temizleyicisi çağrıldığında (bağımlılık
+    değişimi / unmount) işe yarıyordu. Elle yapılan reload()'ların döndürdüğü temizleyici
+    ise kimse tarafından çağrılmıyor: art arda iki tazelemede ilki geç dönerse İKİNCİNİN
+    sonucunu eziyordu. Belirtisi sessiz ve kafa karıştırıcıydı — okunmamış rozeti bir
+    eksik kalıyor, liste bir adım geride görünüyordu.
+
+    Nesil, hangi çağrının en son başlatıldığını söylüyor: yalnızca o yazabilir.
+  */
+  const nesilRef = useRef(0)
+
   const run = useCallback(
     (options = {}) => {
+      const nesil = ++nesilRef.current
       let cancelled = false
+      const yazabilir = () => !cancelled && nesil === nesilRef.current
 
       setState((prev) => ({
         ...prev,
@@ -24,10 +39,10 @@ export function useAsync(loader, deps = []) {
 
       loader()
         .then((data) => {
-          if (!cancelled) setState({ data, error: null, loading: false })
+          if (yazabilir()) setState({ data, error: null, loading: false })
         })
         .catch((error) => {
-          if (!cancelled) setState((prev) => ({ data: prev.data, error, loading: false }))
+          if (yazabilir()) setState((prev) => ({ data: prev.data, error, loading: false }))
         })
 
       return () => {

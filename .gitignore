@@ -42,3 +42,14 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Play Console servis hesabı anahtarı (eas.json → submit.production).
+# Bu dosya mağaza hesabına yükleme yetkisi taşır; depoya ASLA girmemeli.
+play-service-account.json
+*-service-account.json
+
+# Playwright MCP oturum çıktıları
+# Tarayıcı oturumlarının ekran görüntüleri ve konsol dökümleri — her koşuda yeniden
+# üretiliyor, depoda tutulacak bir şey değil. Bu kural olmadan tek bir `git add -A`
+# 67 dosya / 343 KB gürültü ekliyordu. Ana depoda aynı kural zaten var.
+.playwright-mcp/

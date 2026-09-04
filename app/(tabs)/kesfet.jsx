@@ -113,6 +113,24 @@ function useBirikenListe(aktif, yukleyici, bagimliliklar, anahtar) {
       setTotalCount(0)
       setHasNextPage(false)
       setPage(0)
+
+      /*
+        YÜKLEME BAYRAKLARI DA SIFIRLANMALI.
+
+        seq artırıldığı anda uçuştaki isteğin `finally` bloğu artık koşulunu sağlamıyor
+        (seq.current === benimSeq false) ve bayrakları TEMİZLEMİYOR. Arama kutusu yazı
+        yazılırken temizlendiğinde tam bu oluyordu: ekranda "Aramaya başla" yönlendirmesi
+        yerine sonsuza kadar dönen bir "Aranıyor…" spinner'ı kalıyor, kullanıcı arama
+        kutusuna yeniden bir şey yazana kadar da çıkmıyordu.
+
+        Kilit de bırakılıyor: aksi hâlde sonraki arama "zaten yükleniyor" sanılıp
+        hiç başlatılmazdı.
+      */
+      kilit.current = false
+      basarisizHedef.current = null
+      setIlkYukleme(false)
+      setEkYukleme(false)
+      setError(null)
       return
     }
     sayfaGetir(1)

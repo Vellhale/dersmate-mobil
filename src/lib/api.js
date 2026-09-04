@@ -1,7 +1,7 @@
 import axios from 'axios'
 import Constants from 'expo-constants'
 import { Platform } from 'react-native'
-import { KEYS, secure } from './storage'
+import { KEYS, prefs, secure } from './storage'
 import { ONIZLEME, ONIZLEME_OTURUMU, onizlemeApi } from './onizleme'
 
 /*
@@ -98,8 +98,28 @@ export async function hydrateSession() {
   } catch {
     sessionCache = null
   }
+
+  await avatarSurumleriniYukle()
+
   hydrated = true
   return sessionCache
+}
+
+/*
+  Avatar sayaçlarını diskten geri yükler. Oturum hidrasyonuna bağlanmasının sebebi
+  sırayla ilgili: ilk çizimden ÖNCE tamamlanmalı, yoksa o çizim temel URI'yi kullanıp
+  Fresco'ya eski görseli sordurur ve önbellek bir daha kırılmaz.
+*/
+async function avatarSurumleriniYukle() {
+  const ham = await prefs.get(KEYS.avatarSurumleri)
+  if (!ham) return
+  try {
+    for (const [anahtar, surum] of Object.entries(JSON.parse(ham))) {
+      if (Number.isFinite(surum)) avatarVersions.set(anahtar, surum)
+    }
+  } catch {
+    // Bozuk kayıt: sayaçsız devam. En kötü ihtimalle bir kez eski görsel görünür.
+  }
 }
 
 export function loadSession() {
@@ -146,7 +166,22 @@ client.interceptors.response.use(
   (error) => {
     if (error.response) {
       const { status, data } = error.response
-      if (status === 401) {
+
+      /*
+        401 HER ZAMAN "oturum bitti" DEMEK DEĞİL.
+
+        Bazı uçlarda 401, gövdedeki PAROLANIN yanlış olduğunu söylüyor — oturumun
+        geçersizliğini değil. Koşulsuz oturum düşürmek burada gerçek bir hataya yol
+        açıyordu: "Hesabımı sil" ekranında parolayı yanlış yazan kullanıcı hata mesajını
+        HİÇ göremiyor, modal ve tüm sekmeler kayboluyor, uygulama giriş ekranına düşüyor
+        ve SecureStore'daki oturum siliniyordu. Hesap silinmemiş oluyor ama kullanıcı ne
+        olduğunu anlamıyor.
+
+        Ayrım kod üzerinden: INVALID_CREDENTIALS "yazdığın parola yanlış" demek, jetonun
+        süresi dolduğunda sunucu bu kodu döndürmüyor (gövdesiz 401 geliyor).
+      */
+      const parolaHatasi = data?.title === 'INVALID_CREDENTIALS'
+      if (status === 401 && !parolaHatasi) {
         authExpiredListeners.forEach((l) => l())
       }
       // Kod arayüzde gösterilmiyor (bkz. ErrorBox); teşhis için konsolda kalıyor.
@@ -200,8 +235,51 @@ async function request(path, { method = 'GET', body, formData, signal, headers }
   Token her ÇAĞRIDA okunur (render anında): oturum yenilendiğinde eski token'lı
   donmuş bir kaynak nesnesi kalmasın.
 */
+/*
+  ⛔ KULLANILMIYOR — RN Image bu başlıkları GÖNDERMİYOR (ölçüldü, aşağıya bakın).
+  Yalnızca kararın geçmişi görünsün diye duruyor; yeni kod authedImageDataUri kullanır.
+*/
 function authImageSource(path) {
   return { uri: `${API_BASE}${path}`, headers: { Authorization: `Bearer ${getToken()}` } }
+}
+
+/*
+  YETKİLİ GÖRSEL — baytlar İSTEKLE indirilip data URI olarak veriliyor.
+
+  NEDEN: <Image source={{uri, headers}}> Android'de (newArchEnabled) Authorization
+  başlığını GÖNDERMİYOR. Telefonun kendi istekleri köprü günlüğünde ölçüldü:
+
+    GET /api/v1/users/<id>/profile      → 200  jetonlu     (axios)
+    GET /api/v1/users/<id>/avatar?v=1   → 401  JETONSUZ    (RN Image)
+
+  Aynı oturumda, aynı saniyede. Bu yüzden kimlik isteyen HER görsel sessizce 401
+  alıyordu: avatarlar, ders kanıtı ekran görüntüleri ve yönetimdeki kanıt incelemesi.
+  Belirtisi "fotoğraf güncellenmiyor"du; 401'i middleware controller'dan önce
+  reddettiği için sunucu günlüğünde sorgu bile görünmüyordu.
+
+  Çözüm web'in yaptığının aynısı (orada blob + object URL): baytları axios ile —
+  başlığı doğru gönderen tek yol — indirip Image'a hazır veri olarak veriyoruz.
+
+  Önbellek YOL ile anahtarlanıyor; yol ?v=N taşıdığı için yeni yükleme kendiliğinden
+  yeni bir anahtar üretiyor ve eski görsel düşüyor.
+*/
+const gorselOnbellegi = new Map()
+
+export async function authedImageDataUri(path) {
+  const hazir = gorselOnbellegi.get(path)
+  if (hazir) return hazir
+
+  const yanit = await client.get(path, { responseType: 'blob' })
+
+  const dataUri = await new Promise((coz, red) => {
+    const okuyucu = new FileReader()
+    okuyucu.onload = () => coz(okuyucu.result)
+    okuyucu.onerror = () => red(okuyucu.error ?? new Error('Görsel okunamadı.'))
+    okuyucu.readAsDataURL(yanit.data)
+  })
+
+  gorselOnbellegi.set(path, dataUri)
+  return dataUri
 }
 
 /*
@@ -219,33 +297,58 @@ function authImageSource(path) {
 */
 const avatarVersions = new Map()
 
+/*
+  YEREL ÖNİZLEME — yükleme biter bitmez gösterilecek dosya.
+
+  NEDEN VAR: yükleme sunucuda başarılı olduğu hâlde kullanıcı eski görüntüyü görmeye
+  devam ediyordu; sunucu günlüğünde yüklemeden SONRA hiç avatar isteği yoktu, yani
+  RN Image uzaktaki görseli yeniden istemeye hiç kalkışmamıştı. Cihaza erişimim
+  olmadığı için hangi halkanın koptuğunu kesinleştiremedim — bu yüzden çözüm o halkayı
+  ONARMAK değil, ONA BAĞIMLILIĞI KALDIRMAK: yüklenen dosya zaten telefonda duruyor,
+  doğrudan onu gösteriyoruz. Uzak görsel de arka planda tazeleniyor (sürüm sayacı),
+  ama artık kullanıcının gördüğü şey ona bağlı değil.
+
+  Bellekte: uygulama yeniden açıldığında sunucudaki görsele dönülür.
+*/
+const yerelAvatarlar = new Map()
+
+/*
+  ANAHTAR NORMALLEŞTİRME. forgetAvatar'ı çağıran ekran kimliği OTURUMDAN, avatarı çizen
+  bileşen ise PROFİL YANITINDAN alıyor. İkisi aynı GUID ama farklı yerlerden geldiği için
+  harf büyüklüğü ya da tür (string/undefined) farkı Map aramasını ıskalar; ıskalarsa
+  ?v= hiç eklenmez ve önbellek kırılmaz. Tek noktadan normalleştirmek bu sınıfı kapatıyor.
+*/
+function avatarAnahtar(userId) {
+  return String(userId ?? '').toLowerCase()
+}
+
 function avatarPath(userId) {
-  const v = avatarVersions.get(userId)
-  return `/api/users/${userId}/avatar${v ? `?v=${v}` : ''}`
+  const v = avatarVersions.get(avatarAnahtar(userId))
+  return `/api/v1/users/${userId}/avatar${v ? `?v=${v}` : ''}`
 }
 
 export const api = {
   // --- Kimlik ---
-  register: (payload) => request('/api/auth/register', { method: 'POST', body: payload }),
-  verifyEmail: (token) => request('/api/auth/verify-email', { method: 'POST', body: { token } }),
+  register: (payload) => request('/api/v1/auth/register', { method: 'POST', body: payload }),
+  verifyEmail: (token) => request('/api/v1/auth/verify-email', { method: 'POST', body: { token } }),
 
   /** Doğrulama bağlantısını yeniden gönderir. Yanıt, adres kayıtlı olsun olmasın aynıdır. */
   resendVerification: (email) =>
-    request('/api/auth/resend-verification', { method: 'POST', body: { email } }),
-  login: (payload) => request('/api/auth/login', { method: 'POST', body: payload }),
+    request('/api/v1/auth/resend-verification', { method: 'POST', body: { email } }),
+  login: (payload) => request('/api/v1/auth/login', { method: 'POST', body: payload }),
 
   /** Parola sıfırlama bağlantısı ister. Yanıt, adres kayıtlı olsun olmasın AYNI (204) —
       farklı yanıt vermek "bu e-posta kayıtlı mı" sorusunu herkese yanıtlardı. */
   forgotPassword: (email) =>
-    request('/api/auth/forgot-password', { method: 'POST', body: { email } }),
+    request('/api/v1/auth/forgot-password', { method: 'POST', body: { email } }),
 
   /** Bağlantıdaki token'la yeni parolayı yazar. Token tek kullanımlık, 1 saat geçerli. */
   resetPassword: (token, newPassword) =>
-    request('/api/auth/reset-password', { method: 'POST', body: { token, newPassword } }),
+    request('/api/v1/auth/reset-password', { method: 'POST', body: { token, newPassword } }),
 
   // --- Katalog ---
-  topics: () => request('/api/catalog/topics'),
-  categories: () => request('/api/catalog/categories'),
+  topics: () => request('/api/v1/catalog/topics'),
+  categories: () => request('/api/v1/catalog/categories'),
 
   /** Gelişmiş arama (Modül 1). Boş/null filtreler sorgu dizesine hiç eklenmez. */
   searchOffers: (filters) => {
@@ -254,7 +357,7 @@ export const api = {
       if (value === null || value === undefined || value === '') continue
       params.set(key, String(value))
     }
-    return request(`/api/discovery/offers?${params.toString()}`)
+    return request(`/api/v1/discovery/offers?${params.toString()}`)
   },
 
   /** Üniversite ağı araması. searchOffers ile aynı kural: boş/null filtreler sorguya eklenmez. */
@@ -266,30 +369,30 @@ export const api = {
       if (value === null || value === undefined || value === '') continue
       params.set(key, String(value))
     }
-    return request(`/api/discovery/users?${params.toString()}`)
+    return request(`/api/v1/discovery/users?${params.toString()}`)
   },
 
   // --- Portföy & eşleştirme ---
-  myPortfolio: () => request('/api/portfolio/entries'),
+  myPortfolio: () => request('/api/v1/portfolio/entries'),
   addPortfolioEntry: (payload) =>
-    request('/api/portfolio/entries', { method: 'POST', body: payload }),
-  removePortfolioEntry: (id) => request(`/api/portfolio/entries/${id}`, { method: 'DELETE' }),
-  suggestions: (limit = 20) => request(`/api/portfolio/suggestions?limit=${limit}`),
+    request('/api/v1/portfolio/entries', { method: 'POST', body: payload }),
+  removePortfolioEntry: (id) => request(`/api/v1/portfolio/entries/${id}`, { method: 'DELETE' }),
+  suggestions: (limit = 20) => request(`/api/v1/portfolio/suggestions?limit=${limit}`),
 
-  myMatches: () => request('/api/matches'),
+  myMatches: () => request('/api/v1/matches'),
   // Konusuz (üniversite ağı) istekte requestedTopicId null gönderilebilir.
-  createMatch: (payload) => request('/api/matches', { method: 'POST', body: payload }),
+  createMatch: (payload) => request('/api/v1/matches', { method: 'POST', body: payload }),
   respondMatch: (matchId, accept) =>
-    request(`/api/matches/${matchId}/respond`, { method: 'POST', body: { accept } }),
-  closeMatch: (matchId) => request(`/api/matches/${matchId}/close`, { method: 'POST' }),
+    request(`/api/v1/matches/${matchId}/respond`, { method: 'POST', body: { accept } }),
+  closeMatch: (matchId) => request(`/api/v1/matches/${matchId}/close`, { method: 'POST' }),
 
   // --- Sohbet ---
-  conversations: () => request('/api/conversations'),
+  conversations: () => request('/api/v1/conversations'),
   messages: (conversationId, page = 1, pageSize = 50) =>
-    request(`/api/conversations/${conversationId}/messages?page=${page}&pageSize=${pageSize}`),
+    request(`/api/v1/conversations/${conversationId}/messages?page=${page}&pageSize=${pageSize}`),
   sendMessage: (conversationId, content) =>
-    request(`/api/conversations/${conversationId}/messages`, { method: 'POST', body: { content } }),
-  markRead: (conversationId) => request(`/api/conversations/${conversationId}/read`, { method: 'POST' }),
+    request(`/api/v1/conversations/${conversationId}/messages`, { method: 'POST', body: { content } }),
+  markRead: (conversationId) => request(`/api/v1/conversations/${conversationId}/read`, { method: 'POST' }),
 
   // --- Dersler ---
   /**
@@ -298,13 +401,13 @@ export const api = {
    * FlatList onEndReached ile 5'erli sayfalarla yüklenir (iş kuralı 4).
    */
   mySessions: (pastPage = 1, pastPageSize = 5) =>
-    request(`/api/sessions?pastPage=${pastPage}&pastPageSize=${pastPageSize}`),
-  sessionProofs: (sessionId) => request(`/api/sessions/${sessionId}/proofs`),
+    request(`/api/v1/sessions?pastPage=${pastPage}&pastPageSize=${pastPageSize}`),
+  sessionProofs: (sessionId) => request(`/api/v1/sessions/${sessionId}/proofs`),
 
   /** Kanıt görseli için <Image source> nesnesi (uri + Authorization başlığı). */
   proofImageSource: (sessionId, proofId) =>
-    authImageSource(`/api/sessions/${sessionId}/proofs/${proofId}/content`),
-  bookSession: (payload) => request('/api/sessions', { method: 'POST', body: payload }),
+    ({ yol: `/api/v1/sessions/${sessionId}/proofs/${proofId}/content` }),
+  bookSession: (payload) => request('/api/v1/sessions', { method: 'POST', body: payload }),
 
   /**
    * Ders tamamlama + kanıt yükleme (iş kuralı 5).
@@ -315,66 +418,130 @@ export const api = {
     const form = new FormData()
     form.append('verificationCode', verificationCode)
     form.append('proof', file)
-    return request(`/api/sessions/${sessionId}/complete`, { method: 'POST', formData: form })
+    return request(`/api/v1/sessions/${sessionId}/complete`, { method: 'POST', formData: form })
   },
-  approveSession: (sessionId) => request(`/api/sessions/${sessionId}/approve`, { method: 'POST' }),
+  approveSession: (sessionId) => request(`/api/v1/sessions/${sessionId}/approve`, { method: 'POST' }),
   cancelSession: (sessionId, reason) =>
-    request(`/api/sessions/${sessionId}/cancel`, { method: 'POST', body: { reason } }),
+    request(`/api/v1/sessions/${sessionId}/cancel`, { method: 'POST', body: { reason } }),
   /**
    * Ders hakkında TEK YÖNLÜ şikayet. Şikayet edilen kişi bunu görmez, bildirilmez ve
    * yanıt veremez; kayıt doğrudan yönetim kuyruğuna düşer. Ders akışı etkilenmez.
    */
   reportSession: (sessionId, reason, description) =>
-    request(`/api/sessions/${sessionId}/report`, { method: 'POST', body: { reason, description } }),
+    request(`/api/v1/sessions/${sessionId}/report`, { method: 'POST', body: { reason, description } }),
+
+  /**
+   * İTİRAZ — şikayetten FARKLI ve daha ağır: "ders yapılmadı" ya da "kanıt sahte".
+   *
+   * Ders Disputed'a geçer, puan basımı DONAR ve konu yönetim hakemliğine düşer. Şikayet
+   * ise dersin akışını hiç etkilemiyor (bkz. reportSession) — ikisi ayrı mekanizma ve
+   * arayüzde de ayrı sunuluyor.
+   *
+   * Yalnızca öğrenci ve yalnızca onay bekleyen derste açılabilir; kural sunucuda
+   * (SessionRules.EnsureCanDispute). Açıklama 10-2000 karakter.
+   */
+  disputeSession: (sessionId, reason, description) =>
+    request(`/api/v1/sessions/${sessionId}/dispute`, { method: 'POST', body: { reason, description } }),
 
   // --- Cüzdan (puan/seviye kaynağı; harcama YOK — iş kuralı 1) ---
-  wallet: () => request('/api/wallet'),
+  wallet: () => request('/api/v1/wallet'),
   statement: (page = 1, pageSize = 20) =>
-    request(`/api/wallet/statement?page=${page}&pageSize=${pageSize}`),
+    request(`/api/v1/wallet/statement?page=${page}&pageSize=${pageSize}`),
 
   // --- Profil ve değerlendirmeler ---
-  userProfile: (userId) => request(`/api/users/${userId}/profile`),
+  userProfile: (userId) => request(`/api/v1/users/${userId}/profile`),
 
   /** Oturumdaki kullanıcının profili — çağıranların userId taşımasını gerektirmez. */
   myProfile: () => {
     const userId = loadSession()?.userId
     if (!userId) return Promise.resolve(null)
-    return request(`/api/users/${userId}/profile`)
+    return request(`/api/v1/users/${userId}/profile`)
   },
 
-  updateProfile: (payload) => request('/api/profile', { method: 'PUT', body: payload }),
-  uploadAvatar: (formData) => request('/api/profile/avatar', { method: 'POST', formData }),
+  updateProfile: (payload) => request('/api/v1/profile', { method: 'PUT', body: payload }),
+
+  /**
+   * HESABI SİL — geri alınamaz.
+   *
+   * Google Play, hesap açtıran uygulamalarda silmeyi UYGULAMA İÇİNDE zorunlu tutuyor;
+   * KVKK/GDPR'ın silme hakkı da aynı şeyi istiyor. Sunucu kişisel alanları temizleyip
+   * kaydı anonimleştiriyor: ders geçmişi, puanlar ve değerlendirmeler KARŞI TARAFA ait
+   * olduğu için silinmiyor, orada "Silinmiş kullanıcı" olarak görünüyor.
+   *
+   * VERB POST, DELETE DEĞİL: parola gövdede gidiyor ve gövdeli DELETE isteklerini bazı
+   * vekiller kırpıyor — istek sunucuya parolasız ulaşıp 401'e düşerdi.
+   */
+  deleteAccount: (password) =>
+    request('/api/v1/profile/delete', { method: 'POST', body: { password } }),
+  uploadAvatar: (formData) => request('/api/v1/profile/avatar', { method: 'POST', formData }),
   /**
    * Öğrenci belgesi (PDF/görsel, en fazla 10 MB). Yeni belge, önceki doğrulama/ret
    * kararını sıfırlar ve beyanı yeniden kuyruğa sokar.
+   *
+   * Uç 2026-09-01'de AÇILDI (ProfileController). Öncesinde backend'de yalnızca komut ve
+   * handler vardı, rota yoktu; bu metot da sessiz 404 yerine sebebini söyleyerek
+   * reddediyordu. Artık gerçek çağrı yapıyor.
+   *
+   * ⚠️ Yönetim ekranı belgeyi GÖSTERMİYOR (hakem görüntüleyicisi henüz bağlanmadı).
+   * Belge yüklenip okunabiliyor, ama doğrulama akışı tamamlanana kadar hakem kararı
+   * hâlâ sistem dışı kanıta dayanıyor.
    */
   uploadTeacherDocument: (file) => {
     const form = new FormData()
     form.append('document', file)
-    return request('/api/profile/teacher-candidate/document', { method: 'POST', formData: form })
+    return request('/api/v1/profile/teacher-candidate/document', { method: 'POST', formData: form })
   },
 
+  /** Kendi yüklediğin belgeyi geri okur (yetki sunucuda: başkasınınki 403). */
+  teacherDocumentSource: (profileId) => ({
+    yol: `/api/v1/profile/teacher-candidate/${profileId}/document`,
+  }),
+
   declareTeacherCandidate: (payload) =>
-    request('/api/profile/teacher-candidate', { method: 'PUT', body: payload }),
+    request('/api/v1/profile/teacher-candidate', { method: 'PUT', body: payload }),
 
   /** Avatar için <Image source> nesnesi. Avatar yoksa sunucu 404 döner; Image onError
       ile baş harflere düşülür (bkz. components/Avatar). */
-  avatarImageSource: (userId) => authImageSource(avatarPath(userId)),
+  /**
+   * Avatarın nereden okunacağını söyler:
+   *   { yerel }  → az önce yüklenen, cihazdaki dosya (istek gerekmez)
+   *   { yol }    → sunucudaki adres; baytları authedImageDataUri indirir
+   */
+  avatarImageSource: (userId) => {
+    const yerel = yerelAvatarlar.get(avatarAnahtar(userId))
+    return yerel ? { yerel } : { yol: avatarPath(userId) }
+  },
 
   /** Yeni avatar yüklendikten sonra çağrılır — bir sonraki avatarImageSource yeni
       görseli indirir (web'deki forgetAvatar ile aynı sözleşme). */
   forgetAvatar: (userId) => {
-    avatarVersions.set(userId, (avatarVersions.get(userId) ?? 0) + 1)
+    const anahtar = avatarAnahtar(userId)
+    avatarVersions.set(anahtar, (avatarVersions.get(anahtar) ?? 0) + 1)
+    // Diske yaz: açılışta geri okunmazsa adres temel URI'ye döner ve Fresco eski
+    // görseli ağa hiç çıkmadan sunar (bkz. KEYS.avatarSurumleri).
+    prefs.set(KEYS.avatarSurumleri, JSON.stringify(Object.fromEntries(avatarVersions)))
+  },
+
+  /**
+   * Yeni yüklenen fotoğrafın CİHAZDAKİ yolunu hatırlar; avatarImageSource bundan sonra
+   * uzak adres yerine onu döndürür (bkz. yerelAvatarlar).
+   *
+   * MOBİLE ÖZGÜ — web'de karşılığı YOK ve olması da gerekmiyor: web, yükleme sonrası
+   * object URL'i zaten elinde tutuyor. Buradaki eşitsizlik bilinçli (CLAUDE.md'deki
+   * proofImageSource/avatarImageSource sapmalarıyla aynı gerekçe).
+   */
+  rememberLocalAvatar: (userId, uri) => {
+    if (uri) yerelAvatarlar.set(avatarAnahtar(userId), uri)
   },
 
   userReviews: (userId, page = 1, pageSize = 10) =>
-    request(`/api/users/${userId}/reviews?page=${page}&pageSize=${pageSize}`),
+    request(`/api/v1/users/${userId}/reviews?page=${page}&pageSize=${pageSize}`),
 
   /**
    * Branş rozetleri + branş bazlı anlatım saatleri (iş kuralı 2).
    * Profil ucundan AYRI: rozet şeridi daha seyrek değişiyor ve gecikmeli yüklenebiliyor.
    */
-  userSubjectBadges: (userId) => request(`/api/users/${userId}/subject-badges`),
+  userSubjectBadges: (userId) => request(`/api/v1/users/${userId}/subject-badges`),
 
   /*
     KULLANICI ŞİKAYETİ — ders bağlamı olmadan.
@@ -384,10 +551,10 @@ export const api = {
     kuyruğuna düşer (moderation.Reports).
   */
   reportUser: (userId, reason, description) =>
-    request(`/api/users/${userId}/report`, { method: 'POST', body: { reason, description } }),
+    request(`/api/v1/users/${userId}/report`, { method: 'POST', body: { reason, description } }),
 
   createReview: (sessionId, payload) =>
-    request(`/api/sessions/${sessionId}/review`, { method: 'POST', body: payload }),
+    request(`/api/v1/sessions/${sessionId}/review`, { method: 'POST', body: payload }),
 
   /*
     ─── TOPLULUK (FORUM) ──────────────────────────────────────────────────────
@@ -405,16 +572,16 @@ export const api = {
     // Etiket yoksa parametre HİÇ gönderilmez: boş bir `tag=` değeri sunucuda geçersiz
     // enum olarak bağlanır ve akış 400 döner.
     if (tag) q.set('tag', tag)
-    return request(`/api/community/posts?${q}`, { signal })
+    return request(`/api/v1/community/posts?${q}`, { signal })
   },
 
   createForumPost: (tag, title, body) =>
-    request('/api/community/posts', { method: 'POST', body: { tag, title, body } }),
+    request('/api/v1/community/posts', { method: 'POST', body: { tag, title, body } }),
 
-  forumComments: (postId, signal) => request(`/api/community/posts/${postId}/comments`, { signal }),
+  forumComments: (postId, signal) => request(`/api/v1/community/posts/${postId}/comments`, { signal }),
 
   createForumComment: (postId, body) =>
-    request(`/api/community/posts/${postId}/comments`, { method: 'POST', body: { body } }),
+    request(`/api/v1/community/posts/${postId}/comments`, { method: 'POST', body: { body } }),
 
   /**
    * Oy. value yalnızca 1 ya da -1; SIFIR GÖNDERİLMEZ — geri almak, aynı yöne ikinci kez
@@ -425,9 +592,9 @@ export const api = {
    * İstemci optimistik gösterip bu yanıtla düzeltir.
    */
   voteForumPost: (postId, value) =>
-    request(`/api/community/posts/${postId}/vote`, { method: 'POST', body: { value } }),
+    request(`/api/v1/community/posts/${postId}/vote`, { method: 'POST', body: { value } }),
   voteForumComment: (commentId, value) =>
-    request(`/api/community/comments/${commentId}/vote`, { method: 'POST', body: { value } }),
+    request(`/api/v1/community/comments/${commentId}/vote`, { method: 'POST', body: { value } }),
 
   /**
    * Şikayet aynı moderasyon kuyruğuna düşer — ders, sohbet ve forum şikayetleri
@@ -435,18 +602,18 @@ export const api = {
    * 15 karakter; arayüz aynı sınırı uygular ki kullanıcı gönderdikten sonra 400 görmesin.
    */
   reportForumPost: (postId, reason, description) =>
-    request(`/api/community/posts/${postId}/report`, {
+    request(`/api/v1/community/posts/${postId}/report`, {
       method: 'POST',
       body: { reason, description },
     }),
   reportForumComment: (commentId, reason, description) =>
-    request(`/api/community/comments/${commentId}/report`, {
+    request(`/api/v1/community/comments/${commentId}/report`, {
       method: 'POST',
       body: { reason, description },
     }),
 
   // --- Tercihler ---
-  myPreferences: () => request('/api/preferences'),
+  myPreferences: () => request('/api/v1/preferences'),
 
   /*
     Uç adı "cookie-consent" ama MOBİLDE ÇEREZ YOK: taşıdığı şey analitik ve işlevsel
@@ -454,13 +621,13 @@ export const api = {
     karşılığı olan bir uç değişikliğiyle birlikte yapılmalı).
   */
   saveCookieConsent: (analytics, functional, consentVersion) =>
-    request('/api/preferences/cookie-consent', {
+    request('/api/v1/preferences/cookie-consent', {
       method: 'PUT',
       body: { analytics, functional, consentVersion },
     }),
 
   saveOnboarding: (lastStep, completed, suppressed) =>
-    request('/api/preferences/onboarding', {
+    request('/api/v1/preferences/onboarding', {
       method: 'PUT',
       body: { lastStep, completed, suppressed },
     }),
@@ -470,15 +637,15 @@ export const api = {
     Yetki kontrolü SUNUCUDA (403). Arayüz bu ayrımı taklit etmez — yetki kontrolünü
     iki yerde tutmak, birinin unutulduğu gün sessizce açık bırakır.
   */
-  disputes: () => request('/api/admin/disputes'),
-  disputeDetail: (disputeId) => request(`/api/admin/disputes/${disputeId}`),
+  disputes: () => request('/api/v1/admin/disputes'),
+  disputeDetail: (disputeId) => request(`/api/v1/admin/disputes/${disputeId}`),
   resolveDispute: (disputeId, resolution, note) =>
-    request(`/api/admin/disputes/${disputeId}/resolve`, { method: 'POST', body: { resolution, note } }),
+    request(`/api/v1/admin/disputes/${disputeId}/resolve`, { method: 'POST', body: { resolution, note } }),
 
   /** Açık şikayet kuyruğu (yalnızca yönetim). */
-  reports: (onlyOpen = true) => request(`/api/admin/reports?onlyOpen=${onlyOpen}`),
+  reports: (onlyOpen = true) => request(`/api/v1/admin/reports?onlyOpen=${onlyOpen}`),
   resolveReport: (reportId, actionTaken, note) =>
-    request(`/api/admin/reports/${reportId}/resolve`, { method: 'POST', body: { actionTaken, note } }),
+    request(`/api/v1/admin/reports/${reportId}/resolve`, { method: 'POST', body: { actionTaken, note } }),
 
   /**
    * Forum içeriğini kaldırır (remove=true) ya da geri getirir (remove=false).
@@ -488,38 +655,47 @@ export const api = {
    * sonsuza kadar perdeli kalırdı. Gerekçe zorunlu (en az 10 karakter), denetim izine yazılır.
    */
   moderateForumContent: ({ postId = null, commentId = null, remove, reason }) =>
-    request('/api/admin/community/moderate', {
+    request('/api/v1/admin/community/moderate', {
       method: 'POST',
       body: { postId, commentId, remove, reason },
     }),
 
-  adminSessionProofs: (sessionId) => request(`/api/admin/sessions/${sessionId}/proofs`),
+  adminSessionProofs: (sessionId) => request(`/api/v1/admin/sessions/${sessionId}/proofs`),
   /** Yönetici, katılımcı olmadığı derslerin kanıtını kendi ucundan görür. */
   adminProofImageSource: (sessionId, proofId) =>
-    authImageSource(`/api/admin/sessions/${sessionId}/proofs/${proofId}/content`),
+    ({ yol: `/api/v1/admin/sessions/${sessionId}/proofs/${proofId}/content` }),
 
   banUser: (userId, reason) =>
-    request(`/api/admin/users/${userId}/ban`, { method: 'POST', body: { reason } }),
+    request(`/api/v1/admin/users/${userId}/ban`, { method: 'POST', body: { reason } }),
   unbanUser: (userId, reason) =>
-    request(`/api/admin/users/${userId}/unban`, { method: 'POST', body: { reason } }),
+    request(`/api/v1/admin/users/${userId}/unban`, { method: 'POST', body: { reason } }),
 
   /** @param type 'Warning' | 'TemporaryBan' — durationHours yalnızca TemporaryBan'de anlamlı. */
   sanctionUser: (userId, type, reason, durationHours = null) =>
-    request(`/api/admin/users/${userId}/sanction`, {
+    request(`/api/v1/admin/users/${userId}/sanction`, {
       method: 'POST',
       body: { type, reason, durationHours },
     }),
 
+  /**
+   * Adayın öğrenci belgesi (hakem gözüyle). Yetki sunucuda: bu uç AdminOnly.
+   * Baytlar authedImageDataUri ile indiriliyor — RN Image başlık taşımıyor
+   * (bkz. YetkiliGorsel).
+   */
+  adminTeacherDocumentSource: (profileId) => ({
+    yol: `/api/v1/admin/teacher-candidates/${profileId}/document`,
+  }),
+
   teacherCandidates: (status = 'Pending', page = 1, pageSize = 25) =>
-    request(`/api/admin/teacher-candidates?status=${status}&page=${page}&pageSize=${pageSize}`),
+    request(`/api/v1/admin/teacher-candidates?status=${status}&page=${page}&pageSize=${pageSize}`),
   /** decision: Verify | Reject | Revert. Gerekçe zorunlu (sunucu da doğruluyor). */
   reviewTeacherCandidate: (profileId, decision, note) =>
-    request(`/api/admin/teacher-candidates/${profileId}/review`, {
+    request(`/api/v1/admin/teacher-candidates/${profileId}/review`, {
       method: 'POST',
       body: { decision, note },
     }),
 
-  economyMetrics: () => request('/api/admin/metrics'),
+  economyMetrics: () => request('/api/v1/admin/metrics'),
 
   /**
    * Yönetim eliyle puan tanımlama/düzeltme. Pozitif ekler, negatif düşer; gerekçe zorunlu.
@@ -530,14 +706,14 @@ export const api = {
    * ağ hatasından sonraki tekrar denemede korunması gereken durumda.
    */
   adjustCredits: (userId, amount, reason, idempotencyKey) =>
-    request(`/api/admin/users/${userId}/credits`, {
+    request(`/api/v1/admin/users/${userId}/credits`, {
       method: 'POST',
       body: { amount, reason },
       headers: { 'Idempotency-Key': idempotencyKey },
     }),
 
   auditLog: (page = 1, pageSize = 25) =>
-    request(`/api/admin/audit-log?page=${page}&pageSize=${pageSize}`),
+    request(`/api/v1/admin/audit-log?page=${page}&pageSize=${pageSize}`),
 }
 
 /*

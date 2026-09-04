@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { api } from '../src/lib/api'
 import { useAsync } from '../src/state/useAsync'
+import { useInbox } from '../src/state/InboxContext'
 import { formatDateTime } from '../src/lib/format'
 import { Avatar } from '../src/components/Avatar'
 import { Badge, Button, EmptyState, ErrorBox, Loading, Notice } from '../src/components/ui'
@@ -31,6 +32,7 @@ const TABS = [
 
 export default function Eslesmeler() {
   const router = useRouter()
+  const { reloadConversations } = useInbox()
   const matches = useAsync(() => api.myMatches(), [])
   const [tab, setTab] = useState('incoming')
   const [notice, setNotice] = useState(null)
@@ -94,7 +96,11 @@ export default function Eslesmeler() {
 
         {matches.loading ? (
           <Loading />
-        ) : current.length === 0 ? (
+        ) : /* Hata varken boş durum GÖSTERİLMEZ: "Bekleyen istek yok" ile "Sunucuya
+              ulaşılamadı" aynı ekranda çelişiyor ve kullanıcı kendisine gelmiş bir
+              isteği kaçırdığını fark etmiyor. Boş durum yalnızca veri gerçekten
+              geldiyse doğrudur. */
+        matches.error || matches.data == null ? null : current.length === 0 ? (
           <SekmeBosDurumu tab={tab} router={router} />
         ) : (
           current.map((match) => (
@@ -106,6 +112,18 @@ export default function Eslesmeler() {
               onChanged={(message) => {
                 setNotice(message)
                 matches.reload({ silent: true })
+                /*
+                  SOHBET LİSTESİ DE TAZELENMELİ.
+
+                  Eşleşme kabul edilince sunucu konuşmayı AÇIYOR ama bunu kimseye
+                  BİLDİRMİYOR: SignalR'ın ConversationUpdated olayı yalnızca mesaj
+                  gönderiminde yayınlanıyor. InboxContext ise listeyi açılışta bir kez
+                  çekip sonrasını o olaya bırakıyor. Sonuç: kullanıcı "Sohbet açıldı"
+                  bildirimini görüyor, Mesajlar sekmesine geçiyor ve orada hiçbir şey
+                  yok — ilk eşleşmesiyse "Henüz sohbetin yok" boş durumu duruyor.
+                  Ancak karşı taraf mesaj yazınca ya da uygulama yeniden açılınca düzeliyor.
+                */
+                reloadConversations()
               }}
             />
           ))

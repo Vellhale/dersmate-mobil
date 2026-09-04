@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import { api } from '../src/lib/api'
+import { useYetkiliGorsel } from '../src/components/YetkiliGorsel'
 import { amber, rose, slate } from '../src/lib/theme'
 import { useAsync } from '../src/state/useAsync'
 import { useWallet } from '../src/state/WalletContext'
@@ -92,7 +93,21 @@ export default function Dersler() {
   const [gecmisHata, setGecmisHata] = useState(null)
   const gecmisKilit = useRef(false)
 
+  /*
+    NESİL SAYACI — tazeleme ile sayfalama yarışıyor.
+
+    Bir ders onaylandığında sessions.reload() koşuyor ve aşağıdaki efekt biriken
+    geçmişi sıfırlıyor. Ama o sırada uçuşta bir "daha getir" varsa, o istek döndüğünde
+    ESKİ ofsetli sayfayı YENİ listenin üstüne ekliyordu: onaylanan ders geçmişin başına
+    girdiği için sayfa sınırları kayıyor ve arada kalan kayıtlar hiç görünmüyordu.
+
+    Nesil, hangi listenin geçerli olduğunu söylüyor; eski nesle ait yanıt atılıyor.
+  */
+  const gecmisNesil = useRef(0)
+
   useEffect(() => {
+    gecmisNesil.current += 1
+    gecmisKilit.current = false
     setEkGecmis([])
     setGecmisSayfa(1)
     setGecmisHata(null)
@@ -143,18 +158,23 @@ export default function Dersler() {
 
   async function dahaGetir() {
     if (gecmisKilit.current || !dahaVar) return
+    const nesil = gecmisNesil.current
     gecmisKilit.current = true
     setGecmisYukleniyor(true)
     setGecmisHata(null)
     try {
       const data = await api.mySessions(gecmisSayfa + 1, PAST_PAGE_SIZE)
+      // Liste bu sırada tazelendiyse bu sayfa artık başka bir listeye ait: at.
+      if (nesil !== gecmisNesil.current) return
       setEkGecmis((prev) => [...prev, ...(data.past?.items ?? [])])
       setGecmisSayfa((p) => p + 1)
     } catch (err) {
-      setGecmisHata(err)
+      if (nesil === gecmisNesil.current) setGecmisHata(err)
     } finally {
-      gecmisKilit.current = false
-      setGecmisYukleniyor(false)
+      if (nesil === gecmisNesil.current) {
+        gecmisKilit.current = false
+        setGecmisYukleniyor(false)
+      }
     }
   }
 
@@ -168,7 +188,17 @@ export default function Dersler() {
     refreshWallet()
   }
 
+  /*
+    BOŞ DURUM, HATA DURUMUNDAN AYRI.
+
+    Liste yüklenemediğinde de uzunluk 0 oluyordu ve ekranda kırmızı "Sunucuya ulaşılamadı"
+    kutusunun HEMEN ALTINDA "Henüz dersin yok" yazıyordu. İki mesaj birbiriyle çelişiyor
+    ve ikincisi daha kesin konuştuğu için kullanıcı derslerinin silindiğini sanıyordu.
+    Veri gerçekten geldiyse ve boşsa boş durum doğrudur; hata varsa yalnızca hata.
+  */
   const hicDersYok =
+    !sessions.error &&
+    sessions.data != null &&
     groups.action.length + groups.upcoming.length + groups.gecmisAcik.length + gecmisItems.length === 0
 
   const baslikBolumu = (
@@ -313,6 +343,20 @@ export default function Dersler() {
             setDialog({ type: 'review', session })
           }}
           onReport={() => setDialog({ type: 'report', session: dialog.session })}
+          onDispute={() => setDialog({ type: 'dispute', session: dialog.session })}
+        />
+      )}
+
+      {dialog?.type === 'dispute' && (
+        <DisputeModal
+          session={dialog.session}
+          onClose={() => setDialog(null)}
+          onDone={() =>
+            refresh(
+              'İtirazın yönetime iletildi. Karar verilene kadar puan yazılmayacak; ' +
+                'sonucu Derslerim ekranından takip edebilirsin.',
+            )
+          }
         />
       )}
 
@@ -892,9 +936,10 @@ function CompleteModal({ session, onClose, onDone }) {
 
 /* ── ONAY (kanıt inceleme) ───────────────────────────────────────────────── */
 
-function ApproveModal({ session, onClose, onApproved, onReport }) {
+function ApproveModal({ session, onClose, onApproved, onReport, onDispute }) {
   const proofs = useAsync(() => api.sessionProofs(session.sessionId), [session.sessionId])
   const [imageFailed, setImageFailed] = useState(false)
+
   const [error, setError] = useState(null)
 
   /* Onay dosyanın en pahalı geri alınamaz işlemi: puan basar. Kilit modalın KENDİ
@@ -904,6 +949,15 @@ function ApproveModal({ session, onClose, onApproved, onReport }) {
   const onayKilidi = useRef(false)
 
   const latestProof = proofs.data?.[proofs.data.length - 1] ?? null
+  /*
+    Kanıt görseli BAŞLIKLI İSTEKLE indiriliyor: RN Image, source'a verilen Authorization
+    başlığını göndermiyor ve istek 401 alıyordu (ölçüm: YetkiliGorsel). Eski hâlinde
+    kanıt hiçbir zaman görünmeyecekti — onay ekranındaki tek dayanak o görsel.
+  */
+  const kanitKaynagi = latestProof
+    ? api.proofImageSource(session.sessionId, latestProof.proofId)
+    : null
+  const { uri: kanitUri, hata: kanitHatasi } = useYetkiliGorsel(kanitKaynagi)
 
   async function approve() {
     if (onayKilidi.current) return
@@ -936,11 +990,17 @@ function ApproveModal({ session, onClose, onApproved, onReport }) {
         <>
           {/* Onay uçarken diğer düğmeler de kapalı: basım sürerken şikayete geçmek,
               hangi sonucun geçerli olduğunu tıklama sırasına bırakırdı. */}
+          {/*
+            DÜĞMELER DERSİN KADERİNİ BELİRLEYENLER: onayla ya da itiraz et. Şikayet
+            gövdeye, sönük bir bağlantıya indi — çünkü şikayet dersi ETKİLEMİYOR, kişi
+            hakkında bir bildirim. Üçünü eşit ağırlıkta düğme yapmak hem mobilde sığmıyor
+            hem de "hangisi dersi durdurur" sorusunu belirsiz bırakıyordu.
+          */}
           <Button variant="secondary" disabled={onaylaniyor} onPress={onClose}>
             Sonra
           </Button>
-          <Button variant="danger" disabled={onaylaniyor} onPress={onReport}>
-            Şikayet et
+          <Button variant="danger" disabled={onaylaniyor} onPress={onDispute}>
+            İtiraz et
           </Button>
           <Button variant="success" loading={onaylaniyor} disabled={onaylaniyor} onPress={approve}>
             Onayla
@@ -983,15 +1043,15 @@ function ApproveModal({ session, onClose, onApproved, onReport }) {
               </View>
             )}
 
-            {imageFailed ? (
+            {imageFailed || kanitHatasi ? (
               <Text className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
                 Kanıt görseli yüklenemedi. Bağlantını kontrol edip yeniden dene.
               </Text>
             ) : (
-              /* RN Image, Authorization başlığını kendisi taşır — web'deki blob/object
-                 URL dolambacına gerek yok (bkz. api.proofImageSource). */
+              /* Baytlar axios ile indirilip data URI olarak veriliyor; RN Image'ın
+                 kendi başlık taşıma yolu Android'de çalışmıyor (bkz. YetkiliGorsel). */
               <Image
-                source={api.proofImageSource(session.sessionId, latestProof.proofId)}
+                source={kanitUri ? { uri: kanitUri } : undefined}
                 accessibilityLabel="Ders kanıtı ekran görüntüsü"
                 onError={() => setImageFailed(true)}
                 className="h-80 w-full rounded-lg border border-slate-200 bg-slate-100"
@@ -1004,6 +1064,133 @@ function ApproveModal({ session, onClose, onApproved, onReport }) {
             </Text>
           </View>
         )}
+
+        <ErrorBox error={error} />
+
+        {/*
+          ŞİKAYET BURADA, DÜĞMELERDE DEĞİL. Dersin akışını değiştirmiyor: kişi hakkında
+          yönetime giden bir bildirim. İtirazla aynı ağırlıkta sunmak, hangisinin puan
+          basımını durdurduğunu belirsiz bırakıyordu.
+        */}
+        <View className="items-center border-t border-slate-100 pt-3">
+          <Pressable
+            accessibilityRole="button"
+            disabled={onaylaniyor}
+            onPress={onReport}
+            className="min-h-[44px] justify-center px-2"
+          >
+            <Text className="text-sm text-slate-500 underline">
+              Ders değil, kişi hakkında şikayetim var
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
+/* ── İTİRAZ ──────────────────────────────────────────────────────────────── */
+
+/*
+  İTİRAZ — şikayetten AYRI bir mekanizma ve arayüzün bunu net söylemesi gerekiyor.
+
+  Şikayet kişi hakkında; ders akmaya devam eder, puan basılır. İtiraz ise dersin
+  KENDİSİNE dair: "yapılmadı" ya da "kanıt sahte". Ders Disputed'a geçer, puan basımı
+  DONAR ve konu yönetim hakemliğine düşer. Öğrenci onay yolunu da kapatmış olur.
+
+  Sebep listesi DisputeReason enum'undan (Domain/Moderation/Enums.cs) ve ders şikayeti
+  listesiyle aynı beş değeri taşıyor — ama ayrı yazılıyor: iki enum bağımsız ve birinin
+  değişmesi diğerinin formunu sessizce bozmamalı (aynı tuzak DERS_SIKAYET_SEBEPLERI'nde
+  bir kez yaşandı).
+*/
+const ITIRAZ_SEBEPLERI = ['SessionNotHeld', 'FakeProof', 'DurationMismatch', 'Abuse', 'Other']
+
+function DisputeModal({ session, onClose, onDone }) {
+  const [reason, setReason] = useState('SessionNotHeld')
+  const [description, setDescription] = useState('')
+  const [error, setError] = useState(null)
+  const [gonderiliyor, setGonderiliyor] = useState(false)
+  const kilit = useRef(false)
+
+  async function submit() {
+    // Çift gönderim: ikincisi sunucudan DISPUTE_ALREADY_OPEN alır ve kullanıcı,
+    // itiraz ASLINDA açılmışken hata görürdü.
+    if (kilit.current || description.trim().length < 10) return
+    kilit.current = true
+    setGonderiliyor(true)
+    setError(null)
+    try {
+      await api.disputeSession(session.sessionId, reason, description.trim())
+      onDone()
+    } catch (err) {
+      kilit.current = false
+      setError(err)
+    } finally {
+      setGonderiliyor(false)
+    }
+  }
+
+  return (
+    <Modal
+      open
+      onClose={gonderiliyor ? () => {} : onClose}
+      title="Bu derse itiraz et"
+      footer={
+        <>
+          <Button variant="secondary" disabled={gonderiliyor} onPress={onClose}>
+            Vazgeç
+          </Button>
+          <Button
+            variant="danger"
+            loading={gonderiliyor}
+            disabled={gonderiliyor || description.trim().length < 10}
+            onPress={submit}
+          >
+            İtirazı gönder
+          </Button>
+        </>
+      }
+    >
+      <View className="gap-4 pb-2">
+        <Notice tone="warning">
+          İtiraz, dersi yönetim hakemliğine taşır: {session.otherDisplayName} kişisine puan
+          YAZILMAZ ve karar verilene kadar donar. Bu dersi artık onaylayamazsın. Yalnızca
+          ders gerçekten yapılmadıysa ya da kanıt bu derse ait değilse itiraz et.
+        </Notice>
+
+        <View>
+          <Text className="mb-2 text-sm font-medium text-slate-700">Sebep</Text>
+          <View className="gap-2">
+            {ITIRAZ_SEBEPLERI.map((value) => {
+              const secili = reason === value
+              return (
+                <Pressable
+                  key={value}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: secili }}
+                  onPress={() => setReason(value)}
+                  className={`min-h-[44px] justify-center rounded-lg border px-3 py-2
+                              ${secili ? 'border-rose-500 bg-rose-50' : 'border-slate-200 bg-white'}`}
+                >
+                  <Text className={`text-sm ${secili ? 'font-medium text-rose-800' : 'text-slate-700'}`}>
+                    {REPORT_REASON_LABELS[value]}
+                  </Text>
+                </Pressable>
+              )
+            })}
+          </View>
+        </View>
+
+        <Field label="Ne oldu?" hint="En az 10 karakter. Hakem yalnızca bunu ve kanıtı görecek.">
+          <Girdi
+            value={description}
+            onChangeText={setDescription}
+            maxLength={2000}
+            multiline
+            textAlignVertical="top"
+            className="h-28"
+          />
+        </Field>
 
         <ErrorBox error={error} />
       </View>

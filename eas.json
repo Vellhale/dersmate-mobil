@@ -9,7 +9,6 @@
       "Play Store'un istediği .aab yalnızca production profilinde; internal profillerde",
       "android.buildType 'apk' olmadan EAS varsayılan olarak .aab üretir ve telefona kurulamaz."
     ],
-
     "onizleme": {
       "//": [
         "BACKEND'SİZ ÇALIŞAN DEMO APK'sı. EXPO_PUBLIC_ONIZLEME derleme anında gömülür;",
@@ -21,23 +20,21 @@
         "EXPO_PUBLIC_ONIZLEME": "1"
       }
     },
-
     "preview": {
       "//": [
         "GERÇEK APK — backend'e bağlanır. EXPO_PUBLIC_API_URL ŞART: bağımsız derlemede",
         "Constants.expoConfig.hostUri null gelir (Metro yok) ve api.js emülatör adresine",
         "(10.0.2.2) düşer; gerçek telefonda o adres anlamsızdır. Değer, backend'in LAN",
-        "adresidir — ağ değişirse burası da güncellenmeli."
+        "adresidir — ağ değişirse burası da güncellenmeli. Port 5099: telefon dotnet'e DOĞRUDAN ulaşamıyor (güvenlik duvarı kuralları programa bağlı), araclar/lan-koprusu.js üzerinden geçiyor. Ayrıntı: CLAUDE.md → Yerel arka uç."
       ],
       "distribution": "internal",
       "android": {
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://192.168.1.111:5000"
+        "EXPO_PUBLIC_API_URL": "http://192.168.1.111:5099"
       }
     },
-
     "development": {
       "//": [
         "Geliştirme istemcisi: içinde Metro'ya bağlanan bir kabuk taşır (Expo Go'nun",
@@ -50,13 +47,50 @@
         "buildType": "apk"
       }
     },
-
     "production": {
-      "//": "Play Store yüklemesi için .aab (varsayılan). Şimdilik kullanılmıyor.",
-      "autoIncrement": true
+      "//": [
+        "MAĞAZA PAKETİ (.aab). Play yalnızca .aab kabul ediyor; doğrudan kurulabilen .apk",
+        "için production-apk profili kullanılır — İKİSİ DE AYNI ANAHTARLA imzalanmalı, aksi",
+        "halde Android bunları farklı uygulama sayar ve kullanıcı geçişte veri kaybeder.",
+        "",
+        "⛔ EXPO_PUBLIC_API_URL İLK DERLEMEDEN ÖNCE GERÇEK ALAN ADIYLA DEĞİŞTİRİLMELİ.",
+        "Aşağıdaki değer bir yer tutucudur. Yanlış kalırsa uygulama derlenir, mağazaya",
+        "yüklenir ve kullanıcıda sessizce 'sunucuya ulaşılamadı' verir — derleme anında",
+        "hiçbir uyarı çıkmaz, çünkü adres yalnızca çalışma anında denenir.",
+        "",
+        "https:// olması ayrıca gerekli: app.config.js şifresiz trafik iznini adresin",
+        "şemasına bağlıyor. http:// bırakılırsa izin açık kalır ve mağaza sürümü",
+        "gereksiz yere zayıflar."
+      ],
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.ALANADINI-YAZ.com"
+      }
+    },
+    "production-apk": {
+      "//": [
+        "SİTEDEN DOĞRUDAN İNDİRİLEN APK. production ile aynı ortamı miras alır; yalnızca",
+        "paket biçimi farklıdır. distribution 'internal' değil: bu bir üretim paketi ve",
+        "mağaza sürümüyle AYNI imza anahtarını kullanmalı."
+      ],
+      "extends": "production",
+      "android": {
+        "buildType": "apk"
+      }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "//": [
+        "Play'e otomatik gönderim. serviceAccountKeyPath, Play Console'dan indirilen JSON",
+        "anahtarın yoludur ve DEPOYA İŞLENMEZ — depo dışında tutulup yolu buraya yazılır.",
+        "track 'internal' ile başla: yalnızca test listesindeki hesaplara gider, mağaza",
+        "incelemesi beklemeden kurulabilir. 'production' ise herkese açık yayındır."
+      ],
+      "android": {
+        "serviceAccountKeyPath": "./play-service-account.json",
+        "track": "internal"
+      }
+    }
   }
 }
