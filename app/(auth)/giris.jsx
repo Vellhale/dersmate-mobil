@@ -82,8 +82,14 @@ export default function Giris() {
 
         <ErrorBox error={error} />
 
+        {/* Adres parametreyle taşınıyor: doğrulama ekranı kodun yanında e-posta da
+            istiyor ve buraya kadar gelen kullanıcı onu az önce yazdı. Yeniden
+            yazdırmak, hatanın hemen ardında gereksiz bir sürtünme olurdu. */}
         {error?.code === 'EMAIL_NOT_VERIFIED' && (
-          <Button variant="secondary" onPress={() => router.push('/dogrula')}>
+          <Button
+            variant="secondary"
+            onPress={() => router.push({ pathname: '/dogrula', params: { email: email.trim() } })}
+          >
             E-postamı doğrula
           </Button>
         )}

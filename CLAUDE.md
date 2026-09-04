@@ -215,6 +215,15 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
   göre kendisi geçiş yapar (`app/_layout.jsx`).
 - Ders geçmişi sayfa boyutu **5** ve FlatList `onEndReached` ile yüklenir (mobil iş
   kuralı); web 20 kullanıyor.
+- **"Yeni kod gönder" beklemesi damgadan hesaplanır**, web'deki gibi sayaçtan
+  düşülmez (`src/lib/dogrulamaKodu.js`). Web'de doğrulama sayfasına yalnızca kayıt
+  ekranından geliniyor, o yüzden "sayacı 60'tan başlat" doğru cevabı veriyor.
+  Mobilde ekranın **üç girişi** var (kayıt, girişteki `EMAIL_NOT_VERIFIED` kısayolu,
+  giriş altındaki bağlantı) ve ikisinde hiç kod gönderilmiyor — nereden gelindiğine
+  bakan bir sayaç, kodu çoktan ölmüş kullanıcıyı 60 saniye boşuna bekletiyordu.
+  Kalan süre artık kodun gerçekten gönderildiği andan türüyor. Damga **diske
+  yazılmaz**: yazılsaydı `IzinContext` kuralı gereği `ISLEVSEL_DEPOLAMA`ya girip
+  `IZIN_SURUMU`nü artırmak ve izin bildirimini herkese yeniden göstermek gerekirdi.
 
 ## Korunan iş kuralları (backend'de yaşar, arayüz ihlal etmez)
 
@@ -256,6 +265,9 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
   (hakkimizda/gizlilik/kosullar + `yasalMetinler.js`), parola sıfırlama, kayıt onayı,
   sohbette taciz bildirimi, üç rozet şeridi, ürün turu, analitik + veri izni.
   `api.js` yüzeyi web ile eşit (71 metot).
+- **ADIM 6 (tamam):** hesap silme, itiraz akışı, belge görüntüleyici, `/api/v1` öneki.
+- **ADIM 7 (tamam):** e-posta doğrulama 6 haneli koda geçti, yönetim rozeti profile
+  bağlandı, gövdesiz 403/404/5xx'e anlamlı metin, topluluk katkı sayaçları.
 
 ## Web ile senkron tutma
 
@@ -266,19 +278,34 @@ commit'ten diff çekmek:
 cd C:/projeler/dersmate && git diff <baseline>..HEAD --stat -- frontend/src
 ```
 
-Son senkron baseline'ı: **`7f140a9`** (2026-08-25). Bir sonraki senkronda buradaki
+Son senkron baseline'ı: **`b93422a`** (2026-09-04). Bir sonraki senkronda buradaki
 değeri güncelle, yoksa aynı diff iki kez uygulanır.
+
+⚠️ BASELINE'I GÜNCELLEMEYİ UNUTMAK SESSİZ BİR HATADIR ve bir kez yaşandı: değer
+`7f140a9`'da (25 Ağustos) kalmışken mobil aslında iki tur daha ilerlemişti, bu yüzden
+diff on günlük bitmiş işi de "yapılacak" diye gösteriyordu. Ters yönü daha kötü:
+baseline ileri kalırsa gerçek bir fark hiç görünmez.
+
+**Bilerek taşınmayan tek iş** (`0015860`, Keşfet filtre sütununun ekrana yapışması):
+web'de yan sütun sayfa ile birlikte kayıyordu, `position: sticky` ile sabitlendi.
+Mobilde filtreler yan sütunda değil ALT SAYFA MODALINDE ve modal zaten ekranda sabit —
+karşılığı yok, port edilecek bir şey yok.
 
 ⚠️ `api.js` yüzeyini karşılaştırmak için metot adlarını çıkarıp kümeleri karşılaştır;
 mobilde bilinçli olarak FARKLI olan üç metot var (`proofContentUrl` → `proofImageSource`,
 `avatarObjectUrl` → `avatarImageSource`, `adminProofContentUrl` → `adminProofImageSource`)
 — blob/object-URL yerine `<Image source={{uri, headers}}>` kullanıldığı için.
 
-⚠️ `deleteAccount` MOBİLDE VAR, WEB'DE HENÜZ YOK. Uç sunucuya eklendi
-(`POST /api/profile/delete`) ve mobil ekranı bağlandı; web istemcisine aynı metot ve bir
-"Hesabımı sil" akışı eklenmeli — yüzey eşitliği kuralı gereği ve Play'in istediği "herkese
-açık adreste silme yolu" ancak web'de var olabilir. Sunucu tarafı hazır, yapılacak iş
-yalnızca istemcide.
+⚠️ `verifyEmail` İKİ ARGÜMAN ALIYOR (`email`, `code`) — tek argümanlı token sürümü
+2 Eylül'de sunucudan kalktı. Bu, senkron gecikmesinin en pahalı örneği: sunucu
+sözleşmeyi değiştirdi, mobil eski gövdeyi göndermeye devam etti ve **hiç kimse hesabını
+doğrulayamadı** (doğrulanmadan giriş de kapalı, yani yeni kayıt tamamen kilitliydi).
+Ne uygulama ne sunucu çöküyordu; ekran yalnızca "kod yanlış" diyordu. Kimlik uçlarının
+gövdesi değiştiğinde mobil AYNI TURDA güncellenmeli.
+
+⚠️ Parola sıfırlama HÂLÂ TOKEN'LA. Doğrulama koda geçti, sıfırlama geçmedi
+(`ResetPasswordRequest(Token, NewPassword)`). İki akış artık farklı; birini diğerine
+bakarak "düzeltme".
 
 ⚠️ `SOZLESME_SURUMU` artık ÜÇ yerde: sunucu (`LegalDocuments.cs`), web ve mobil
 (`src/lib/yasalMetinler.js`). Sürüm artarken mağazadaki eski mobil sürüm kendi eski

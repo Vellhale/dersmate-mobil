@@ -9,6 +9,7 @@ import { Avatar } from './Avatar'
 import { SubjectBadges } from './SubjectBadges'
 import { UniversiteRozetleri } from './UniversiteRozetleri'
 import { ToplulukRozetleri } from './ToplulukRozetleri'
+import { YonetimRozeti } from './YonetimRozeti'
 import { GrafikIkonu, KepIkonu, TakvimIkonu, YildizIkonu } from './Ikonlar'
 import { Badge, Button, Card, EmptyState, ErrorBox, Loading } from './ui'
 
@@ -37,9 +38,11 @@ import { Badge, Button, Card, EmptyState, ErrorBox, Loading } from './ui'
   sorusunu yanıtlıyor ve konu panellerinden ("ne yapabilir") önce geliyor; üçü de
   gösterecek bir şey yoksa kendini tamamen gizliyor.
 
-  YÖNETİM ROZETİ BURADA YOK ve bu bir eksik değil: profil ucu rolü bilerek sızdırmıyor
-  (bkz. YonetimRozeti.jsx). Rozetin işi forumda/Keşfet'te resmi cevabı ayırt etmek,
-  profilde kişi etiketlemek değil.
+  YÖNETİM ROZETİ ADIN YANINDA (bkz. ProfilBasligi). Önce bilerek yoktu — gerekçe
+  "rozetin işi resmi cevabı ayırt etmek, profilde kişi etiketlemek değil" idi — ama o
+  gerekçe rozeti DOĞRULAMA yolunu kapatıyordu: forumda rozetli bir yorum görüp adına
+  dokunan kullanıcı hiçbir işaret bulamıyordu. Sunucu profil ucuna `isStaff` ekledi
+  (ProfileQueries.cs) ve rozet buraya bağlandı; ayrıntılı gerekçe YonetimRozeti.jsx'te.
 */
 
 export function ProfilGorunumu({ userId, kendiProfilim = false }) {
@@ -85,7 +88,12 @@ export function ProfilGorunumu({ userId, kendiProfilim = false }) {
         kural ihlaliyle toplanan oy rozet kazandırmıyor (bkz. ProfileQueries).
         Kazanılmamış kademelerin merdiveni yalnızca kendi profilinde çiziliyor.
       */}
-      <ToplulukRozetleri oy={p.communityUpvotes} kendiProfilim={benimProfilim} />
+      <ToplulukRozetleri
+        oy={p.communityUpvotes}
+        kendiProfilim={benimProfilim}
+        gonderiSayisi={p.communityPostCount}
+        yorumSayisi={p.communityCommentCount}
+      />
 
       <KonuPaneli title="Anlatabilirim" tone="brand" topics={p.canTeach} emptyText="Henüz konu eklenmemiş." />
       <KonuPaneli
@@ -116,9 +124,22 @@ function ProfilBasligi({ profile }) {
         className="border-4 border-brand-200"
       />
 
-      <Text className="mt-4 text-center text-3xl font-bold leading-tight tracking-tight text-slate-900">
-        {profile.displayName}
-      </Text>
+      {/*
+        YÖNETİM ROZETİ ADIN YANINDA, altında değil: forumda rozetli bir yorum görüp
+        adına dokunan kullanıcının doğrulamak istediği şey tam olarak bu ve aradığı
+        yerde bulmalı. Aşağı kaydırma gerektiren bir rozet, doğrulama adımını
+        başarısız kılar.
+
+        Sarmalayıcı flex-wrap: mobilde ad zaten 3xl ve uzun adlarda rozet alt satıra
+        iniyor; aynı satırda zorlanırsa ad kırpılır ve kimlik okunamaz hâle gelir —
+        rozetin varlığı adın okunmasından daha önemli değil.
+      */}
+      <View className="mt-4 flex-row flex-wrap items-center justify-center gap-x-3 gap-y-2">
+        <Text className="text-center text-3xl font-bold leading-tight tracking-tight text-slate-900">
+          {profile.displayName}
+        </Text>
+        {profile.isStaff && <YonetimRozeti />}
+      </View>
 
       {(profile.university || profile.department) && (
         <Text className="mt-2 text-center text-sm font-medium text-slate-600">

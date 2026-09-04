@@ -212,8 +212,13 @@ function YeniParola({ ilkToken, onBaglantiIste }) {
     >
       <View className="gap-6">
         <View className="gap-4">
-          {/* Token kutusu dogrula.jsx'teki ile aynı biçimde: çok satırlı, mono ve
-              düzeltmesiz — uzun bir dizgeyi yapıştırmak için tasarlandı, yazmak için değil. */}
+          {/* Çok satırlı, mono ve düzeltmesiz: uzun bir dizgeyi yapıştırmak için
+              tasarlandı, yazmak için değil.
+
+              ⚠️ PAROLA SIFIRLAMA HÂLÂ TOKEN'LA, e-posta doğrulaması gibi 6 haneli
+              koda GEÇMEDİ — sunucu burada tek kullanımlık bir token bekliyor
+              (ResetPasswordRequest). İki akış artık farklı; bu kutuyu "doğrulama
+              ekranıyla aynı" diye kod girdisine çevirme. */}
           <Field label="Sıfırlama token'ı" hint="E-postandaki bağlantıdan gelir.">
             <Girdi
               value={token}

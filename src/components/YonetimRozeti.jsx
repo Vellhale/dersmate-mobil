@@ -18,9 +18,21 @@ import { KalkanIkonu } from './Ikonlar'
   engellenmek istenen şey. Bu bileşene bir "role" prop'u EKLEME; kim yönetimdir sorusu
   istemcide cevaplanmamalı.
 
-  ⚠️ PROFİL UCU ROLÜ SIZDIRMIYOR. Bayrak yalnızca yazarın/ilan sahibinin göründüğü
-  listelerde var — bu yüzden rozet profil görünümüne (ProfilGorunumu) BAĞLANMADI, tıpkı
-  web'de olduğu gibi. Rozetin işi resmi cevabı ayırt etmek, kişi listelemek değil.
+  PROFİLDE DE VAR (2026-08-29 sunucu, mobile şimdi taşındı) ve bu, ilk kararın
+  düzeltilmesidir. Bayrak önce yalnızca forum ve Keşfet'teydi; gerekçe "rozetin işi
+  resmi cevabı ayırt etmek, kişi listelemek değil" idi. O gerekçe DOĞRULAMA YOLUNU
+  atlıyordu:
+
+    kullanıcı forumda "Yönetim" rozetli bir yorum görür
+      → adına dokunur (şüphelendiğinde atılacak ilk adım)
+      → profilde hiçbir işaret yok
+
+  Yani rozetin kendisini doğrulamanın yolu kapalıydı. Ters yönde de boşluk vardı:
+  adını "dersmate Yönetim" yapan biri için de profil sessiz kalıyordu, sahteciliği
+  ÇÜRÜTECEK bir yer yoktu. Artık profil ucu da `isStaff` döndürüyor (ProfileQueries.cs)
+  ve rozet ProfilGorunumu'nda adın yanında çiziliyor.
+
+  SIZDIRILAN TEK ŞEY "yönetimde mi" — hangi rol (Admin/Moderator) olduğu sızdırılmıyor.
 
   METİN "YÖNETİM", "ADMİN" DEĞİL: bayrak Admin VE Moderator rollerini birlikte kapsıyor
   (sunucuda `Role is UserRole.Admin or UserRole.Moderator`). "Admin" yazmak moderatörler
