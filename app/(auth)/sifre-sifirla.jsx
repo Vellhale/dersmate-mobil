@@ -11,7 +11,8 @@ import { Button, ErrorBox, Field, Girdi, Notice } from '../../src/components/ui'
   Web'de kipi adres belirliyordu (`?token=` varsa YENİ PAROLA, yoksa BAĞLANTI İSTE).
   Mobilde adres çubuğu yok: token ya derin bağlantının route parametresinden gelir
   (useLocalSearchParams) ya da kullanıcı e-postadaki token'ı ELLE yapıştırır —
-  dogrula.jsx'in zaten kullandığı kalıp. Kip bu yüzden URL'e değil bir duruma bağlı.
+  kayit.jsx'in doğrulama adımının da kullandığı kalıp. Kip bu yüzden URL'e değil bir
+  duruma bağlı.
 
   Web'in "iki ayrı sayfa yazmayalım" gerekçesi mobilde daha da güçlü: token'ı
   kaybeden kullanıcı aynı ekrandan yeni bağlantı isteyebilmeli, e-postası eline
@@ -85,7 +86,7 @@ function BaglantiIste({ onTokenVar }) {
       title="Şifreni mi unuttun?"
       subtitle="E-postanı yaz, sıfırlama bağlantısı gönderelim."
       // Puan/ücretsizlik alt bilgisi burada kapalı: ekran zaten iki bloklu ve uzun,
-      // dogrula.jsx de aynı gerekçeyle kapatıyor.
+      // kayit.jsx'in doğrulama adımı da aynı gerekçeyle kapatıyor.
       altBilgi={false}
     >
       <View className="gap-6">

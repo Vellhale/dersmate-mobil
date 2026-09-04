@@ -91,10 +91,36 @@ export default function Kayit() {
   const [resendBusy, setResendBusy] = useState(false)
   const [resendDone, setResendDone] = useState(false)
 
+  /*
+    "YENİ KOD GÖNDER" KENDİ HATA DURUMUNU TUTUYOR, ana `error`'u paylaşmıyor.
+
+    Paylaşılan tek bir hata kutusu, doğrulama bloğunun içinde — "Doğrula" düğmesinin
+    üstünde — çiziliyor. Yeniden gönderme düğmesi ise ayırıcı çizginin ALTINDA. Ortak
+    durumla, en alttaki düğmeye basıp hata alan kullanıcının geri bildirimi ekranın
+    yukarısında beliriyordu: klavye açıkken ya da içerik kaydırılmışken hiç görünmüyor,
+    yani düğme "hiçbir şey yapmamış" gibi duruyordu.
+  */
+  const [resendError, setResendError] = useState(null)
+
   const [kosullarKabul, setKosullarKabul] = useState(false)
   const [yasBeyani, setYasBeyani] = useState(false)
   const emailRef = useRef(null)
   const sifreRef = useRef(null)
+
+  /*
+    ⛔ ÇİFT GÖNDERİM KİLİDİ REF'TE, STATE'TE DEĞİL.
+
+    Her iki gönderim de İKİ tetikleyiciye bağlı: düğmenin onPress'i ve klavyenin
+    "bitti" tuşu (onSubmitEditing). State bir sonraki render'a kadar eski değerini
+    gösterdiği için `if (busy) return` iki hızlı basışta İKİNCİ isteği geçiriyor —
+    kayıtta duplicate, doğrulamada hız sınırını (429) kullanıcının kendi eliyle
+    tetikleme. sifre-sifirla.jsx bu tuzağı ölçüp aynı çözüme varmıştı; oradaki not
+    "state yetmez" diyordu ve bu dosya onu tekrarlamıştı.
+
+    `busy` state'i DURUYOR ama yalnızca görsel: düğmenin dönen göstergesi için.
+  */
+  const gonderiliyor = useRef(false)
+  const yenidenGonderiliyor = useRef(false)
 
   const eposta = form.email.trim()
 
@@ -134,9 +160,8 @@ export default function Kayit() {
   }
 
   async function onKayit() {
-    // Busy koruması: klavyenin "done" tuşu bu fonksiyona doğrudan bağlı — korumasız hâli
-    // uçuştaki kaydın üstüne ikinci bir istek bindirip duplicate hata üretiyordu.
-    if (busy) return
+    // Kilit ref'te (yukarıdaki gerekçe): şifre alanının "done" tuşu da buraya bağlı.
+    if (gonderiliyor.current) return
 
     // Web'de tarayıcının required/type=email/minLength doğrulamasıydı; RN'de o katman
     // yok — kısa şifreyi sunucuya taşımak turu sunucu hatasıyla kapatırdı.
@@ -157,6 +182,7 @@ export default function Kayit() {
       return
     }
 
+    gonderiliyor.current = true
     setBusy(true)
     setError(null)
     try {
@@ -193,6 +219,7 @@ export default function Kayit() {
     } catch (err) {
       setError(err)
     } finally {
+      gonderiliyor.current = false
       setBusy(false)
     }
   }
@@ -200,7 +227,9 @@ export default function Kayit() {
   const kodGonderilebilir = eposta.length >= 5 && kod.length === KOD_UZUNLUK
 
   async function onDogrula() {
-    if (busy || !kodGonderilebilir) return
+    // Kilit ref'te: kod alanının "Bitti" tuşu da buraya bağlı (yukarıdaki gerekçe).
+    if (gonderiliyor.current || !kodGonderilebilir) return
+    gonderiliyor.current = true
     setBusy(true)
     setError(null)
     try {
@@ -209,14 +238,26 @@ export default function Kayit() {
     } catch (err) {
       setError(err)
     } finally {
+      gonderiliyor.current = false
       setBusy(false)
     }
   }
 
   async function onYenidenGonder() {
-    if (resendBusy || bekleme > 0) return
+    if (yenidenGonderiliyor.current || bekleme > 0) return
+    yenidenGonderiliyor.current = true
     setResendBusy(true)
-    setError(null)
+    setResendError(null)
+
+    /*
+      ⚠️ ÖNCEKİ "GÖNDERDİK" BİLDİRİMİ BURADA SÖNDÜRÜLÜYOR.
+
+      `resendDone` bir kez true olup hiç geri dönmezse, bu denemenin SONUCU ne olursa
+      olsun yeşil "yeni bir kod gönderdik" kutusu ekranda kalır. Hata durumunda ekranda
+      aynı anda hem "gönderdik" hem hata mesajı durur ve kullanıcı hangisine
+      inanacağını bilemez.
+    */
+    setResendDone(false)
     try {
       const r = await api.resendVerification(eposta)
       setResendDone(true)
@@ -224,8 +265,9 @@ export default function Kayit() {
       kodGonderildiIsaretle(eposta)
       if (r?.verificationToken) setKod(r.verificationToken)
     } catch (err) {
-      setError(err)
+      setResendError(err)
     } finally {
+      yenidenGonderiliyor.current = false
       setResendBusy(false)
     }
   }
@@ -258,10 +300,30 @@ export default function Kayit() {
       >
         <View className="gap-6">
           <View className="gap-4">
-            <Notice tone="info">
-              <Text className="font-semibold">{KOD_UZUNLUK} haneli kod</Text> {eposta} adresine
-              gönderildi. Kodu girince hesabın etkinleşir.
-            </Notice>
+            {/*
+              ⚠️ "GÖNDERİLDİ" YALNIZCA GERÇEKTEN GÖNDERİLDİYSE YAZILABİLİR.
+
+              Kayıt yolunda sunucu kodu kaydın içinde gönderiyor (Register.cs), yani cümle
+              doğru. Giriş yolunda HİÇBİR ŞEY gönderilmiyor: Login.cs yalnızca
+              EMAIL_NOT_VERIFIED fırlatıyor, posta atmıyor. Tek bir metin kullanılsaydı bu
+              ekran girişten gelen kullanıcıya hiç gönderilmemiş bir postayı bekletirdi —
+              üstelik en ikna edici biçimde, adresini de yazarak.
+
+              Aynı ayrım geri sayımda zaten yapılıyordu (damga yoksa bekleme 0); burada
+              yapılmadığı için metin ile davranış birbirini yalanlıyordu: düğme "Yeni kod
+              gönder" diye AÇIK duruyor ama yazı "gönderildi" diyor.
+            */}
+            {giristenDogrulama ? (
+              <Notice tone="warning">
+                <Text className="font-semibold">{eposta}</Text> henüz doğrulanmamış. Elinde
+                {' '}{KOD_UZUNLUK} haneli kod varsa gir; yoksa aşağıdan yeni kod iste.
+              </Notice>
+            ) : (
+              <Notice tone="info">
+                <Text className="font-semibold">{KOD_UZUNLUK} haneli kod</Text> {eposta} adresine
+                gönderildi. Kodu girince hesabın etkinleşir.
+              </Notice>
+            )}
 
             <Field label="Doğrulama kodu" hint={`E-postandaki ${KOD_UZUNLUK} haneli sayı.`}>
               {/*
@@ -337,6 +399,11 @@ export default function Kayit() {
               </Notice>
             )}
 
+            {/* Hata BASILAN DÜĞMENİN yanında: tek ortak kutu yukarıda, "Doğrula"nın
+                üstünde duruyor ve buraya basan kullanıcı — klavye açıkken ya da içerik
+                kaydırılmışken — hiçbir şey görmüyordu. */}
+            <ErrorBox error={resendError} />
+
             <Button
               variant="secondary"
               loading={resendBusy}
@@ -365,6 +432,7 @@ export default function Kayit() {
               variant="ghost"
               onPress={() => {
                 setError(null)
+                setResendError(null)
                 setKod('')
                 setResendDone(false)
                 setAdim('form')

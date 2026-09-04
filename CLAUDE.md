@@ -218,9 +218,15 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
 - **"Yeni kod gönder" beklemesi damgadan hesaplanır**, web'deki gibi sayaçtan
   düşülmez (`src/lib/dogrulamaKodu.js`). Web'de doğrulama sayfasına yalnızca kayıt
   ekranından geliniyor, o yüzden "sayacı 60'tan başlat" doğru cevabı veriyor.
-  Mobilde ekranın **üç girişi** var (kayıt, girişteki `EMAIL_NOT_VERIFIED` kısayolu,
-  giriş altındaki bağlantı) ve ikisinde hiç kod gönderilmiyor — nereden gelindiğine
-  bakan bir sayaç, kodu çoktan ölmüş kullanıcıyı 60 saniye boşuna bekletiyordu.
+  Mobilde doğrulama **ayrı ekran değil**, `app/(auth)/kayit.jsx`'in ikinci adımı
+  (2026-09-04; `dogrula.jsx` kaldırıldı). İki girişi var: kayıt akışının kendisi ve
+  girişteki `EMAIL_NOT_VERIFIED` kısayolu (`?dogrula=1&email=`). **İkincisinde hiç kod
+  gönderilmiyor** — `Login.cs` yalnızca hata fırlatıyor; nereden gelindiğine bakan bir
+  sayaç, kodu çoktan ölmüş kullanıcıyı 60 saniye boşuna bekletiyordu.
+
+  ⚠️ Aynı ayrım **metinde de** yapılmak zorunda: o yolda ekran "kod gönderildi" YAZAMAZ,
+  yoksa kullanıcı hiç gönderilmemiş bir postayı bekler. Bu hata bir kez yapıldı — sayaç
+  doğruydu, cümle yanlıştı.
   Kalan süre artık kodun gerçekten gönderildiği andan türüyor. Damga **diske
   yazılmaz**: yazılsaydı `IzinContext` kuralı gereği `ISLEVSEL_DEPOLAMA`ya girip
   `IZIN_SURUMU`nü artırmak ve izin bildirimini herkese yeniden göstermek gerekirdi.
