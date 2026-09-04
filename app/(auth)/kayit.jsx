@@ -1,11 +1,15 @@
-import { useRef, useState } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
 import { Pressable, Text, View } from 'react-native'
-import { Link, useRouter } from 'expo-router'
+import { Link, useLocalSearchParams, useRouter } from 'expo-router'
 import { api } from '../../src/lib/api'
-import { kodGonderildiIsaretle } from '../../src/lib/dogrulamaKodu'
+import { kalanBeklemeSn, kodGonderildiIsaretle } from '../../src/lib/dogrulamaKodu'
 import { SOZLESME_SURUMU } from '../../src/lib/yasalMetinler'
 import { AuthKabuk } from '../../src/components/AuthKabuk'
 import { Button, ErrorBox, Field, Girdi, Notice } from '../../src/components/ui'
+
+/** Sunucudaki EmailVerificationRules ile aynı olmalı. */
+const KOD_UZUNLUK = 6
+const KOD_DAKIKA = 15
 
 /**
  * Onay kutusu — RN'de yerleşik checkbox yok.
@@ -36,35 +40,102 @@ function OnayKutusu({ secili, onToggle, children }) {
 }
 
 /*
-  KAYIT — web'deki Register.jsx'in portu.
+  KAYIT VE E-POSTA DOĞRULAMA — TEK EKRAN, İKİ ADIM.
 
-  Kayıt sonrası doğrulama ekranına geçiliyor ve ADRES PARAMETREYLE TAŞINIYOR: o ekran
-  kodun yanında e-posta da istiyor (6 hane kullanıcıya özgü değil, aynı anda yüzlerce
-  hesapta aynı kod olabilir) ve kullanıcıya az önce yazdığı adresi ikinci kez
-  yazdırmak, hiçbir şey kazandırmayan bir sürtünme olurdu.
+  ─── AYRI /dogrula EKRANI NEDEN KALDIRILDI (2026-09-04) ─────────────────────────
 
-  Geliştirme ortamında sunucu kodu da `verificationToken` alanında döndürüyor ve kod
-  parametreyle taşınıyor — üretimde o alan boş gelir, yalnızca adres taşınır.
+  Akış üç ekrandı: form → "Kayıt alındı" ara ekranı → düğme → /dogrula. Tek iş için üç
+  ekran ve ortadaki hiçbir iş yapmıyordu; yalnızca "şimdi de şuraya git" diyordu.
+
+  Şimdi kayıt başarılı olunca AYNI ekran kod girişine dönüşüyor: gezinme yok, geri
+  yığını yok, adres parametreyle taşınmıyor (zaten state'te duruyor).
+
+  ⚠️ ADIM URL'E DEĞİL DURUMA BAĞLI. Rota olarak ayrılsaydı geri düğmesi kullanıcıyı
+  doldurulmuş forma geri atardı ve "Hesap oluştur" ikinci kez basılabilir hâle gelirdi —
+  sunucu bunu duplicate ile reddeder, kullanıcı da neden reddedildiğini anlamaz.
+  sifre-sifirla.jsx aynı gerekçeyle aynı kalıbı kullanıyor.
+
+  ─── GİRİŞTEN GELEN YOL ─────────────────────────────────────────────────────────
+
+  Doğrulanmamış hesapla giriş denemesi EMAIL_NOT_VERIFIED veriyor ve giris.jsx oraya bir
+  düğme koyuyor. O düğme buraya `?dogrula=1&email=...` ile geliyor ve ekran DOĞRUDAN 2.
+  adımda açılıyor — kayıt formu hiç görünmüyor. Yani "doğrulama" ayrı bir alan değil,
+  bu ekranın bir durumu.
+
+  Dünkü kullanıcının hesabına dönebilmesi bu yola bağlı; ayrı ekranı silerken bu yol
+  kurulmasaydı doğrulanmamış hesap KALICI olarak kilitlenirdi: doğrulanmadan giriş
+  kapalı, aynı e-postayla yeniden kayıt da kapalı.
 */
 export default function Kayit() {
   const router = useRouter()
+  const params = useLocalSearchParams()
 
-  const [form, setForm] = useState({ email: '', password: '', displayName: '' })
+  /*
+    expo-router bir parametreyi iki kez taşıyan adreste DİZİ döndürebiliyor; tür kontrolü
+    o yüzden var, String(params.email) yeterli değil (dizi "a,b" olurdu).
+  */
+  const giristenDogrulama = params.dogrula === '1'
+  const gelenEposta = typeof params.email === 'string' ? params.email : ''
+
+  const [adim, setAdim] = useState(giristenDogrulama ? 'kod' : 'form')
+  const [form, setForm] = useState({
+    email: giristenDogrulama ? gelenEposta : '',
+    password: '',
+    displayName: '',
+  })
+  const [kod, setKod] = useState('')
+
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
-  const [result, setResult] = useState(null)
+
+  const [resendBusy, setResendBusy] = useState(false)
+  const [resendDone, setResendDone] = useState(false)
+
   const [kosullarKabul, setKosullarKabul] = useState(false)
   const [yasBeyani, setYasBeyani] = useState(false)
   const emailRef = useRef(null)
   const sifreRef = useRef(null)
 
+  const eposta = form.email.trim()
+
+  /*
+    ─── GERİ SAYIM: SUNUCUNUN SESSİZ BEKLEMESİNİ GÖRÜNÜR KILIYOR ────────────────
+
+    ⚠️ BU BİR SÜS DEĞİL, GERÇEK BİR KUSURUN ÇARESİ. Gerekçenin tamamı
+    src/lib/dogrulamaKodu.js başında; özeti: sunucu dakikada bir posta gönderiyor ve
+    sınırı SESSİZCE uyguluyor (varlık sızdırmamak için), o yüzden kalan süreyi yalnızca
+    istemci bilebilir.
+
+    ⚠️ SAYAÇ "NEREDEN GELİNDİĞİNE" DEĞİL, KODUN GERÇEKTEN GÖNDERİLDİĞİ ANA BAĞLI.
+    Bir ara yalnızca `email` parametresinin varlığı sayacı dolduruyordu ve YANLIŞTI:
+    giriş ekranı EMAIL_NOT_VERIFIED dalında buraya adres yolluyor ama o yolda HİÇBİR kod
+    gönderilmiyor (Login.cs yalnızca hata fırlatıyor). Sonuç, kodu bir hafta önce ölmüş
+    kullanıcının 60 saniye boşuna bekletilmesiydi — hem de "Yeni kod gönder (60 sn)"
+    etiketi kod az önce gönderilmiş gibi dururken.
+
+    Kalan süre her render'da damgadan HESAPLANIYOR, bir sayaçtan düşülmüyor.
+  */
+  const [tik, tikla] = useReducer((n) => n + 1, 0)
+  const bekleme = adim === 'kod' ? kalanBeklemeSn(eposta) : 0
+
+  /*
+    Tetikleyici `tik`, `bekleme` DEĞİL: iki ardışık ölçüm aynı tam sayıya yuvarlanırsa
+    (yarım saniyelik kayma) `bekleme`ye bağlı bir effect yeniden koşmaz ve geri sayım
+    ekranda donardı. 500 ms, saniyelik değişimi kaçırmayacak kadar sık.
+  */
+  useEffect(() => {
+    if (bekleme <= 0) return undefined
+    const t = setTimeout(tikla, 500)
+    return () => clearTimeout(t)
+  }, [tik, bekleme])
+
   function update(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
-  async function onSubmit() {
-    // Busy koruması: klavyenin "done" tuşu bu fonksiyona doğrudan bağlı — korumasız
-    // hâli uçuştaki kaydın üstüne ikinci bir istek bindirip duplicate hata üretiyordu.
+  async function onKayit() {
+    // Busy koruması: klavyenin "done" tuşu bu fonksiyona doğrudan bağlı — korumasız hâli
+    // uçuştaki kaydın üstüne ikinci bir istek bindirip duplicate hata üretiyordu.
     if (busy) return
 
     // Web'de tarayıcının required/type=email/minLength doğrulamasıydı; RN'de o katman
@@ -73,7 +144,7 @@ export default function Kayit() {
       setError({ message: 'Adını yaz.' })
       return
     }
-    if (!/\S+@\S+\.\S+/.test(form.email.trim())) {
+    if (!/\S+@\S+\.\S+/.test(eposta)) {
       setError({ message: 'Geçerli bir e-posta adresi yaz.' })
       return
     }
@@ -101,22 +172,24 @@ export default function Kayit() {
         ⚠️ Bu iki alan olmadan sunucu kaydı REDDEDİYOR (Register.cs: AgeConfirmed ve
         TermsVersion zorunlu) — alanlar eklenene kadar mobilden hiç kayıt olunamıyordu.
       */
-      setResult(
-        await api.register({
-          ...form,
-          email: form.email.trim(),
-          termsVersion: kosullarKabul ? SOZLESME_SURUMU : null,
-          ageConfirmed: yasBeyani,
-        }),
-      )
+      const sonuc = await api.register({
+        ...form,
+        email: eposta,
+        termsVersion: kosullarKabul ? SOZLESME_SURUMU : null,
+        ageConfirmed: yasBeyani,
+      })
 
       /*
-        Kayıt başarılıysa sunucu doğrulama kodunu GÖNDERDİ (Register.cs). Damga,
-        doğrulama ekranındaki "yeni kod gönder" beklemesinin tek doğru kaynağı —
-        kullanıcı oraya buradan da gitse, önce giriş ekranına uğrayıp oradan da
-        gitse, kalan süre aynı hesaplanır. Ayrıntısı: src/lib/dogrulamaKodu.js
+        Kayıt başarılıysa sunucu doğrulama kodunu GÖNDERDİ (Register.cs). Damga, "yeni kod
+        gönder" beklemesinin tek doğru kaynağı.
       */
-      kodGonderildiIsaretle(form.email.trim())
+      kodGonderildiIsaretle(eposta)
+
+      // Geliştirmede sunucu kodu yanıtta döndürüyor; kullanıcı e-postaya bakmasın diye
+      // doğrudan kutuya yazılıyor. Üretimde bu alan BOŞ gelir ve hiçbir şey değişmez.
+      if (sonuc?.verificationToken) setKod(sonuc.verificationToken)
+
+      setAdim('kod')
     } catch (err) {
       setError(err)
     } finally {
@@ -124,51 +197,188 @@ export default function Kayit() {
     }
   }
 
-  if (result) {
+  const kodGonderilebilir = eposta.length >= 5 && kod.length === KOD_UZUNLUK
+
+  async function onDogrula() {
+    if (busy || !kodGonderilebilir) return
+    setBusy(true)
+    setError(null)
+    try {
+      await api.verifyEmail(eposta, kod)
+      setAdim('bitti')
+    } catch (err) {
+      setError(err)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function onYenidenGonder() {
+    if (resendBusy || bekleme > 0) return
+    setResendBusy(true)
+    setError(null)
+    try {
+      const r = await api.resendVerification(eposta)
+      setResendDone(true)
+      // Gönderim GERÇEKLEŞTİ: damga buradan atılıyor, geri sayım damgadan türüyor.
+      kodGonderildiIsaretle(eposta)
+      if (r?.verificationToken) setKod(r.verificationToken)
+    } catch (err) {
+      setError(err)
+    } finally {
+      setResendBusy(false)
+    }
+  }
+
+  /* ─── 3. ADIM: DOĞRULANDI ──────────────────────────────────────────────────── */
+  if (adim === 'bitti') {
     return (
-      <AuthKabuk title="Kayıt alındı" subtitle="Son adım: e-postanı doğrula." altBilgi={false}>
+      <AuthKabuk
+        title="E-postan doğrulandı"
+        subtitle="Hesabın etkin. Artık eşleşme isteği gönderebilirsin."
+        altBilgi={false}
+      >
         <View className="gap-4">
-          <Notice tone="info">
-            <Text className="font-semibold">6 haneli doğrulama kodu</Text> {form.email} adresine
-            gönderildi. Kodu girince hesabın etkinleşir ve eşleşme isteği gönderebilirsin.
+          <Notice tone="success">
+            Hesabın açıldı 🎉 Giriş yapıp ilk dersini ayarlayabilirsin.
           </Notice>
-
-          {/*
-            DÜĞME HER DURUMDA VAR. Önce yalnızca `verificationToken` dönen (geliştirme)
-            dalda gösteriliyordu; üretimde kullanıcı bu ekranda kalıyor ve doğrulama
-            ekranına gidecek hiçbir yol bulamıyordu — tek çıkışı "Giriş sayfasına dön"
-            düğmesiydi, oysa doğrulanmamış hesapla giriş kapalı. Yani kayıt olan
-            kullanıcı çıkmaz sokağa giriyordu.
-          */}
-          <Button
-            onPress={() =>
-              router.push({
-                pathname: '/dogrula',
-                params: {
-                  email: form.email.trim(),
-                  ...(result.verificationToken ? { kod: result.verificationToken } : null),
-                },
-              })
-            }
-          >
-            Kodu gir ve doğrula
-          </Button>
-
-          {result.verificationToken && (
-            <Text className="text-center text-sm text-slate-600">
-              Geliştirme ortamında kod doğrudan taşınır (gerçek kurulumda yalnızca e-postaya
-              gider): <Text className="font-semibold">{result.verificationToken}</Text>
-            </Text>
-          )}
-
-          <Button variant="secondary" onPress={() => router.replace('/giris')}>
-            Giriş sayfasına dön
-          </Button>
+          <Button onPress={() => router.replace('/giris')}>Giriş yap</Button>
         </View>
       </AuthKabuk>
     )
   }
 
+  /* ─── 2. ADIM: KOD GİRİŞİ (gezinme yok, aynı ekran) ────────────────────────── */
+  if (adim === 'kod') {
+    return (
+      <AuthKabuk
+        title="E-postanı doğrula"
+        subtitle="Son adım — kodu gir, hesabın açılsın."
+        altBilgi={false}
+      >
+        <View className="gap-6">
+          <View className="gap-4">
+            <Notice tone="info">
+              <Text className="font-semibold">{KOD_UZUNLUK} haneli kod</Text> {eposta} adresine
+              gönderildi. Kodu girince hesabın etkinleşir.
+            </Notice>
+
+            <Field label="Doğrulama kodu" hint={`E-postandaki ${KOD_UZUNLUK} haneli sayı.`}>
+              {/*
+                keyboardType="number-pad": telefonda doğrudan sayı tuş takımı açılıyor.
+                Değer STRING olarak tutuluyor ve öyle gönderiliyor — sayıya çevrilseydi
+                baştaki sıfırlar kırpılırdı, oysa "004271" geçerli bir koddur (sunucu D6
+                ile üretiyor) ve kırpılırsa eşleşme tutmaz.
+
+                ⚠️ SINIR `maxLength` İLE DEĞİL, SÜZGECİN İÇİNDE. maxLength yerli katmanda
+                uygulanıyor (iOS RCTBaseTextInputView, Android InputFilter.LengthFilter) ve
+                metni onChangeText'e ULAŞMADAN kırpıyor. İkisi birlikte kullanılınca
+                yapıştırma sessizce bozuluyordu:
+
+                  pano " 042713" → maxLength 6'ya kırpar → " 04271" → süzgeç → "04271"
+
+                Kutuda beş hane kalıyor, "Doğrula" kapalı ve kullanıcıya neyin eksik
+                olduğunu söyleyen hiçbir şey yok. Kod e-postada kendi satırında durduğu için
+                baştaki boşluğu da kapan seçim OLAĞAN durum. Önce rakamları süz, SONRA
+                altıya in.
+
+                Rakam dışı her karakter siliniyor: bazı Android klavyeleri sayı tuş
+                takımında da boşluk/virgül verebiliyor ve kullanıcı fark etmediği bir
+                karakter yüzünden "kod yanlış" alırdı — üstelik yanlış deneme sayacı
+                (5 hakta kod iptal) o denemeyi de sayardı.
+
+                OTOMATİK DOLDURMA İKİ PLATFORMDA DA AÇIK:
+                  • textContentType="oneTimeCode" → iOS
+                  • autoComplete="email-otp"      → Android
+                `email-otp` tam olarak "e-postayla gelen tek kullanımlık kod" demek. Bir ara
+                burada "off" yazıyordu ve gerekçesi "Android'de karşılığı yok" idi —
+                YANLIŞTI; "off" Android'in otomatik doldurmasını KAPATIYORDU. `sms-otp` ise
+                gerçekten yanlış olurdu: o, SMS dinler.
+
+                inputAccessoryViewButtonLabel: iOS'un sayı tuş takımında return tuşu yok, RN
+                returnKeyType verilince üstte bir araç çubuğu çiziyor ve düğme metnini
+                İngilizce "Done" olarak SABİT yazıyor. Etiketi Türkçeleştirilmezse ekrandaki
+                tek İngilizce metin olurdu. (Android'de bu prop yok sayılıyor.)
+              */}
+              <Girdi
+                value={kod}
+                onChangeText={(v) => setKod(v.replace(/\D/g, '').slice(0, KOD_UZUNLUK))}
+                keyboardType="number-pad"
+                textContentType="oneTimeCode"
+                autoComplete="email-otp"
+                autoCorrect={false}
+                placeholder="000000"
+                returnKeyType="done"
+                inputAccessoryViewButtonLabel="Bitti"
+                onSubmitEditing={onDogrula}
+                className="text-center text-lg font-semibold tracking-[0.3em]"
+              />
+            </Field>
+
+            <ErrorBox error={error} />
+
+            <Button loading={busy} disabled={!kodGonderilebilir} onPress={onDogrula}>
+              Doğrula
+            </Button>
+          </View>
+
+          <View className="gap-3 border-t border-slate-200 pt-5">
+            <Text className="text-sm text-slate-600">
+              <Text className="font-semibold">Kod gelmedi mi ya da süresi doldu mu?</Text> Kod{' '}
+              {KOD_DAKIKA} dakika geçerlidir; yenisini gönderelim.
+            </Text>
+
+            {/* Yanıt her durumda aynı: e-posta kayıtlı olsun olmasın — aksi halde bu düğme,
+                bir adresin platformda kayıtlı olup olmadığını herkese söylerdi. */}
+            {resendDone && (
+              <Notice tone="success">
+                Bu adres kayıtlı ve henüz doğrulanmamışsa yeni bir kod gönderdik. Gelen
+                kutunu (ve spam klasörünü) kontrol et.
+              </Notice>
+            )}
+
+            <Button
+              variant="secondary"
+              loading={resendBusy}
+              disabled={eposta.length < 5 || bekleme > 0}
+              onPress={onYenidenGonder}
+            >
+              {bekleme > 0 ? `Yeni kod gönder (${bekleme} sn)` : 'Yeni kod gönder'}
+            </Button>
+          </View>
+
+          {/*
+            ÇIKIŞ YOLU — ve iki durumda İKİ FARKLI yol olmak zorunda.
+
+            Kayıttan gelindiyse en olası arıza yanlış yazılmış adrestir (kod hiç gelmez),
+            çaresi forma dönüp düzeltmek. Girişten gelindiyse dönülecek bir form yok: adres
+            zaten kayıtlı hesabın adresi ve kullanıcının isteyeceği şey giriş ekranı.
+
+            Tek düğmeye indirgenirse durumların biri mutlaka yanlış yere gider.
+          */}
+          {giristenDogrulama ? (
+            <Button variant="ghost" onPress={() => router.replace('/giris')}>
+              Giriş sayfasına dön
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              onPress={() => {
+                setError(null)
+                setKod('')
+                setResendDone(false)
+                setAdim('form')
+              }}
+            >
+              Adresi düzelt
+            </Button>
+          )}
+        </View>
+      </AuthKabuk>
+    )
+  }
+
+  /* ─── 1. ADIM: KAYIT FORMU ─────────────────────────────────────────────────── */
   return (
     <AuthKabuk title="Kayıt ol" subtitle="İyi olduğun dersi anlat, ihtiyacın olanı ücretsiz al.">
       <View className="gap-4">
@@ -209,7 +419,7 @@ export default function Kayit() {
             autoComplete="new-password"
             textContentType="newPassword"
             returnKeyType="done"
-            onSubmitEditing={onSubmit}
+            onSubmitEditing={onKayit}
           />
         </Field>
 
@@ -217,12 +427,11 @@ export default function Kayit() {
           ONAY VE YAŞ BEYANI.
 
           İKİ AYRI KUTU, tek kutu değil: biri sözleşmeyi kabul etmek, diğeri yaş beyanı.
-          Tek kutuda birleştirilseydi kullanıcı ikisini de okumadan tek hareketle geçer
-          ve hangisine onay verdiği ayrıştırılamazdı.
+          Tek kutuda birleştirilseydi kullanıcı ikisini de okumadan tek hareketle geçer ve
+          hangisine onay verdiği ayrıştırılamazdı.
 
-          Bağlantılar aynı yığında açılıyor (web'de yeni sekmedeydi): mobilde geri
-          düğmesi kullanıcıyı forma döndürür ve doldurduğu alanlar yerinde kalır —
-          web'deki "formu terk eden alanları kaybetmesin" gerekçesinin karşılığı.
+          Bağlantılar aynı yığında açılıyor (web'de yeni sekmedeydi): mobilde geri düğmesi
+          kullanıcıyı forma döndürür ve doldurduğu alanlar yerinde kalır.
 
           Kutuların pasif bıraktığı düğme yalnızca YÖNLENDİRME; asıl kapı sunucuda.
         */}
@@ -238,9 +447,8 @@ export default function Kayit() {
 
             Önce onay metninin İÇİNDE, iç içe Text.onPress ile duruyorlardı: dışardaki
             Pressable `accessible` olduğu için ekran okuyucu tüm bloğu TEK öğe okuyor ve
-            içteki bağlantılara odaklanılamıyordu — yani metni okumadan onaylamak,
-            ekran okuyucu kullanan için tek seçenekti. Ayrı satır hem erişilebilir hem
-            de dokunma hedeflerini ayırıyor (yanlışlıkla onaylamak yerine metni açmak).
+            içteki bağlantılara odaklanılamıyordu — yani metni okumadan onaylamak, ekran
+            okuyucu kullanan için tek seçenekti.
           */}
           <View className="flex-row flex-wrap items-center gap-x-4 pl-8">
             <Pressable
@@ -268,11 +476,7 @@ export default function Kayit() {
 
         <ErrorBox error={error} />
 
-        <Button
-          loading={busy}
-          disabled={!kosullarKabul || !yasBeyani}
-          onPress={onSubmit}
-        >
+        <Button loading={busy} disabled={!kosullarKabul || !yasBeyani} onPress={onKayit}>
           Hesap oluştur
         </Button>
       </View>

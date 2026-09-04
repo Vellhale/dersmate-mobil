@@ -82,13 +82,24 @@ export default function Giris() {
 
         <ErrorBox error={error} />
 
-        {/* Adres parametreyle taşınıyor: doğrulama ekranı kodun yanında e-posta da
-            istiyor ve buraya kadar gelen kullanıcı onu az önce yazdı. Yeniden
-            yazdırmak, hatanın hemen ardında gereksiz bir sürtünme olurdu. */}
+        {/*
+          DOĞRULANMAMIŞ HESABIN TEK ÇIKIŞI BURASI.
+
+          Ayrı /dogrula ekranı kaldırıldı (2026-09-04); kod girişi artık kayıt ekranının
+          ikinci adımı. `dogrula=1` o ekranı DOĞRUDAN kod adımında açıyor — kayıt formu
+          görünmüyor, çünkü kullanıcının zaten hesabı var.
+
+          Adres parametreyle taşınıyor: doğrulama, kodun yanında e-posta da istiyor
+          (6 hane kullanıcıya özgü değil, sunucu "kimin için" sorusunu bilmek zorunda) ve
+          buraya kadar gelen kullanıcı adresini az önce yazdı. Yeniden yazdırmak, hatanın
+          hemen ardında gereksiz bir sürtünme olurdu.
+        */}
         {error?.code === 'EMAIL_NOT_VERIFIED' && (
           <Button
             variant="secondary"
-            onPress={() => router.push({ pathname: '/dogrula', params: { email: email.trim() } })}
+            onPress={() =>
+              router.push({ pathname: '/kayit', params: { dogrula: '1', email: email.trim() } })
+            }
           >
             E-postamı doğrula
           </Button>
@@ -120,14 +131,17 @@ export default function Giris() {
         </Link>
       </View>
 
-      <View className="mt-2 flex-row justify-center">
-        <Text className="text-sm text-slate-500">E-postanı henüz doğrulamadın mı? </Text>
-        <Link href="/dogrula" asChild>
-          <Pressable accessibilityRole="link" hitSlop={12}>
-            <Text className="text-sm font-medium text-brand-600">Doğrulama</Text>
-          </Pressable>
-        </Link>
-      </View>
+      {/*
+        "E-postanı henüz doğrulamadın mı? → Doğrulama" bağlantısı KALDIRILDI (2026-09-04).
+
+        Boşa çıkan bir yoldu: kod, kime ait olduğu bilinmeden doğrulanamıyor, yani o ekran
+        kullanıcıdan adresi yeniden yazmasını istiyordu. Oysa giriş denemesi aynı bilgiyi
+        zaten topluyor ve doğrulanmamış hesapta EMAIL_NOT_VERIFIED ile yukarıdaki düğmeyi
+        adres DOLU olarak çıkarıyor. İki yoldan biri her zaman daha fazla iş istiyordu.
+
+        Kaldırmak aynı zamanda "doğrulama" diye ayrı bir alan hissini bitiriyor: doğrulama
+        artık kayıt akışının bir adımı, ayrı bir sayfa değil.
+      */}
     </AuthKabuk>
   )
 }
