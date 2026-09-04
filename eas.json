@@ -53,8 +53,9 @@
         "için production-apk profili kullanılır — İKİSİ DE AYNI ANAHTARLA imzalanmalı, aksi",
         "halde Android bunları farklı uygulama sayar ve kullanıcı geçişte veri kaybeder.",
         "",
-        "⛔ EXPO_PUBLIC_API_URL İLK DERLEMEDEN ÖNCE GERÇEK ALAN ADIYLA DEĞİŞTİRİLMELİ.",
-        "Aşağıdaki değer bir yer tutucudur. Yanlış kalırsa uygulama derlenir, mağazaya",
+        "⛔ EXPO_PUBLIC_API_URL GERÇEK ALAN ADI OLMAK ZORUNDA. 2026-09-04’te yer tutucu",
+        "gerçek adresle değiştirildi: api.dersmate.com (canlı, ölçüldü). Yanlış bir adres",
+        "bırakılırsa uygulama yine derlenir, mağazaya",
         "yüklenir ve kullanıcıda sessizce 'sunucuya ulaşılamadı' verir — derleme anında",
         "hiçbir uyarı çıkmaz, çünkü adres yalnızca çalışma anında denenir.",
         "",
@@ -64,7 +65,7 @@
       ],
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.ALANADINI-YAZ.com"
+        "EXPO_PUBLIC_API_URL": "https://api.dersmate.com"
       }
     },
     "production-apk": {
