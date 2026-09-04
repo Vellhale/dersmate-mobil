@@ -3,6 +3,7 @@ import { FlatList, Image, Pressable, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { api } from '../src/lib/api'
+import { useYetkiliGorsel } from '../src/components/YetkiliGorsel'
 import { rose } from '../src/lib/theme'
 import { useAsync } from '../src/state/useAsync'
 import { useAuth } from '../src/state/AuthContext'
@@ -995,12 +996,15 @@ function AdayKuyrugu({ onNotice }) {
               </SectionTitle>
             )}
 
-            {/* Dürüstlük notu operatöre de gösteriliyor: bu ekran belge doğrulamaz,
-                karar kaydeder. */}
+            {/* Dürüstlük notu operatöre de gösteriliyor. 2026-09-01'de güncellendi:
+                belge yükleme kanalı AÇILDI, artık "kanal yok" demek yanlış olurdu. Ama
+                belge ZORUNLU değil — yüklemeyen aday da kuyrukta duruyor ve onun
+                doğrulaması hâlâ sistem dışı kanıta dayanıyor. Metin ikisini ayırıyor. */}
             <Text className="text-xs leading-relaxed text-slate-500">
-              Sistemde öğrenci belgesi yükleme kanalı yok. Doğrulama, sistem dışı bir kanıta (ör.
-              e-posta ile gelen öğrenci belgesi) dayanır; gerekçe alanı o kanıtın kayda geçtiği tek
-              yerdir ve denetim izine yazılır.
+              Belge yükleyen adayın belgesi kartında görünür. Belge yüklemek zorunlu değil;
+              yüklemeyen adayda doğrulama sistem dışı bir kanıta (ör. e-postayla gelen öğrenci
+              belgesi) dayanır. Her iki durumda da gerekçe alanı kararın dayanağının kayda
+              geçtiği tek yerdir ve denetim izine yazılır.
             </Text>
           </View>
         }
@@ -1110,6 +1114,8 @@ function AdayKarti({ row, onKarar }) {
         </Text>
       )}
 
+      <AdayBelgesi profileId={row.profileId} varMi={row.hasDocument} />
+
       <View className="gap-1">
         <Text className="text-xs text-slate-600">Beyan: {formatDateTime(row.declaredAtUtc)}</Text>
         <Text className="text-xs text-slate-600">Üyelik: {formatDateTime(row.joinedAtUtc)}</Text>
@@ -1141,6 +1147,65 @@ function AdayKarti({ row, onKarar }) {
         </View>
       )}
     </KuyrukKarti>
+  )
+}
+
+/*
+  ADAY BELGESİ — hakemin karar dayanağı.
+
+  Belge yükleme kanalı 2026-09-01'de açıldı; öncesinde yüklenen belge hiçbir yerde
+  görünmüyordu (yükleme ucu da yoktu). Burası o zincirin son halkası: hakem, kararı
+  vermeden önce belgeye bakabilmeli.
+
+  TÜR ÖNCEDEN BİLİNMİYOR: liste satırı yalnızca "belge var mı" diyor, türünü söylemiyor
+  (dosyayı her satırda çekmemek için bilinçli). Tür, indirilen data URI'nin önekinden
+  anlaşılıyor: görselse yerinde gösteriliyor, PDF ise mobilde açılamadığı için web
+  paneline yönlendiriliyor — bu ekran zaten "geniş tablo ve geri alınamaz işlem masabaşı
+  işidir" diyerek başka yerlerde de aynı ayrımı yapıyor.
+*/
+function AdayBelgesi({ profileId, varMi }) {
+  const { uri, hata } = useYetkiliGorsel(varMi ? api.adminTeacherDocumentSource(profileId) : null)
+
+  if (!varMi) {
+    return (
+      <Text className="text-xs text-slate-500">
+        Aday belge yüklemedi — doğrulama sistem dışı kanıta dayanır.
+      </Text>
+    )
+  }
+
+  if (hata) {
+    return (
+      <Text className="rounded-lg border border-rose-200 bg-rose-50 p-2 text-xs text-rose-800">
+        Belge yüklenemedi. Bağlantını kontrol edip sayfayı yeniden aç.
+      </Text>
+    )
+  }
+
+  if (!uri) {
+    return <Text className="text-xs text-slate-500">Belge yükleniyor…</Text>
+  }
+
+  if (uri.startsWith('data:application/pdf')) {
+    return (
+      <View className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <Text className="text-xs leading-relaxed text-slate-600">
+          Aday PDF belge yükledi. PDF bu ekranda açılamıyor — web panelinden incele.
+        </Text>
+      </View>
+    )
+  }
+
+  return (
+    <View className="gap-1">
+      <Text className="text-xs font-medium text-slate-700">Öğrenci belgesi</Text>
+      <Image
+        source={{ uri }}
+        accessibilityLabel="Adayın öğrenci belgesi"
+        className="h-72 w-full rounded-lg border border-slate-200 bg-slate-100"
+        resizeMode="contain"
+      />
+    </View>
   )
 }
 
@@ -1615,6 +1680,16 @@ function TarafKarti({ baslik, taraf, onBan, pasif }) {
 function KanitKarti({ kanit, sessionId }) {
   const [hata, setHata] = useState(false)
 
+  /*
+    Kanıt görseli BAŞLIKLI İSTEKLE indiriliyor: RN Image, source'a verilen Authorization
+    başlığını Android'de göndermiyor ve istek 401 alıyordu (ölçüm: YetkiliGorsel).
+    Hakemin karar verirken bakacağı tek şey bu görsel — görünmemesi kuyruğu işlevsiz
+    bırakırdı.
+  */
+  const { uri: kanitUri, hata: kanitHatasi } = useYetkiliGorsel(
+    api.adminProofImageSource(sessionId, kanit.proofId),
+  )
+
   return (
     <View className="rounded-xl border border-slate-200 p-3">
       <View className="flex-row flex-wrap items-center gap-2">
@@ -1629,13 +1704,13 @@ function KanitKarti({ kanit, sessionId }) {
         )}
       </View>
 
-      {hata ? (
+      {hata || kanitHatasi ? (
         <Text className="mt-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
           Kanıt görseli yüklenemedi. Bağlantını kontrol edip sayfayı yeniden aç.
         </Text>
       ) : (
         <Image
-          source={api.adminProofImageSource(sessionId, kanit.proofId)}
+          source={kanitUri ? { uri: kanitUri } : undefined}
           accessibilityLabel="Ders kanıtı ekran görüntüsü"
           onError={() => setHata(true)}
           className="mt-2 h-72 w-full rounded-lg border border-slate-200 bg-slate-100"

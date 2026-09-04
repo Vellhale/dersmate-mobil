@@ -19,7 +19,10 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+      },
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -36,7 +39,9 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Ders sonu kanıt görselini yüklemek için fotoğraflarına erişim gerekiyor."
+          "photosPermission": "Ders sonu kanıt görselini yüklemek için fotoğraflarına erişim gerekiyor.",
+          "microphonePermission": false,
+          "cameraPermission": false
         }
       ],
       "@react-native-community/datetimepicker"

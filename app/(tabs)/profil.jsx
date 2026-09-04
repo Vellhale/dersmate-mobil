@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import { api } from '../../src/lib/api'
 import { useAsync } from '../../src/state/useAsync'
 import { useAuth } from '../../src/state/AuthContext'
@@ -47,14 +48,41 @@ export default function Profil() {
     const foto = secim.assets[0]
     setAvatarBusy(true)
     try {
+      /*
+        KÜÇÜLTME İSTEMCİDE — web'in canvas adımının mobil karşılığı ve ATLANAMAZ.
+
+        ImagePicker'ın allowsEditing + aspect [1,1] ayarı yalnızca KIRPIYOR, çözünürlüğü
+        düşürmüyor: telefon kamerasıyla çekilmiş 4032×3024 bir fotoğraf kare kırpıldıktan
+        sonra da ~3000×3000 kalıyor ve q90 JPEG'te 2-4 MB ediyor. Sunucu sınırı 2 MB
+        (ProfileCommands.MaxAvatarBytes), controller sınırı 3 MB — yani normal bir telefon
+        fotoğrafı reddediliyordu. 2-3 MB arası "Fotoğraf 2 MB'tan büyük", üstünde ise
+        gövdesiz 413 yüzünden hiçbir şey açıklamayan bir hata görünüyordu; küçük dosyalar
+        (ekran görüntüsü) geçtiği için sorun rastgele görünüyordu.
+
+        Hedef web ile AYNI: 512×512 JPEG (AvatarPicker.jsx → OUTPUT_SIZE = 512).
+      */
+      const olcekli = await ImageManipulator.manipulate(foto.uri)
+        .resize({ width: 512, height: 512 })
+        .renderAsync()
+      const kucuk = await olcekli.saveAsync({ compress: 0.85, format: SaveFormat.JPEG })
+
       const form = new FormData()
       form.append('avatar', {
-        uri: foto.uri,
-        name: foto.fileName ?? 'avatar.jpg',
-        type: foto.mimeType ?? 'image/jpeg',
+        uri: kucuk.uri,
+        name: 'avatar.jpg',
+        type: 'image/jpeg',
       })
       await api.uploadAvatar(form)
-      // Önbellekteki eski avatar düşürülmeli, yoksa değişiklik görünmez (web kararı).
+      /*
+        ÜÇ ADIM, ÜÇÜ DE GEREKLİ:
+        1. Seçilen dosya hatırlanıyor — kullanıcı yeni fotoğrafı ANINDA görüyor ve bu,
+           uzaktaki görselin önbellekten tazelenmesine hiç bağlı değil. (Önceki sürümde
+           yükleme sunucuda başarılıydı ama ekranda değişiklik olmuyordu.)
+        2. Sürüm sayacı artıyor — diğer ekranlardaki (akış, sohbet) avatarlar bir
+           sonraki çizimde ?v= ile yeniden isteniyor.
+        3. Görünüm yeniden kuruluyor — profil verisi tazeleniyor.
+      */
+      api.rememberLocalAvatar(session.userId, kucuk.uri)
       api.forgetAvatar(session.userId)
       setVersion((v) => v + 1)
       setNotice('Profil fotoğrafın güncellendi.')
@@ -140,8 +168,27 @@ export default function Profil() {
             <VeriTercihleriBaglantisi />
             <RehberiTekrarIzle />
           </View>
+
+          {/*
+            HESABI SİL — Google Play, hesap açtıran uygulamalarda silmeyi UYGULAMA İÇİNDE
+            zorunlu tutuyor, yani bu bağlantı bulunabilir olmak ZORUNDA. Ama öne de
+            çıkmamalı: geri alınamaz bir işlem, "Çıkış yap"ın yanında eşit ağırlıkta
+            durursa yanlışlıkla dokunulur. Çözüm: altbilginin en dibinde, ayrı bir
+            satırda ve sönük — arayan bulur, aramayan çarpmaz.
+          */}
+          <View className="mt-2 items-center border-t border-slate-100 pt-3">
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setDialog('sil')}
+              className="min-h-[44px] justify-center px-2"
+            >
+              <Text className="text-sm text-slate-400">Hesabımı sil</Text>
+            </Pressable>
+          </View>
         </View>
       </ScrollView>
+
+      <HesabiSilModali open={dialog === 'sil'} onClose={() => setDialog(null)} onDeleted={logout} />
 
       <ProfilDuzenleModali
         open={dialog === 'edit'}
@@ -158,6 +205,117 @@ export default function Profil() {
 }
 
 /** Altbilgi bağlantısı — 44px dokunma hedefi, ikincil ton. */
+/*
+  HESABI SİL — geri alınamaz, bu yüzden iki kapı var: ne olacağını AÇIKÇA yazan bir metin
+  ve parolanın yeniden girilmesi. Parola sunucuda da doğrulanıyor; buradaki alan onay
+  niyetini kanıtlıyor, güvenliği tek başına buraya bırakmıyor.
+
+  METİN NEYİN KALDIĞINI DA SÖYLÜYOR. "Her şey silinecek" demek yanlış olurdu: ders
+  geçmişi, verilen puanlar ve değerlendirmeler KARŞI TARAFA ait ve duruyor — orada
+  "Silinmiş kullanıcı" olarak görünüyorsun. Kullanıcıya olmayan bir şey vaat etmek,
+  silme hakkını yanlış anlatmaktır.
+*/
+function HesabiSilModali({ open, onClose, onDeleted }) {
+  const [sifre, setSifre] = useState('')
+  const [error, setError] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const kilit = useRef(false)
+
+  useEffect(() => {
+    if (open) {
+      setSifre('')
+      setError(null)
+      kilit.current = false
+    }
+  }, [open])
+
+  async function sil() {
+    // Geri alınamaz işlemde çift gönderim koruması: ikinci istek 404 ile dönerdi ve
+    // kullanıcı hesabı silindiği hâlde hata görürdü.
+    if (kilit.current) return
+    if (!sifre) {
+      setError({ message: 'Devam etmek için parolanı yaz.' })
+      return
+    }
+
+    kilit.current = true
+    setBusy(true)
+    setError(null)
+    try {
+      await api.deleteAccount(sifre)
+      // Oturumu düşürmek yeterli: kök guard'lar giriş ekranına kendisi geçiyor.
+      onDeleted()
+    } catch (err) {
+      kilit.current = false
+      setError(err)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={busy ? () => {} : onClose}
+      title="Hesabımı sil"
+      footer={
+        <>
+          <Button variant="secondary" onPress={onClose} disabled={busy}>
+            Vazgeç
+          </Button>
+          <Button variant="danger" loading={busy} onPress={sil}>
+            Hesabımı kalıcı olarak sil
+          </Button>
+        </>
+      }
+    >
+      <View className="gap-4 pb-2">
+        <Notice tone="warning">
+          Bu işlem geri alınamaz. Hesabına bir daha giriş yapamazsın.
+        </Notice>
+
+        <View className="gap-1.5">
+          <Text className="text-sm font-semibold text-slate-900">Silinecekler</Text>
+          {[
+            'Adın, e-postan, telefonun ve profil fotoğrafın',
+            'Biyografin, üniversite ve bölüm bilgin',
+            'Açtığın ders ilanları',
+            'Veri tercihlerin ve cihaz kaydın',
+          ].map((madde) => (
+            <View key={madde} className="flex-row gap-2">
+              <Text className="text-xs text-slate-400">•</Text>
+              <Text className="flex-1 text-sm leading-relaxed text-slate-600">{madde}</Text>
+            </View>
+          ))}
+        </View>
+
+        <View className="gap-1.5">
+          <Text className="text-sm font-semibold text-slate-900">Kalacaklar</Text>
+          <Text className="text-sm leading-relaxed text-slate-600">
+            Yaptığın dersler, kazandırdığın puanlar ve yazdığın değerlendirmeler karşı
+            tarafın geçmişine ait olduğu için siliniyor değil — orada adın yerine
+            "Silinmiş kullanıcı" görünecek.
+          </Text>
+        </View>
+
+        <Field label="Parolan" hint="Onay için parolanı yeniden yaz.">
+          <Girdi
+            value={sifre}
+            onChangeText={setSifre}
+            secureTextEntry
+            autoComplete="current-password"
+            textContentType="password"
+            returnKeyType="done"
+            onSubmitEditing={sil}
+          />
+        </Field>
+
+        <ErrorBox error={error} />
+      </View>
+    </Modal>
+  )
+}
+
 function AltBaglanti({ onPress, children }) {
   return (
     <Pressable accessibilityRole="link" onPress={onPress} className="min-h-[44px] justify-center">
@@ -176,6 +334,23 @@ function ProfilDuzenleModali({ open, userId, onClose, onSaved }) {
   const [form, setForm] = useState(null)
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
+
+  /*
+    VAZGEÇ GERÇEKTEN VAZGEÇSİN.
+
+    `form` state'i modal kapandığında duruyordu ve `values = form ?? sunucuVerisi`
+    her zaman taslağı tercih ettiği için modal, VAZGEÇİLEN metinlerle yeniden
+    açılıyordu. Kullanıcı bunu sunucudaki kayıtlı bilgisi sanıp başka bir alanı
+    düzeltip "Kaydet"e bastığında, iptal ettiğini sandığı değişiklik de kaydediliyordu.
+
+    Açılışta sıfırlanıyor: her açılış sunucudaki gerçek veriden başlar.
+  */
+  useEffect(() => {
+    if (open) {
+      setForm(null)
+      setError(null)
+    }
+  }, [open])
 
   const values = form ?? {
     displayName: profile.data?.displayName ?? '',

@@ -455,6 +455,7 @@ export const onizlemeApi = {
   approveSession: () => gecikme({ creditsMinted: 100 }),
   cancelSession: () => gecikme(null),
   reportSession: () => gecikme(null),
+  disputeSession: () => gecikme('onizleme-itiraz-id'),
 
   wallet: () => gecikme(CUZDAN),
   statement: (page = 1, pageSize = 20) => gecikme(sayfala(PUAN_HAREKETLERI, page, pageSize)),
@@ -462,8 +463,17 @@ export const onizlemeApi = {
   userProfile: (userId) => gecikme(PROFILLER[userId] ?? VARSAYILAN_PROFIL(userId)),
   myProfile: () => gecikme(PROFILLER[BEN.userId]),
   updateProfile: () => gecikme({}),
-  uploadAvatar: () => gecikme({}),
   uploadTeacherDocument: () => gecikme({}),
+  /* Önizlemede hesap SİLİNMİYOR: demo oturumu bellekte duruyor ve silinmiş gibi yapmak,
+     sonraki ekranlarda var olmayan bir kullanıcıyla gezinmek demek olurdu. */
+  deleteAccount: () =>
+    Promise.reject(new Error('Önizleme modunda hesap silinemez.')),
+  uploadAvatar: () => gecikme({}),
+  /*
+    Önizleme de BAŞARI TAKLİT ETMİYOR: bu uç backend'de açık değil (bkz. api.js) ve
+    burada boş bir {} dönmek, olmayan bir yeteneği çalışıyormuş gibi göstererek
+    eksikliğin fark edilmesini tam da bu yüzden geciktirdi. Önizleme gerçeğe uyuyor.
+  */
   declareTeacherCandidate: () => gecikme({}),
   /*
     Avatar YOK muamelesi: bileşen onError ile baş harflere düşsün diye kasıtlı olarak

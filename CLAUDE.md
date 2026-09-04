@@ -18,10 +18,157 @@ npx expo start --android       # Android emülatörde aç
 npx expo export --platform android   # derleme sağlaması (cihazsız hata yakalama)
 ```
 
+### ⚠️ APK derlemesi bu yoldan ÇALIŞMAZ — 260 karakter sınırı
+
+`gradlew assembleRelease`, `C:\projeler\dersmate Mobil` altında **kırılıyor**:
+
+```
+ninja: error: Stat(...RNGestureHandlerDetectorShadowNode.cpp.o):
+Filename longer than 260 characters
+```
+
+Sebep boşluk DEĞİL, uzunluk: CMake nesne dosyasının yoluna KAYNAK yolunu da gömüyor
+(`.cxx/.../CMakeFiles/react_codegen_....dir/C_/projeler/dersmate_Mobil/node_modules/...`),
+yani proje yolu iki kez sayılıyor ve `react-native-gesture-handler` codegen'inde sınır
+aşılıyor. Metro/`expo export` etkilenmez — yalnızca native derleme.
+
+İki çözüm var:
+
+1. **Kısa yoldan derle** (kurulum gerektirmez): projeyi `C:\dm` gibi kısa bir yola
+   kopyala, orada derle, APK'yı geri al.
+2. **Windows uzun yol desteğini aç** (kalıcı, yönetici gerekir — makinede şu an KAPALI):
+   `HKLM\SYSTEM\CurrentControlSet\Control\FileSystem` → `LongPathsEnabled = 1`, ardından
+   yeniden başlat. Sonrasında proje kendi yerinde derlenir.
+
+`android/local.properties` içine SDK yolunu **eğik bölüyle** yaz — Java `.properties`
+biçiminde ters bölü kaçış karakteridir ve `C:\Android\Sdk` sessizce `C:AndroidSdk`
+olur (bu hata iki derlemeyi kırdı):
+
+```
+sdk.dir=C:/Android/Sdk
+```
+
 API'nin mobilden erişilebilir olması için backend LAN'dan dinlemeli
 (`dotnet run --project src/PeerLearn.Api` varsayılan localhost'tur; fiziksel cihaz için
 `--urls http://0.0.0.0:5000`). Geliştirmede `src/lib/api.js` bilgisayarın LAN IP'sini
 Metro hostUri'sinden kendisi türetir; başka ortam için `.env` → `EXPO_PUBLIC_API_URL`.
+
+---
+
+
+## Yerel arka uç — mobil ve web aynı veritabanını paylaşır
+
+Mobil istemci web ile **aynı** `/api/*` uçlarına, aynı .NET API'sine ve aynı PostgreSQL
+veritabanına gider. Paylaşım için yazılacak kod yok; yapılması gereken tek şey arka ucu
+ayağa kaldırmak.
+
+### Veritabanı (yönetici gerektirmeyen kurulum)
+
+`C:\Program Files\PostgreSQL\{16,17}` altında ikililer var ama **hiçbir küme
+başlatılmamış ve Windows hizmeti kayıtlı değil**. Hizmet kaydı ve `Program Files`
+altına yazmak yönetici ister; küme bu yüzden kullanıcı klasöründe:
+
+```bash
+initdb -D C:/Users/abdul/pgdata/dersmate -U postgres \
+  --auth-local=trust --auth-host=scram-sha-256 --pwfile=<parola-dosyasi> \
+  -E UTF8 --locale=C --locale-provider=icu --icu-locale=tr-TR
+pg_ctl -D C:/Users/abdul/pgdata/dersmate -l C:/Users/abdul/pgdata/dersmate-server.log start
+```
+
+⚠️ `--locale=C` ZORUNLU: sistem yereli `Turkish_Türkiye.utf8` ve initdb ASCII dışı
+locale adını reddediyor. Türkçe sıralama/harf katlaması ICU sağlayıcısından geliyor —
+`C` ctype ile bırakılsaydı `ILIKE` aramalarında İ/ı doğru eşleşmezdi.
+
+⚠️ Windows'ta `127.0.0.1` bağlantısı **host** sayılır, `local` değil: `--auth-local=trust`
+psql'i parolasız yapmaz, `PGPASSWORD` gerekir. Parolasız çağrı TTY beklerken kilitlenir,
+bu yüzden `psql -w` kullan.
+
+Rol ve veritabanı `appsettings.json`'daki geliştirme bağlantı dizesiyle birebir aynı
+(`peerlearn` / `peerlearn`). Şema ve katalog:
+
+```bash
+cd C:/projeler/dersmate && ConnectionStrings__Redis= dotnet run --project src/PeerLearn.Api -- --migrate
+```
+
+**Redis gerekmiyor.** `DependencyInjection.cs` bağlantı dizesi boşsa süreç içi kilide
+düşüyor — tek instance için belgelenmiş yapılandırma. Docker/WSL2 kurmaya gerek yok.
+
+### API
+
+```bash
+cd C:/projeler/dersmate && ConnectionStrings__Redis= ASPNETCORE_ENVIRONMENT=Development \
+  dotnet run --project src/PeerLearn.Api --urls http://0.0.0.0:5000
+```
+
+`Development` ortamı kayıt yanıtında `verificationToken` döndürür; e-posta sunucusu
+olmadan hesap doğrulanabilir. İlk yönetici: `dotnet run --project src/PeerLearn.Api --
+--promote-admin <eposta>`.
+
+### Üçünü birden başlat
+
+Makine yeniden başladığında üçü de gider (veritabanı Windows hizmeti olarak kayıtlı
+değil). Betik yalnızca çalışmayanı başlatır ve telefonun bağlanacağı adresi yazar:
+
+```bash
+powershell -ExecutionPolicy Bypass -File araclar/arka-uc-baslat.ps1
+```
+
+### ⚠️ Güvenlik duvarı: telefon `dotnet`'e DOĞRUDAN ulaşamaz
+
+Windows Güvenlik Duvarı kuralları **programa** bağlıdır, porta değil. Bu makinede:
+
+```
+Action=Allow|Dir=In|App=C:\program files\nodejs\node.exe   ← VAR
+(dotnet.exe için gelen kural)                              ← YOK
+```
+
+Yani `http://<lan-ip>:5000` telefondan sessizce düşer. Kural eklemek yönetici hakkı ve
+güvenlik ayarı değişikliğidir; bunun yerine izinli programın içinden köprü kuruluyor:
+
+```bash
+node araclar/lan-koprusu.js     # 0.0.0.0:5099 → 127.0.0.1:5000
+```
+
+Köprü WebSocket yükseltmesini de aktarıyor; onsuz SignalR sohbeti long-polling'e düşer
+ya da hiç bağlanmaz. Kalıcı çözüm dotnet için gelen kural eklemek ya da API'yi gerçek
+bir sunucuya almaktır — o zaman `araclar/` silinebilir ve `.env` doğrudan `:5000`
+gösterir.
+
+### Bağımsız APK
+
+`.env` derleme anında gömülür (`EXPO_PUBLIC_API_URL`). Demo bayrağı **verilmez**:
+`EXPO_PUBLIC_ONIZLEME` tanımlıysa tüm yazma işlemleri `src/lib/onizleme.js` içindeki
+sahte uçlara gider ve profil fotoğrafı gibi değişiklikler sessizce kaybolur.
+
+```
+EXPO_PUBLIC_API_URL=http://192.168.1.111:5099
+```
+
+#### ⚠️ Şifresiz HTTP: release APK'da VARSAYILAN OLARAK ENGELLİ
+
+Android 9'dan (API 28) beri `http://` trafiği yasak. Expo bu izni yalnızca
+`android/app/src/debug/AndroidManifest.xml`'e koyuyor; **release manifest'te yok**.
+Belirtisi yanıltıcı: uygulama "Sunucuya ulaşılamadı" diyor ama sunucu tarafında
+HİÇBİR KAYIT yok — çünkü paket cihazdan hiç çıkmıyor. Ağı, IP'yi, güvenlik duvarını
+kovalamadan önce bunu kontrol et:
+
+```bash
+grep -o 'usesCleartextTraffic="[a-z]*"' android/app/src/main/AndroidManifest.xml
+```
+
+İzin `app.config.js` üzerinden ve KOŞULLU veriliyor: `EXPO_PUBLIC_API_URL` `http://`
+ile başlıyorsa açılır, `https://` olunca kendiliğinden kapanır. Sabit `true` yazmak
+mağazaya çıkacak sürümde de şifresiz trafiği açık bırakırdı.
+
+⚠️ Bu ayar manifest'e yalnızca `npx expo prebuild --platform android` çalıştırılınca
+yansır; `gradlew assembleRelease` tek başına manifest'i güncellemez. Prebuild `android/`
+klasörünü SIFIRLIYOR — sonrasında `android/local.properties` yeniden yazılmalı
+(`sdk.dir=C:/Android/Sdk`, eğik bölüyle). Debug imza anahtarı Expo'da sabit olduğu için
+yeniden üretilse de aynı kalıyor, yani APK üstüne kurulum bozulmuyor (sha256 ile ölçüldü).
+
+Derleme logunda `env: export ...` satırları hangi değişkenlerin gömüldüğünü söyler —
+demo bayrağının orada OLMADIĞINI doğrula. (Paketin içinde demo metinleri yine görünür;
+Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
 
 ---
 
@@ -44,8 +191,26 @@ Metro hostUri'sinden kendisi türetir; başka ortam için `.env` → `EXPO_PUBLI
 - `localStorage` → oturum + HWID **SecureStore**'da, tercihler AsyncStorage'da
   (`src/lib/storage.js`). Oturum açılışta BİR KEZ okunur, sonrası bellekte —
   `getToken()` senkron kalmalı (axios interceptor + SignalR accessTokenFactory).
-- Blob/object-URL görselleri (avatar, kanıt) → `<Image source={{ uri, headers }}>`.
-  RN'de `URL.createObjectURL` yok; `api.avatarImageSource` / `api.proofImageSource`.
+- Kimlik gerektiren görseller (avatar, kanıt) → baytlar **axios ile indirilip** data URI
+  olarak veriliyor (`src/components/YetkiliGorsel.jsx`).
+
+  ⛔ `<Image source={{ uri, headers }}>` KULLANMA. Bu dosyada uzun süre öyle yazıyordu ve
+  YANLIŞTI: RN Image, Android'de (newArchEnabled) Authorization başlığını GÖNDERMİYOR.
+  Telefonun kendi istekleri köprü günlüğünde ölçüldü — aynı oturum, aynı saniye:
+
+  ```
+  GET /api/users/<id>/profile      → 200  jetonlu     (axios)
+  GET /api/users/<id>/avatar?v=1   → 401  JETONSUZ    (RN Image)
+  ```
+
+  Sonuç: her avatar ve her kanıt görseli sessizce 401 alıyordu. Belirtisi "profil
+  fotoğrafı güncellenmiyor"du ve teşhisi zordu: 401'i middleware controller'dan ÖNCE
+  reddettiği için sunucu günlüğünde sorgu bile görünmüyor. Web'in blob + object URL
+  çözümü mobilde data URI olarak karşılanıyor.
+
+- Avatar önbellek sayacı **diskte** (`KEYS.avatarSurumleri`). Fresco'nun disk önbelleği
+  uygulama yeniden başlatmalarını aşıyor; sayaç bellekte kalırsa açılışta temel URI'ye
+  dönülür ve eski görsel ağa hiç çıkmadan sunulur.
 - Giriş sonrası `navigate` ÇAĞRILMAZ: kök `Stack.Protected` guard'ları oturum durumuna
   göre kendisi geçiş yapar (`app/_layout.jsx`).
 - Ders geçmişi sayfa boyutu **5** ve FlatList `onEndReached` ile yüklenir (mobil iş
@@ -108,6 +273,12 @@ değeri güncelle, yoksa aynı diff iki kez uygulanır.
 mobilde bilinçli olarak FARKLI olan üç metot var (`proofContentUrl` → `proofImageSource`,
 `avatarObjectUrl` → `avatarImageSource`, `adminProofContentUrl` → `adminProofImageSource`)
 — blob/object-URL yerine `<Image source={{uri, headers}}>` kullanıldığı için.
+
+⚠️ `deleteAccount` MOBİLDE VAR, WEB'DE HENÜZ YOK. Uç sunucuya eklendi
+(`POST /api/profile/delete`) ve mobil ekranı bağlandı; web istemcisine aynı metot ve bir
+"Hesabımı sil" akışı eklenmeli — yüzey eşitliği kuralı gereği ve Play'in istediği "herkese
+açık adreste silme yolu" ancak web'de var olabilir. Sunucu tarafı hazır, yapılacak iş
+yalnızca istemcide.
 
 ⚠️ `SOZLESME_SURUMU` artık ÜÇ yerde: sunucu (`LegalDocuments.cs`), web ve mobil
 (`src/lib/yasalMetinler.js`). Sürüm artarken mağazadaki eski mobil sürüm kendi eski
