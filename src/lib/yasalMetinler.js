@@ -22,11 +22,26 @@
   yalnızca bir denetimde, en kötü anda fark edilirdi.
 */
 
+/*
+  ⛔ BU DEĞER PAKETE GÖMÜLÜ — DAĞITIMLA GÜNCELLENMEZ.
+
+  Web'de sürüm, arayüz yeniden derlendiği için sunucu dağıtımıyla birlikte hizalanır.
+  Burada öyle değil: kullanıcının telefonundaki APK bu sabiti taşır ve sunucu EŞİTLİK
+  aradığı için, sunucu artırılıp kullanıcı güncellemeyi almadıysa o kullanıcı KAYIT
+  OLAMAZ (Register.cs → ValidationFailed).
+
+  Yani sürüm artışı mobilde bir ayar değişikliği değil, bir YAYIN işi. Sıra:
+    1. burayı ve web'deki karşılığını artır
+    2. yeni APK'yı yayınla
+    3. sonra sunucuyu dağıt
+  Ters sırada, güncellemeyi almamış herkes kayıt ekranında takılır.
+*/
+
 /** Sunucudaki LegalDocuments.CurrentVersion ile BİREBİR aynı olmalı. */
-export const SOZLESME_SURUMU = '2026-08-27'
+export const SOZLESME_SURUMU = '2026-09-05'
 
 /** Kullanıcıya gösterilen biçim. Sürümle aynı günü anlatır. */
-export const SOZLESME_TARIHI = '27 Ağustos 2026'
+export const SOZLESME_TARIHI = '5 Eylül 2026'
 
 /** İletişim adresi — hem yasal metinlerin altbilgisinde hem KVKK talep satırında. */
 export const ILETISIM_EPOSTA = 'iletisim@dersmate.com'
