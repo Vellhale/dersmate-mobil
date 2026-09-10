@@ -54,7 +54,14 @@ export function Button({
       // değiştirip "çalışıyormuş" derdi.
       disabled={pasif}
       onPress={onPress}
-      className={`min-h-[44px] flex-row items-center justify-center gap-2 rounded-lg px-4 py-2
+      /*
+        `shrink`: RN'de flexShrink varsayılanı 0'dır, yani satıra sığmayan bir buton
+        daralmak yerine TAŞAR. Satır `justify-end` ise taşma sola gider ve soldaki
+        düğme ekranın dışında kalır (ölçüldü: 280 dp'de izin sayfasının "Yalnızca
+        zorunlu" düğmesi x = -19). Daralınca etiket sarıyor, min-h zaten 44px'i
+        koruyor. Sığan satırlarda etkisi yok.
+      */
+      className={`min-h-[44px] shrink flex-row items-center justify-center gap-2 rounded-lg px-4 py-2
                   ${v.kutu} ${pasif ? 'opacity-50' : ''} ${className}`}
     >
       {loading && <ActivityIndicator size="small" color={variant === 'secondary' || variant === 'ghost' ? slate[600] : '#fff'} />}
@@ -224,11 +231,23 @@ export function Notice({ tone = 'success', children, onDismiss }) {
   İçerik ScrollView'da, max %85 yükseklik: klavye ya da uzun liste kutuyu ekrandan
   taşırmasın — web'deki max-h-[90dvh] kararının karşılığı.
 */
-export function Modal({ open, title, onClose, children, footer }) {
+/**
+ * Alt sayfa.
+ *
+ * @param kapatilabilir Kullanıcı bu sayfayı cevap vermeden kapatabilir mi? `false` iken
+ *   karartmaya dokunmak ve ✕ ile kapatma YOKTUR — ve ✕ HİÇ ÇİZİLMEZ. Görünür ama işlevsiz
+ *   bir kapatma düğmesi, kullanıcıya olmayan bir çıkış yolu vaat eder: ilk açılıştaki izin
+ *   sayfasında tam olarak bu oluyordu (onClose boş fonksiyondu, ✕ duruyordu).
+ *   Kapanışın tek yolu bir cevap vermekse, o cevabı veren düğmeler de zaten footer'da.
+ */
+export function Modal({ open, title, onClose, children, footer, kapatilabilir = true }) {
   const insets = useSafeAreaInsets()
+  // Android'in donanım geri tuşu onRequestClose'u ÇAĞIRIR ve prop zorunludur; kapatılamaz
+  // kipte olayı yutan bir no-op veriliyor, yoksa geri tuşu sayfayı kapatırdı.
+  const kapat = kapatilabilir ? onClose : () => {}
 
   return (
-    <RNModal visible={open} transparent animationType="slide" onRequestClose={onClose}>
+    <RNModal visible={open} transparent animationType="slide" onRequestClose={kapat}>
       {/*
         KLAVYE KAÇINMA MODALIN KENDİ İÇİNDE ŞART: RN Modal ayrı bir pencere — ekrandaki
         (varsa) KeyboardAvoidingView onu etkilemez ve iOS'ta klavye, alta yaslı sheet'in
@@ -240,8 +259,14 @@ export function Modal({ open, title, onClose, children, footer }) {
         className="flex-1 justify-end bg-slate-900/40"
       >
         {/* Karartmaya dokunma = kapat. Kutunun kendisi ayrı Pressable DEĞİL: içindeki
-            girdilere dokunmayı yutmasın. */}
-        <Pressable className="flex-1" onPress={onClose} accessibilityLabel="Kapat" />
+            girdilere dokunmayı yutmasın. Kapatılamaz kipte dokunma yine YUTULUR (alttaki
+            ekrana geçmesin) ama bir şey yapmaz. */}
+        <Pressable
+          className="flex-1"
+          onPress={kapat}
+          accessible={kapatilabilir}
+          accessibilityLabel={kapatilabilir ? 'Kapat' : undefined}
+        />
 
         {/*
           ScrollView, max-h'li kutunun DOĞRUDAN çocuğu ve `shrink` (flexShrink:1) taşıyor.
@@ -262,23 +287,33 @@ export function Modal({ open, title, onClose, children, footer }) {
 
           <View className="flex-row items-center justify-between border-b border-slate-200 px-5 py-3">
             <Text className="text-base font-semibold text-slate-800">{title}</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Kapat"
-              onPress={onClose}
-              hitSlop={12}
-              className="min-h-[32px] min-w-[32px] items-center justify-center"
-            >
-              <Text className="text-lg text-slate-400">✕</Text>
-            </Pressable>
+            {kapatilabilir && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Kapat"
+                onPress={onClose}
+                hitSlop={12}
+                className="min-h-[32px] min-w-[32px] items-center justify-center"
+              >
+                <Text className="text-lg text-slate-400">✕</Text>
+              </Pressable>
+            )}
           </View>
 
           <ScrollView className="shrink px-5 py-4" keyboardShouldPersistTaps="handled">
             {children}
           </ScrollView>
 
+          {/*
+            `flex-wrap`: dar ekranda ya da işletim sisteminin yazı tipi ölçeği büyükken
+            iki düğme tek satıra sığmıyor. Sarmasaydı taşan düğme ekranın DIŞINDA kalırdı
+            ve bu, kapatılamaz kipte (izin sayfası) tek çıkışın kaybolması demek: 360 dp +
+            2.0x ölçekte "Yalnızca zorunlu" merkezi bile ekran dışına düşüyordu, yani
+            kullanıcıya yalnızca KABUL seçeneği kalıyordu. Sarma ile düğmeler alt alta
+            geçiyor; `gap-2` satır arasını da veriyor.
+          */}
           {footer && (
-            <View className="flex-row justify-end gap-2 border-t border-slate-200 px-5 py-3">
+            <View className="flex-row flex-wrap justify-end gap-2 border-t border-slate-200 px-5 py-3">
               {footer}
             </View>
           )}

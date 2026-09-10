@@ -80,10 +80,17 @@ export function IzinSayfasi() {
   return (
     <Modal
       open={acik}
-      // İlk açılışta kapatma YOK: karartmaya dokunmak ya da geri tuşu sayfayı
-      // kapatamaz, çünkü kapanınca hangi cevabın verildiği belirsiz kalırdı.
-      // Ayarlar kipinde normal kapanır.
-      onClose={ayarlarAcik ? ayarlariKapat : () => {}}
+      /*
+        İlk açılışta kapatma YOK: karartmaya dokunmak ya da geri tuşu sayfayı kapatamaz,
+        çünkü kapanınca hangi cevabın verildiği belirsiz kalırdı. Ayarlar kipinde normal
+        kapanır.
+
+        Bu KİP BİLGİSİ Modal'a veriliyor, kapatma işlevi boşaltılarak DEĞİL: eskiden
+        `onClose` no-op geçiliyordu ve başlıktaki ✕ çizilmeye devam ediyordu — ilk
+        açılışta ekranda hiçbir şey yapmayan bir kapatma düğmesi duruyordu.
+      */
+      kapatilabilir={ayarlarAcik}
+      onClose={ayarlariKapat}
       title="Veri tercihleri"
       footer={
         <>

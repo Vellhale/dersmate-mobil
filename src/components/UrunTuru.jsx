@@ -17,6 +17,7 @@ import {
   turYenidenBaslatmayiDinle,
   turuYenidenBaslat,
 } from '../lib/tur'
+import { useIzin } from '../state/IzinContext'
 
 /**
  * İnteraktif ürün rehberi — web'deki ProductTour.jsx'in mobil UYARLAMASI.
@@ -44,11 +45,16 @@ import {
  *   CustomEvent → tur.js'teki dinleyici kümesi.
  *   sessionStorage → tur.js'teki bellek işareti (uygulama ömrü = oturum ömrü).
  *
- * ÇEREZ/RIZA KAPISI TAŞINMADI: web'de adım ilerlemesi fonksiyonel rızaya tabiydi
- * çünkü tarayıcıda saklanan bir kolaylık verisiydi ve banner bunu ayrıca sayıyordu.
- * Mobilde çerez banner'ı ve ConsentContext yok; kaydedilen tek şey kullanıcının kendi
- * hesabındaki rehber ilerlemesi. Rıza katmanı mobile gelirse `kaydet`in başına aynı
- * kapı konur — açık kararlar (tamamlandı/bir daha gösterme) o zaman da yazılmalı.
+ * RIZA KAPISI GEREKMİYOR ama SIRA GEREKİYOR. Web'de adım ilerlemesi fonksiyonel rızaya
+ * tabiydi çünkü tarayıcıda saklanan bir kolaylık verisiydi. Mobilde ilerleme CİHAZA
+ * DEĞİL kullanıcının kendi hesabına yazılıyor (api.saveOnboarding) — hizmetin kendisi,
+ * ölçüm değil — ve cihazda kalan tek iz belleğe yazılan "geçildi" işareti. Yani
+ * IZIN_KATEGORILERI'nin kapsadığı bir işleme yok, `kaydet` bir kapı istemiyor.
+ *
+ * Buna karşılık tur, izin sayfası ekrandayken AÇILMAZ (bkz. mutlakaSor): ikisi de kök
+ * layout'a takılı iki tam ekran katman ve ilk açılışta üst üste biniyorlardı — izin
+ * sayfası (zIndex 9999) turun (zIndex 60) üstünü örtüyor, tur arkada görünmeden
+ * başlıyor ve ışık tuttuğu öğelere dokunulamıyordu.
  *
  * BİLEŞEN HİÇBİR EKRANI DEĞİŞTİRMEZ: kök layout'a tek satırla takılır, ekranlar
  * yalnızca isterlerse çıpa kaydeder. Çıpası olmayan adım ortada kart olarak çıkar.
@@ -70,7 +76,16 @@ const ACILIS_EKRANLARI = ['/', '/kesfet']
 /** Çıpanın etrafında bırakılan nefes payı (web'deki padding=8 ile aynı). */
 const BOSLUK = 8
 
+/**
+ * İzin sayfası kapandıktan sonra turun beklediği süre (ms).
+ *
+ * ui.jsx'teki alt sayfa `animationType="slide"` ile kapanıyor; beklemeseydik tur, sayfa
+ * hâlâ aşağı süzülürken üstüne biner ve iki katman bir an için yine üst üste görünürdü.
+ */
+const IZIN_KAPANMA_SURESI = 350
+
 export function UrunTuru() {
+  const { mutlakaSor } = useIzin()
   const pathname = usePathname()
   const { width, height } = useWindowDimensions()
   const insets = useSafeAreaInsets()
@@ -122,16 +137,48 @@ export function UrunTuru() {
     // Yalnızca ilk montajda; ekran değiştikçe tercihler yeniden okunmaz.
   }, [])
 
-  // Veri hazır + doğru ekran = aç. İki koşul ayrı efektlerde birleşiyor çünkü hangisinin
-  // önce geleceği belli değil: tercihler ağdan, ekran adı gezinmeden gelir.
+  // İzin sayfası bu açılışta gerçekten göründü mü? Göründüyse tur, sayfanın kapanma
+  // animasyonu bitene kadar bekler; hiç görünmediyse (izin çoktan verilmiş) beklemez.
+  const izinBekletti = useRef(false)
+  useEffect(() => {
+    if (mutlakaSor) izinBekletti.current = true
+  }, [mutlakaSor])
+
+  /*
+    Veri hazır + doğru ekran + izin sorusu kapanmış = aç. Koşullar ayrı efektlerde
+    birleşiyor çünkü hangisinin önce geleceği belli değil: tercihler ağdan, ekran adı
+    gezinmeden, izin cevabı cihazdan (AsyncStorage, async) gelir.
+
+    `mutlakaSor` GEÇİCİ olarak da true kalabilir: kullanıcı izin sayfasından "Gizlilik
+    metnini oku" ile ayrıldığında sayfa gizlenir ama cevap hâlâ verilmemiştir. Koşul
+    sayfanın GÖRÜNÜRLÜĞÜNE değil cevabın verilmiş olmasına bakıyor — yoksa tur, metin
+    okunurken arkadan açılırdı.
+  */
   useEffect(() => {
     if (durum.yukleniyor || durum.aktif) return
+    if (mutlakaSor) return
     if (!gosterilebilir.current || kendiliginenAcildi.current) return
     if (!ACILIS_EKRANLARI.includes(pathname)) return
 
+    // Kilit ZAMANLAYICIDAN ÖNCE: efekt yeniden koşarsa ikinci bir zamanlayıcı kurulmasın.
     kendiliginenAcildi.current = true
-    setDurum((s) => ({ ...s, aktif: true }))
-  }, [pathname, durum.yukleniyor, durum.aktif])
+    let acildi = false
+
+    const zamanlayici = setTimeout(
+      () => {
+        acildi = true
+        setDurum((s) => ({ ...s, aktif: true }))
+      },
+      izinBekletti.current ? IZIN_KAPANMA_SURESI : 0,
+    )
+
+    return () => {
+      clearTimeout(zamanlayici)
+      // Zamanlayıcı çalışmadan temizlendiyse kilit geri veriliyor; aksi hâlde tur bu
+      // açılışta bir daha hiç açılmazdı.
+      if (!acildi) kendiliginenAcildi.current = false
+    }
+  }, [pathname, durum.yukleniyor, durum.aktif, mutlakaSor])
 
   const adim = TUR_ADIMLARI[durum.adim]
 
@@ -186,13 +233,15 @@ export function UrunTuru() {
   // Android geri tuşu = "Rehberi geç" (web'deki Escape'in karşılığı). true dönmek
   // olayı yutar: geri tuşu turu kapatırken ekranı da geri almasın.
   useEffect(() => {
-    if (!durum.aktif) return
+    // İzin sayfası öndeyse geri tuşu ONUN olayıdır (o da yutuyor); tur görünmezken
+    // sessizce "Rehberi geç" saymak, kullanıcının görmediği turu bitirmek olurdu.
+    if (!durum.aktif || mutlakaSor) return
     const abone = BackHandler.addEventListener('hardwareBackPress', () => {
       bitir()
       return true
     })
     return () => abone.remove()
-  }, [durum.aktif, bitir])
+  }, [durum.aktif, mutlakaSor, bitir])
 
   // "Rehberi tekrar izle" sinyali. Elle başlatılan rehber oturum susturmasını da
   // kaldırır: kullanıcı açıkça yeniden istedi.
@@ -209,7 +258,12 @@ export function UrunTuru() {
     [kaydet],
   )
 
-  if (durum.yukleniyor || !durum.aktif || !adim) return null
+  /*
+    İzin sayfası öndeyken tur ÇİZİLMEZ. Yalnızca açılış koşulunu kısıtlamak yetmiyor:
+    IZIN_SURUMU artarsa `mutlakaSor` tur AÇIKKEN de true olabilir ve iki katman yine
+    üst üste binerdi. Tur durumu korunuyor — cevap verilince kaldığı yerden görünür.
+  */
+  if (durum.yukleniyor || !durum.aktif || !adim || mutlakaSor) return null
 
   const sonAdim = durum.adim === TUR_ADIM_SAYISI - 1
 
