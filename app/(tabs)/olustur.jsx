@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
+import { sekmeAltDolgusu } from '../../src/lib/sekmeCubugu'
 import { api } from '../../src/lib/api'
 import { useAsync } from '../../src/state/useAsync'
 import { EkranBasligi } from '../../src/components/EkranBasligi'
@@ -26,6 +27,7 @@ import { Badge, Button, Card, ErrorBox, Field, Girdi, Loading, Modal, Notice } f
   gerekçe: seçenek az ve yan yana karşılaştırma bedava).
 */
 export default function Olustur() {
+  const guvenli = useSafeAreaInsets()
   const entries = useAsync(() => api.myPortfolio(), [])
   const konular = useAsync(() => api.topics(), [])
   const [modalDirection, setModalDirection] = useState(null)
@@ -38,7 +40,11 @@ export default function Olustur() {
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
       <EkranBasligi baslik="Ders Portföyü" />
 
-      <ScrollView contentContainerClassName="gap-3 p-4">
+      <ScrollView contentContainerClassName="gap-3 p-4"
+        /* Yüzen sekme çubuğu içeriğin ÜSTÜNDE duruyor; alt dolgu olmadan son öğe onun
+           altında kalır (bkz. src/lib/sekmeCubugu.js). */
+        contentContainerStyle={{ paddingBottom: sekmeAltDolgusu(guvenli.bottom) }}
+      >
         <Text className="text-sm leading-relaxed text-slate-600">
           Anlatabildiğin konular puan kazandırır; almak istediklerin ücretsizdir. İkisini de
           doldurduğunda karşılıklı takas önerileri güçlenir.

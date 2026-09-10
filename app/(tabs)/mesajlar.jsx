@@ -1,6 +1,7 @@
 import { FlatList, Pressable, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
+import { sekmeAltDolgusu } from '../../src/lib/sekmeCubugu'
 import { useInbox } from '../../src/state/InboxContext'
 import { formatDateTime } from '../../src/lib/format'
 import { EkranBasligi } from '../../src/components/EkranBasligi'
@@ -24,6 +25,7 @@ const DURUM = {
 }
 
 export default function Mesajlar() {
+  const guvenli = useSafeAreaInsets()
   const router = useRouter()
   const { conversations, loading, error, reloadConversations, hub } = useInbox()
 
@@ -52,6 +54,9 @@ export default function Mesajlar() {
           data={conversations}
           keyExtractor={(c) => c.conversationId}
           contentContainerClassName="gap-1.5 p-4"
+        /* Yüzen sekme çubuğu içeriğin ÜSTÜNDE duruyor; alt dolgu olmadan son öğe onun
+           altında kalır (bkz. src/lib/sekmeCubugu.js). */
+        contentContainerStyle={{ paddingBottom: sekmeAltDolgusu(guvenli.bottom) }}
           renderItem={({ item }) => <KonusmaSatiri konusma={item} router={router} />}
         />
       )}

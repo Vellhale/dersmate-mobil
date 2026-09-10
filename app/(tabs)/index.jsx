@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { FlatList, Pressable, RefreshControl, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
+import { sekmeAltDolgusu } from '../../src/lib/sekmeCubugu'
 import { api } from '../../src/lib/api'
 import { useAsync } from '../../src/state/useAsync'
 import { brand, slate } from '../../src/lib/theme'
@@ -32,6 +33,7 @@ import { EmptyState, ErrorBox, Loading, Notice } from '../../src/components/ui'
   (ya da hata) geldiğinde söner.
 */
 export default function Akis() {
+  const guvenli = useSafeAreaInsets()
   const router = useRouter()
   const eslesmelerCipasi = useTurCipasi('eslesmeler')
   const derslerCipasi = useTurCipasi('dersler')
@@ -114,6 +116,9 @@ export default function Akis() {
         keyExtractor={(kisi) => kisi.userId}
         renderItem={({ item }) => <IlanKarti kisi={item} onIstek={setHedef} />}
         contentContainerClassName="gap-3 p-4"
+        /* Yüzen sekme çubuğu içeriğin ÜSTÜNDE duruyor; alt dolgu olmadan son öğe onun
+           altında kalır (bkz. src/lib/sekmeCubugu.js). */
+        contentContainerStyle={{ paddingBottom: sekmeAltDolgusu(guvenli.bottom) }}
         refreshControl={
           <RefreshControl refreshing={yenileniyor} onRefresh={yenile} tintColor={brand[600]} colors={[brand[600]]} />
         }

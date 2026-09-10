@@ -57,6 +57,18 @@ export function AramaIkonu(props) {
 }
 
 /** İlan oluştur: artı. Orta sekmenin işareti — dolgulu marka dairesi içinde çizilir. */
+/** ➕ sekmesi — daire içinde artı, setin geri kalanıyla AYNI çizgi ağırlığında.
+    Referans tasarım ortadaki eylemi dolu bir daireyle ayırmıyor; hepsi tek dil. */
+export function ArtiDaireIkonu(props) {
+  return (
+    <Cizgi {...props}>
+      <Circle cx="12" cy="12" r="9" />
+      <Path d="M12 8v8" />
+      <Path d="M8 12h8" />
+    </Cizgi>
+  )
+}
+
 export function ArtiIkonu(props) {
   return (
     <Cizgi {...props}>
