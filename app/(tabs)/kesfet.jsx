@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FlatList, Pressable, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
+import { sekmeAltDolgusu } from '../../src/lib/sekmeCubugu'
 import { api } from '../../src/lib/api'
 import { useAsync } from '../../src/state/useAsync'
 import { useDebounced } from '../../src/hooks/useDebounced'
@@ -151,6 +152,7 @@ function useBirikenListe(aktif, yukleyici, bagimliliklar, anahtar) {
 }
 
 export default function Kesfet() {
+  const guvenli = useSafeAreaInsets()
   const [sekme, setSekme] = useState('yks')
   const [term, setTerm] = useState('')
   const [filters, setFilters] = useState(VARSAYILAN_FILTRELER)
@@ -337,6 +339,9 @@ export default function Kesfet() {
           )
         }
         contentContainerClassName="gap-3 p-4"
+        /* Yüzen sekme çubuğu içeriğin ÜSTÜNDE duruyor; alt dolgu olmadan son öğe onun
+           altında kalır (bkz. src/lib/sekmeCubugu.js). */
+        contentContainerStyle={{ paddingBottom: sekmeAltDolgusu(guvenli.bottom) }}
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={baslikBolumu}
         ListEmptyComponent={bosDurum}

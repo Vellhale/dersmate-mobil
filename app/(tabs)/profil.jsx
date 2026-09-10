@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
+import { sekmeAltDolgusu } from '../../src/lib/sekmeCubugu'
 import * as ImagePicker from 'expo-image-picker'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import { api } from '../../src/lib/api'
@@ -24,6 +25,7 @@ import { VeriTercihleriBaglantisi } from '../../src/components/IzinSayfasi'
   gerek yok. Alan adı web ile aynı: form.append('avatar', …).
 */
 export default function Profil() {
+  const guvenli = useSafeAreaInsets()
   const router = useRouter()
   const { session, logout } = useAuth()
 
@@ -97,7 +99,11 @@ export default function Profil() {
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
       <EkranBasligi baslik="Profilim" />
 
-      <ScrollView contentContainerClassName="gap-3 p-4">
+      <ScrollView contentContainerClassName="gap-3 p-4"
+        /* Yüzen sekme çubuğu içeriğin ÜSTÜNDE duruyor; alt dolgu olmadan son öğe onun
+           altında kalır (bkz. src/lib/sekmeCubugu.js). */
+        contentContainerStyle={{ paddingBottom: sekmeAltDolgusu(guvenli.bottom) }}
+      >
         {notice && (
           <Notice tone="success" onDismiss={() => setNotice(null)}>
             {notice}
