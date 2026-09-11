@@ -224,8 +224,17 @@ export default function Gizlilik() {
           <Kalin>Arkadaş sayın</Kalin> profilinde herkese görünür. Tam arkadaş listeni
           yalnızca sen görürsün; başka bir kullanıcı profiline baktığında yalnızca{' '}
           <Kalin>ortak arkadaşlarınızı</Kalin> — yani zaten ikinizin de arkadaşı olan
-          kişileri — görür. Engellediğin kişiler bu sayıya ve listelere hiç girmez.
+          kişileri — görür. Engellediğin kişiler bu sayıya, tam listene ve ortak arkadaş
+          listelerine girmez; Arkadaşlar ekranında ise arkadaşlığı sen sonlandırana kadar
+          görünmeye devam eder.
         </Paragraf>
+        {/* ⚠️ Son cümle web'den AYRIŞTI; web'in yetişmesi gerekiyor (Gizlilik.jsx §6).
+            Eski hâli "bu sayıya ve listelere hiç girmez" diyordu. Oysa engelleme kabul
+            edilmiş arkadaşlığı kapatmıyor (UserBlocks.cs) ve Arkadaşlar ekranının ucu
+            (GetMyMatches) engel süzmüyor: engellenen arkadaş orada ve "Arkadaş (N)"
+            sayısında duruyor. Metin gerçeğe daraltıldı, uç süzülmedi: Sonlandır düğmesi
+            YALNIZCA o ekranda ve kişiyi oradan gizlemek o arkadaşlığı bitirmenin tek
+            yolunu kaldırırdı. */}
         <Paragraf>
           Görünen adınla <Kalin>aranabilirsin</Kalin>: Keşfet’teki “Arkadaş Ekle”
           bölümünde adını bilen bir kullanıcı seni bulup istek gönderebilir. Bu, profilini
