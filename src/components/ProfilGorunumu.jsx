@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { api } from '../lib/api'
 import { useAsync } from '../state/useAsync'
 import { formatDateTime } from '../lib/format'
 import { seviyeEtiketi, seviyeHesapla, seviyeIlerlemeMetni } from '../lib/seviye'
 import { brand } from '../lib/theme'
+import { ArkadaslarBolumu } from './ArkadaslarBolumu'
 import { Avatar } from './Avatar'
 import { SubjectBadges } from './SubjectBadges'
 import { UniversiteRozetleri } from './UniversiteRozetleri'
@@ -43,12 +44,27 @@ import { Badge, Button, Card, EmptyState, ErrorBox, Loading } from './ui'
   gerekçe rozeti DOĞRULAMA yolunu kapatıyordu: forumda rozetli bir yorum görüp adına
   dokunan kullanıcı hiçbir işaret bulamıyordu. Sunucu profil ucuna `isStaff` ekledi
   (ProfileQueries.cs) ve rozet buraya bağlandı; ayrıntılı gerekçe YonetimRozeti.jsx'te.
+
+  ARKADAŞLAR (web #31) konu panelleri ile değerlendirmeler arasında ve AYRI UÇTAN
+  (api.userFriends) geliyor — profil yanıtına alan eklenmedi. Kurallar bileşenin kendi
+  başında (ArkadaslarBolumu.jsx).
 */
 
-export function ProfilGorunumu({ userId, kendiProfilim = false }) {
+export function ProfilGorunumu({ userId, kendiProfilim = false, onYuklendi }) {
   const profile = useAsync(() => api.userProfile(userId), [userId])
   const [reviewPage, setReviewPage] = useState(1)
   const reviews = useAsync(() => api.userReviews(userId, reviewPage), [userId, reviewPage])
+
+  /* Profil verisi gelince çağırana verilir: başkasının profilindeki eylem düğmeleri
+     (arkadaş ekle / engelle) kişinin ADINA ihtiyaç duyuyor ve o ad yalnızca bu istekte
+     var. Alternatif aynı ucu ikinci kez çağırmaktı; profil ucu birkaç toplama sorgusu
+     koşuyor (web UserProfileView kararı).
+     Kanca ERKEN DÖNÜŞLERDEN ÖNCE: aşağıdaki `if (profile.loading) return` koşullu kanca
+     üretirdi. Çağıran KARARLI bir setState geçmeli — satır içi işlev her render'da yeni
+     kimlik demek ve efekt her seferinde yeniden koşar. */
+  useEffect(() => {
+    if (profile.data && onYuklendi) onYuklendi(profile.data)
+  }, [profile.data, onYuklendi])
 
   if (profile.loading) return <Loading />
   if (profile.error) return <ErrorBox error={profile.error} onRetry={profile.reload} />
@@ -102,6 +118,15 @@ export function ProfilGorunumu({ userId, kendiProfilim = false }) {
         topics={p.wantsToLearn}
         emptyText="Henüz konu eklenmemiş."
       />
+
+      {/*
+        ARKADAŞLAR — konu panelleri ile değerlendirmeler ARASINDA (web yerleşimi).
+        Sayfa "kim → ne yapmış → ne yapabilir → başkaları ne diyor" diye okunuyor;
+        arkadaş listesi yetenek beyanı değil sosyal kanıt ve en yakın akrabası
+        değerlendirmeler. Sayaç şeridine beşinci kutu olarak KONMADI: 2×2 şerit
+        2+2+1 öksüz bir satır bırakırdı. Sayı bölümün kendi başlığında.
+      */}
+      <ArkadaslarBolumu userId={userId} kendiProfilim={benimProfilim} ad={p.displayName} />
 
       <Degerlendirmeler reviews={reviews} page={reviewPage} onPage={setReviewPage} />
     </View>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { HttpTransportType, HubConnectionBuilder, LogLevel } from '@microsoft/signalr'
-import { API_BASE, getToken } from '../lib/api'
+import { API_BASE, tazeTokenAl } from '../lib/api'
 import { ONIZLEME } from '../lib/onizleme'
 
 const MAX_BACKOFF_MS = 30000
@@ -19,11 +19,16 @@ const SAHTE_HUB = {
 /*
   SignalR ChatHub bağlantısı — web'deki hooks/useChatHub.js'in birebir portu.
 
-  Mantık değişmedi; RN notları:
+  Mantık aynı, token fabrikası hariç; RN notları:
   • RN'in global WebSocket'i var, @microsoft/signalr onu doğrudan kullanır — polyfill
     gerekmez. LongPolling yedeği de fetch üzerinden çalışır.
   • Token, WebSocket header taşıyamadığı için accessTokenFactory ile query'den gider
     (backend yalnızca /hubs yolunda kabul eder).
+  • Fabrika ASYNC ve yenileme farkında (api.js → tazeTokenAl); web'deki senkron
+    getToken(). Sunucu JWT ölünce hub'ı kapatıyor ve negotiate'in 401'i tekrar
+    denenmiyor. Senkron fabrikayla yeniden bağlanma ölü token'la döner, canlı akış bir
+    REST isteği token'ı yenileyene kadar sessizce dururdu. Fabrika her start ve yeniden
+    bağlanmada çağrılıyor.
   • Backend AppExceptionHubFilter iş kuralı hatalarını "KOD|mesaj" olarak yollar;
     parseHubError bunu ayrıştırır.
   • SINIRSIZ yeniden bağlanma: withAutomaticReconnect'in denemeleri tükendiğinde SignalR
@@ -49,7 +54,7 @@ export function useChatHub({ onMessage, onConversationUpdated, onMessagesRead })
 
     const connection = new HubConnectionBuilder()
       .withUrl(`${API_BASE}/hubs/chat`, {
-        accessTokenFactory: () => getToken() ?? '',
+        accessTokenFactory: () => tazeTokenAl(),
         transport: HttpTransportType.WebSockets | HttpTransportType.LongPolling,
       })
       .withAutomaticReconnect([0, 2000, 5000, 10000, 20000])

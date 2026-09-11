@@ -26,9 +26,9 @@ Aşağıdaki görüntüler **demo modunda** alınmıştır (temsili veriler, sun
 | ![Sohbet](docs/ekranlar/sohbet.png) | ![Profil](docs/ekranlar/profil.png) | ![Derslerim](docs/ekranlar/dersler.png) |
 | SignalR canlı akış, ters liste | Branş rozetleri + değerlendirmeler | Takvim yaprağı, kanıt akışı, geri sayımlar |
 
-| Filtre alt sayfası | Eşleşme isteği |
+| Filtre alt sayfası | Arkadaş isteği |
 |---|---|
-| ![Filtre](docs/ekranlar/filtre.png) | ![Eşleşme isteği](docs/ekranlar/eslesme-istegi.png) |
+| ![Filtre](docs/ekranlar/filtre.png) | ![Arkadaş isteği](docs/ekranlar/eslesme-istegi.png) |
 
 ---
 
@@ -152,7 +152,7 @@ app/                      expo-router rotaları
   (auth)/                 giriş · kayıt · e-posta doğrulama
   (tabs)/                 alt sekmeler: akış · keşfet · oluştur · mesajlar · profil
   dersler.jsx             Derslerim (yığın ekranı)
-  eslesmeler.jsx          Eşleşmeler (yığın ekranı)
+  eslesmeler.jsx          Arkadaşlar (yığın ekranı; rota adı bilerek eski)
   profil/[userId].jsx     başkasının profili
   sohbet/[conversationId].jsx   konuşma ekranı
 src/
@@ -163,7 +163,7 @@ src/
 ```
 
 Gezinme **Instagram düzenindedir**: beş sekmeli alt bar (Akış · Keşfet · ➕ · Mesajlar ·
-Profil). Derslerim ve Eşleşmeler sekme değildir — Akış başlığındaki ikonlardan ve profil
+Profil). Derslerim ve Arkadaşlar sekme değildir — Akış başlığındaki ikonlardan ve profil
 kısayollarından açılan yığın ekranlarıdır.
 
 ---

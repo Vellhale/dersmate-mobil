@@ -45,8 +45,8 @@ export default function Mesajlar() {
         <View className="p-4">
           <EmptyState
             title="Henüz sohbetin yok"
-            description="Sohbet, bir eşleşme isteği kabul edildiğinde otomatik açılır."
-            action={<Button onPress={() => router.push('/')}>Eşleşme bul</Button>}
+            description="Sohbet, bir arkadaş isteği kabul edildiğinde otomatik açılır."
+            action={<Button onPress={() => router.push('/')}>Arkadaş bul</Button>}
           />
         </View>
       ) : (

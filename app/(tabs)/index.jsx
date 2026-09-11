@@ -24,7 +24,7 @@ import { EmptyState, ErrorBox, Loading, Notice } from '../../src/components/ui'
   Veri kararları web'den:
   • api.suggestions(20) — öneriler "Almak istediğim konular" portföyünden türer;
     portföyde Seek yoksa kullanıcıya bunu söyleyen bilgi kutusu çıkar.
-  • Portföyün Offer girdileri eşleşme modalındaki takas teklifi listesini besler.
+  • Portföyün Offer girdileri arkadaş isteği modalındaki takas teklifi listesini besler.
   • İstek gönderilince önerilerin SESSİZ tazelenmesi (silent): liste spinner'a
     dönmeden güncellenir.
 
@@ -73,7 +73,7 @@ export default function Akis() {
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
       {/* Instagram düzeninde tab çubuğuna girmeyen bölümler başlıktan açılır:
-          Topluluk (forum), Eşleşmeler (istek kabul/ret) ve Derslerim (rezervasyon +
+          Topluluk (forum), Arkadaşlar (istek kabul/ret) ve Derslerim (rezervasyon +
           kanıt akışı). Üçü de sekme olmadı çünkü alt bar beşten fazlasını taşıyamaz;
           sıra kullanma sıklığına göre. */}
       <EkranBasligi
@@ -91,7 +91,7 @@ export default function Akis() {
                 ışık tuttuğu öğeler (bkz. src/lib/tur.js TUR_ADIMLARI). */}
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Eşleşmeler"
+              accessibilityLabel="Arkadaşlar"
               onPress={() => router.push('/eslesmeler')}
               className="h-11 w-11 items-center justify-center rounded-lg"
               {...eslesmelerCipasi}
@@ -147,7 +147,7 @@ export default function Akis() {
             <Loading />
           ) : suggestions.error ? null : (
             <EmptyState
-              title="Şimdilik eşleşme yok"
+              title="Şimdilik öneri yok"
               description="Almak istediğin konuları genişlet ya da Keşfet sekmesinden katalogda ara."
             />
           )
@@ -163,7 +163,7 @@ export default function Akis() {
         onClose={() => setHedef(null)}
         onSent={(name) => {
           setHedef(null)
-          setNotice(`${name} kişisine eşleşme isteği gönderildi. Kabul edilince sohbet açılacak.`)
+          setNotice(`${name} kişisine arkadaş isteği gönderildi. Kabul edilince sohbet açılacak.`)
           suggestions.reload({ silent: true })
         }}
       />

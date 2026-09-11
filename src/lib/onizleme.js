@@ -27,7 +27,10 @@ const BEN = {
   isAdmin: false,
 }
 
-export const ONIZLEME_OTURUMU = { ...BEN }
+/* Oturum LoginResult biçiminde, refreshToken dahil (web #29). Önizlemede hiç sunulmaz:
+   oturumuYenile önizlemede ağa çıkmıyor ve oturumu düşürmüyor. BEN'e eklenmedi, çünkü
+   o nesne kişi olarak da kullanılıyor. */
+export const ONIZLEME_OTURUMU = { ...BEN, refreshToken: 'onizleme-yenileme' }
 
 const KISILER = {
   elif: { userId: 'u-elif', displayName: 'Elif Yılmaz' },
@@ -35,6 +38,25 @@ const KISILER = {
   zeynep: { userId: 'u-zeynep', displayName: 'Zeynep Demir' },
   can: { userId: 'u-can', displayName: 'Can Öztürk' },
 }
+
+/*
+  ENGELLENENLER — bellekte ve DEĞİŞEBİLİR, ki "engelle → listelerden düşer → engeli
+  kaldır → geri gelir" akışı önizlemede de yürünebilsin. TEK liste: engelle ilgili her
+  sahte uç buna bakar (sunucuda engel isim aramasını, arkadaş bölümünü, ilanları ve
+  önerileri süzüyor). Biçim BlockedUserDto ile birebir.
+
+  Başlangıçta TEK kayıt: "Engellediklerim (1)", tarih ve italik not önizlemede de
+  görünsün. Burak başka hiçbir listede yok, yani hiçbir ekranı süzmüyor. Tarih düz metin:
+  dknOnce aşağıda `const` olarak tanımlı ve burada çağrılsaydı modül yüklenirken TDZ
+  hatası verir, önizlemenin tamamı açılmazdı.
+*/
+let ENGELLENENLER = [
+  {
+    userId: 'u-burak', displayName: 'Burak Şahin', note: 'Tanımıyorum, ısrarla yazıyor.',
+    blockedAtUtc: '2026-09-02T18:30:00Z',
+  },
+]
+const engelliMi = (userId) => ENGELLENENLER.some((e) => e.userId === userId)
 
 /* ── Katalog ─────────────────────────────────────────────────────────────── */
 
@@ -151,15 +173,41 @@ const UNIVERSITE_KISILERI = [
     userId: KISILER.zeynep.userId, displayName: KISILER.zeynep.displayName, level: 8,
     averageRating: 4.9, ratingCount: 41,
     university: 'Boğaziçi Üniversitesi', department: 'Bilgisayar Mühendisliği',
+    isStaff: false, createdAtUtc: '2025-10-02T10:00:00Z',
   },
   {
     userId: KISILER.can.userId, displayName: KISILER.can.displayName, level: 2,
     averageRating: 0, ratingCount: 0,
     university: 'İstanbul Teknik Üniversitesi', department: 'Elektrik-Elektronik Mühendisliği',
+    isStaff: false, createdAtUtc: '2026-02-18T10:00:00Z',
   },
 ]
 
-/* ── Eşleşmeler ──────────────────────────────────────────────────────────── */
+/*
+  İSİMLE ARAMA ("Arkadaş Ekle") üniversite şartı olmadan herkesi arar. Üniversitesini
+  girmemiş kişi university/department NULL ile döner; kartlar bu hâli de çizmeli.
+*/
+const KISI_DIZINI = [
+  ...UNIVERSITE_KISILERI,
+  {
+    userId: KISILER.elif.userId, displayName: KISILER.elif.displayName, level: 6,
+    averageRating: 4.8, ratingCount: 23,
+    university: 'İzmir Atatürk Lisesi', department: 'Sayısal',
+    isStaff: false, createdAtUtc: '2025-09-14T10:00:00Z',
+  },
+  {
+    userId: KISILER.mert.userId, displayName: KISILER.mert.displayName, level: 4,
+    averageRating: 4.3, ratingCount: 9, university: null, department: null,
+    isStaff: false, createdAtUtc: '2025-12-03T10:00:00Z',
+  },
+  {
+    userId: 'u-yonetim', displayName: 'dersmate ekibi', level: 10,
+    averageRating: 0, ratingCount: 0, university: null, department: null,
+    isStaff: true, createdAtUtc: '2025-08-01T10:00:00Z',
+  },
+]
+
+/* ── Arkadaşlık istekleri (myMatches) ────────────────────────────────────── */
 
 const dknOnce = (dk) => new Date(Date.now() - dk * 60000).toISOString()
 const dknSonra = (dk) => new Date(Date.now() + dk * 60000).toISOString()
@@ -196,6 +244,56 @@ const ESLESMELER = {
       createdAtUtc: dknOnce(60 * 24),
     },
   ],
+}
+
+/* ── Arkadaşlar ──────────────────────────────────────────────────────────── */
+
+/*
+  Benim arkadaşlarım ESLESMELER.active ile tutarlı (Elif, Zeynep). Diğerlerinin
+  listeleri yalnızca sayı ve ortak arkadaş hesabı için var.
+*/
+const ARKADASLIKLAR = {
+  [BEN.userId]: [KISILER.elif.userId, KISILER.zeynep.userId],
+  [KISILER.elif.userId]: [BEN.userId, KISILER.zeynep.userId, KISILER.mert.userId, KISILER.can.userId],
+  [KISILER.zeynep.userId]: [BEN.userId, KISILER.elif.userId],
+  [KISILER.mert.userId]: [KISILER.elif.userId, KISILER.can.userId],
+  [KISILER.can.userId]: [KISILER.elif.userId, KISILER.mert.userId],
+}
+
+const SEVIYELER = {
+  [BEN.userId]: 4, [KISILER.elif.userId]: 6, [KISILER.mert.userId]: 4,
+  [KISILER.zeynep.userId]: 8, [KISILER.can.userId]: 2,
+}
+
+const arkadasSatiri = (userId) => ({
+  userId,
+  displayName:
+    userId === BEN.userId
+      ? BEN.displayName
+      : Object.values(KISILER).find((k) => k.userId === userId)?.displayName ?? 'dersmate Kullanıcısı',
+  level: SEVIYELER[userId] ?? 1,
+})
+
+/*
+  ProfileFriendsDto'nun sunucu kuralları: sayı herkese aynı ve sahibinin engelleri
+  düşülmüş (önizlemede engelleyebilen tek kişi benim); tam liste yalnızca kendi
+  profilimde; ortaklar yalnızca başkasınınkinde, en fazla 12. Bilinmeyen kişiye 404
+  yok, sıfırlı yanıt.
+*/
+function arkadasBolumu(userId) {
+  const isSelf = userId === BEN.userId
+  const sahibinki = (ARKADASLIKLAR[userId] ?? []).filter((id) => !isSelf || !engelliMi(id))
+  const benimkiler = new Set((ARKADASLIKLAR[BEN.userId] ?? []).filter((id) => !engelliMi(id)))
+  const sirali = (idler) =>
+    idler.map(arkadasSatiri).sort((a, b) => a.displayName.localeCompare(b.displayName, 'tr'))
+  const ortaklar = isSelf ? [] : sirali(sahibinki.filter((id) => benimkiler.has(id)))
+  return {
+    friendCount: sahibinki.length,
+    isSelf,
+    friends: isSelf ? sirali(sahibinki) : [],
+    mutualCount: ortaklar.length,
+    mutualFriends: ortaklar.slice(0, 12),
+  }
 }
 
 /* ── Sohbet ──────────────────────────────────────────────────────────────── */
@@ -439,7 +537,8 @@ export const onizlemeApi = {
   searchOffers: (filters) => {
     const q = tr(filters.search)
     let liste = ILANLAR.filter(
-      (o) => !q || tr(o.topicName).includes(q) || tr(o.subjectName).includes(q) || tr(o.tutorDisplayName).includes(q),
+      (o) => !engelliMi(o.tutorUserId) &&
+        (!q || tr(o.topicName).includes(q) || tr(o.subjectName).includes(q) || tr(o.tutorDisplayName).includes(q)),
     )
     if (filters.categoryId === 'c-tyt') liste = liste.filter((o) => o.categoryName === 'TYT')
     if (filters.categoryId === 'c-ayt') liste = liste.filter((o) => o.categoryName === 'AYT')
@@ -448,19 +547,49 @@ export const onizlemeApi = {
     return gecikme(sayfala(liste, Number(filters.page) || 1, Number(filters.pageSize) || 20))
   },
 
+  /*
+    Sunucu kuralları: 2 harften kısa isim HATA VERMEZ, yok sayılır ve arama üniversite
+    ağına döner; isimle aramada üniversite şartı düşer, üniversite/bölüm verilmişse
+    isimle birlikte uygulanır. Engelliler iki durumda da düşer. Sıra puan ↓, kayıt ↓.
+  */
   searchUniversityPeers: (filters) => {
     const u = tr(filters.university)
     const d = tr(filters.department)
-    const liste = UNIVERSITE_KISILERI.filter(
-      (k) => (!u || tr(k.university).includes(u)) && (!d || tr(k.department).includes(d)),
-    )
-    return gecikme(sayfala(liste, Number(filters.page) || 1, Number(filters.pageSize) || 20))
+    const ad = tr(filters.name).trim()
+    const isimAramasi = ad.length >= 2
+    const liste = (isimAramasi ? KISI_DIZINI : UNIVERSITE_KISILERI)
+      .filter((k) => !engelliMi(k.userId))
+      .filter((k) => !isimAramasi || tr(k.displayName).includes(ad))
+      .filter((k) => (!u || tr(k.university).includes(u)) && (!d || tr(k.department).includes(d)))
+      .sort((a, b) => b.averageRating - a.averageRating || b.createdAtUtc.localeCompare(a.createdAtUtc))
+    const pageSize = Math.min(50, Math.max(1, Number(filters.pageSize) || 20))
+    return gecikme(sayfala(liste, Number(filters.page) || 1, pageSize))
   },
 
   myPortfolio: () => gecikme(PORTFOY),
   addPortfolioEntry: () => gecikme({}),
   removePortfolioEntry: () => gecikme(null),
-  suggestions: () => gecikme(ONERILER),
+  suggestions: () => gecikme(ONERILER.filter((o) => !engelliMi(o.userId))),
+
+  // Engelleme: iki uç da 204 → null döner ve idempotenttir (gerçek uçlar gibi).
+  blockUser: (userId, note = null) => {
+    if (!engelliMi(userId)) {
+      const kisi = KISI_DIZINI.find((k) => k.userId === userId)
+      ENGELLENENLER = [
+        {
+          userId, displayName: kisi?.displayName ?? 'dersmate Kullanıcısı',
+          note: note?.trim() || null, blockedAtUtc: new Date().toISOString(),
+        },
+        ...ENGELLENENLER,
+      ]
+    }
+    return gecikme(null)
+  },
+  unblockUser: (userId) => {
+    ENGELLENENLER = ENGELLENENLER.filter((e) => e.userId !== userId)
+    return gecikme(null)
+  },
+  myBlocks: () => gecikme([...ENGELLENENLER]),
 
   myMatches: () => gecikme(ESLESMELER),
   createMatch: () => gecikme({}),
@@ -497,6 +626,7 @@ export const onizlemeApi = {
   statement: (page = 1, pageSize = 20) => gecikme(sayfala(PUAN_HAREKETLERI, page, pageSize)),
 
   userProfile: (userId) => gecikme(PROFILLER[userId] ?? VARSAYILAN_PROFIL(userId)),
+  userFriends: (userId) => gecikme(arkadasBolumu(userId)),
   myProfile: () => gecikme(PROFILLER[BEN.userId]),
   updateProfile: () => gecikme({}),
   uploadTeacherDocument: () => gecikme({}),

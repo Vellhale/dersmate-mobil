@@ -15,6 +15,13 @@ import * as SecureStore from 'expo-secure-store'
     değerler). SecureStore'un boyut sınırı (2 KB/anahtar) ve maliyeti var; her şeyi
     oraya koymak hem gereksiz hem yavaş.
 
+    Oturum TEK anahtarda ve öyle KALMALI. Boyut sorun değil (2026-09-11 ölçümü): tipik
+    ~565 B, en kötü (100 karakterlik Türkçe ad + 320 karakterlik e-posta + admin)
+    ~1,94 KB; yenileme token'ı 43 karakter. expo-secure-store 55.0.0'dan beri iOS'taki
+    bayt uyarısı da yok. Asıl sebep ATOMİKLİK: token'ı ayrı anahtara bölmek, iki yazma
+    arasında ölen uygulamada diske yeni erişim + İPTAL EDİLMİŞ eski yenileme token'ı
+    bırakır. Sunucu o token sunulunca hırsızlık sayar ve her cihazdan çıkış yaptırır.
+
   İKİSİ DE ASYNC: web'deki senkron localStorage.getItem alışkanlığı buraya taşınamaz.
   Oturum açılışta BİR KEZ okunur ve bellekte tutulur (bkz. api.js) — her istekte
   await'li depolama okuması yapılmaz.
@@ -57,8 +64,27 @@ export const secure = {
         await SecureStore.setItemAsync(guvenliAnahtar(key), value)
       }
     } catch {
-      // Yazılamıyorsa oturum yalnızca bellekte yaşar: uygulama yeniden açılınca
-      // giriş istenir. Sessiz ama güvenli taraf.
+      /*
+        YAZILAMADI → ESKİ KAYIT SİLİNİYOR. Başarısız bir yazım diskteki eski değeri YERİNDE
+        bırakıyor: iOS'ta SecItemUpdate hata verince öğeye dokunulmuyor, Android'de
+        şifreleme prefs'e yazmadan önce patlıyor. Oturumda bu eski değer, sunucunun az önce
+        dönüştürdüğü (Rotated) bir yenileme token'ı demek. Soğuk açılış onu sunar, 30 sn'lik
+        pencere geçmişse sunucu bunu hırsızlık sayıp web dahil her yerden çıkış yaptırır.
+
+        Silmek o yolu kapatıyor: oturum bu açılışta bellekte yaşar, uygulama yeniden
+        açılınca giriş istenir. Güvenli taraf bu. Silme de başarısız olursa yapılacak bir
+        şey kalmıyor. Silme şifreli veriye dokunmuyor (Android'de yalnızca prefs'ten
+        kaldırıyor), yani yazımı kıran Keystore hatası onu kırmaz.
+
+        HWID'de bu dal fiilen boşta: getHwidHash yalnızca kayıt YOKKEN yazıyor.
+      */
+      if (value !== null && value !== undefined) {
+        try {
+          await SecureStore.deleteItemAsync(guvenliAnahtar(key))
+        } catch {
+          /* ikisi de olmadı; en azından akış kırılmaz */
+        }
+      }
     }
   },
 }

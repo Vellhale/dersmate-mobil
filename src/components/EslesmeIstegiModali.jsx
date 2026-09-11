@@ -4,7 +4,8 @@ import { api } from '../lib/api'
 import { Button, ErrorBox, Modal } from './ui'
 
 /*
-  EŞLEŞME İSTEĞİ — web'deki RequestModal'ın portu, alt sayfa (bottom sheet) olarak.
+  ARKADAŞ İSTEĞİ — web'deki RequestModal'ın portu, alt sayfa (bottom sheet) olarak.
+  Dosya ve bileşen adı bilerek eski (web de RequestModal adını tuttu, #31).
 
   Web'deki iki <select> mobilde SEÇİM SATIRLARINA döndü: RN'de yerel select yok ve
   seçenek sayısı az (kişinin anlatabildikleri + takas kesişimi) — hepsini açık liste
@@ -94,7 +95,7 @@ export function EslesmeIstegiModali({ person, myOffers, onClose, onSent }) {
     <Modal
       open={Boolean(person)}
       onClose={onClose}
-      title="Eşleşme isteği"
+      title="Arkadaş isteği"
       footer={
         <>
           <Button variant="secondary" onPress={onClose}>

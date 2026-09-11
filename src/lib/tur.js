@@ -78,12 +78,12 @@ export const TUR_ADIMLARI = [
   {
     id: 'matches',
     cipa: 'eslesmeler',
-    title: 'Eşleşmeler — istek gönder ve al',
+    title: 'Arkadaşlar — istek gönder ve al',
     body: 'Gönderdiğin ve sana gelen ders istekleri, Akış başlığındaki kişiler simgesinde toplanır.',
     points: [
       'Gelen bir isteği kabul ya da reddedersin.',
       'Kabul edilen istekte sohbet kendiliğinden açılır.',
-      'Eşleşmeyi istediğin an sonlandırabilirsin.',
+      'Arkadaşlığı istediğin an sonlandırabilirsin.',
     ],
   },
   {

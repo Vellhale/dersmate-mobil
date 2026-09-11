@@ -144,7 +144,7 @@ export function IlanKarti({ kisi, onIstek }) {
       )}
 
       <View className="mt-4">
-        <Button onPress={() => onIstek(kisi)}>Eşleşme isteği gönder</Button>
+        <Button onPress={() => onIstek(kisi)}>Arkadaş isteği gönder</Button>
       </View>
     </Card>
   )

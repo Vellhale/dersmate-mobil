@@ -190,7 +190,8 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
 
 - `localStorage` → oturum + HWID **SecureStore**'da, tercihler AsyncStorage'da
   (`src/lib/storage.js`). Oturum açılışta BİR KEZ okunur, sonrası bellekte —
-  `getToken()` senkron kalmalı (axios interceptor + SignalR accessTokenFactory).
+  `getToken()` senkron kalmalı (axios interceptor; SignalR fabrikası `tazeTokenAl` de
+  onu okur).
 - Kimlik gerektiren görseller (avatar, kanıt) → baytlar **axios ile indirilip** data URI
   olarak veriliyor (`src/components/YetkiliGorsel.jsx`).
 
@@ -208,6 +209,65 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
   reddettiği için sunucu günlüğünde sorgu bile görünmüyor. Web'in blob + object URL
   çözümü mobilde data URI olarak karşılanıyor.
 
+- **Oturum yenileme** (`src/lib/api.js` → `oturumuYenile`) web'le aynı sözleşmeyi
+  kullanıyor: tek uçuş, 401 → yenile → bir kez tekrar dene. Beş yerde bilerek ayrılıyor:
+  1. Yol `/api/v1/session/refresh`. Web ön eksiz `/api/session/refresh` çağırıyor;
+     mağazadaki sürüm onu çağırırsa o takma ad sunucudan bir daha kaldırılamaz.
+  2. Geçici hatada (yanıtsız ağ hatası, 429, 5xx) oturum SİLİNMEZ, istek hata metniyle
+     düşer. Web her başarısızlıkta çıkış yaptırıyor. Bedeli: yanıtı yolda kaybolan
+     (sunucuda dönüşmüş) bir yenilemenin eski token'ı 30 sn'den geç yeniden sunulursa
+     sunucu bunu hırsızlık sayıp her yerden çıkış yaptırır. Nadir, kabul edildi.
+  3. Yalnızca GÖVDESİZ 401 yenilenir (`tokenOlduMu`: JwtBearer'ın token reddi); web her
+     401'de yeniliyor. Gövdeli 401'ler yenilenmez. `INVALID_CREDENTIALS` "Hesabımı sil"
+     ekranındaki yanlış parola; çıkış da yapılmaz. `SESSION_REVOKED` sunucunun oturumları
+     düşürdüğü durum ve yenileme token'ı da iptal. Onu sunmak sunucuya "hırsızlık"
+     dedirtir ve kullanıcının parola sıfırladıktan SONRA açtığı taze oturumları da düşürür.
+
+     ⚠️ Bu koruma YALNIZCA erişim token'ının ömrü içinde çalışıyor (sıfırlamadan sonra en
+     fazla ~2 saat). Sunucu önce ömrü sınıyor (JwtBearer, `UseAuthentication`) ve
+     `SESSION_REVOKED`'ı yalnızca ömrü geçerli token'a döndürüyor
+     (`AccountStatusMiddleware`, kimliksiz isteği olduğu gibi geçiriyor). Telefon ertesi
+     gün açılırsa ilk istek GÖVDESİZ 401 alır ve iptal edilmiş yenileme token'ı sunulur.
+     `RefreshSession` hoşgörü penceresini yalnızca `Rotated`'a tanıdığı için bunu
+     `ReuseDetected` sayıp sıfırlamadan sonra açılan web oturumunu da düşürür. Mobil iki
+     durumu AYIRT EDEMEZ: "yalnızca süresi doldu" ile "iptal edildi ve süresi de doldu"
+     aynı gövdesiz 401. Hub fabrikası (`tazeTokenAl`) da aynı yoldan geçiyor. Kök düzeltme
+     sunucuda (hırsızlık varsayımı yalnızca pencere dışı `Rotated` token'da); web de her
+     401'de yenilediği için aynı açığı taşıyor. Sunucu düzelene kadar sınır açık.
+  4. "Beni hatırla" kutusu YOK; `login` açıkça `rememberMe: true` gönderiyor. Web'in
+     gerekçesi ortak bilgisayar, telefon ise kişisel cihaz. `false` giderse sunucu
+     yenileme token'ı üretmez ve oturum sessizce 2 saate iner.
+  5. SignalR token fabrikası async ve yenileme farkında (`tazeTokenAl`); web'inki senkron
+     `getToken()`. Sunucu JWT ölünce hub'ı kapatıyor ve negotiate'in 401'i tekrar
+     denenmiyor. Senkron fabrikayla, Mesajlar'da bekleyen kullanıcının canlı akışı bir
+     REST isteği token'ı yenileyene kadar sessizce dururdu.
+
+  Oturum SecureStore'da TEK anahtarda ve yazımlar sıraya sokuluyor (`saveSession`).
+  Yenileme token'ını ayrı anahtara bölme; gerekçe `storage.js`'te.
+
+  Sunucuda çıkış ucu yok: çıkış yalnızca yerel oturumu siliyor, yenileme token'ı
+  sunucuda 60 gün geçerli kalıyor (web'de de öyle).
+- **Arkadaşlar ekranının rotası `/eslesmeler` kaldı** (`app/eslesmeler.jsx`); web #31'de
+  adres `/arkadaslar` oldu, yalnızca kullanıcıya görünen metinler taşındı. Dosyayı
+  yeniden adlandırma: tur çıpası `eslesmeler`, `dersmate://eslesmeler` derin bağlantısı
+  ve kök `Stack.Protected` listesi ona bağlı — listeye eklenmeyen yeni ad OTURUMSUZ da
+  açılır. Algoritma anlamındaki "eşleşme" ise "öneri" oldu ("Şimdilik öneri yok"), metin
+  eşleşmesi gibi teknik anlamlar olduğu gibi kaldı.
+- **Başka ekranda değişen veri ODAKTA tazelenir**, yeniden kurulumla değil. Web rota
+  değişiminde sayfayı söküp yeniden kuruyor ve sorgular kendiliğinden baştan koşuyor.
+  Mobilde sekme ekranları ve üstüne yığın açılan ekranlar KURULU kalıyor, `useAsync` de
+  odak dinlemiyor. Tazelenmeyen ekran geri dönülünce eski veriyi gösterir; bu hata iki
+  yerde yaşandı (profilde engellenen kişi Keşfet'te kaldı, Arkadaşlar ekranında kabul
+  edilen istek profildeki sayıya yansımadı).
+  - `ArkadaslarBolumu` her odakta sessizce tazeleniyor: değişikliklerin bir kısmı cihazda
+    olmuyor (karşı taraf kabul ediyor) ve kaybedilecek kaydırma yok.
+  - Keşfet YALNIZCA engel sürümü değiştiyse tazeleniyor (`src/lib/engelSurumu.js`).
+    `yenile()` listeyi 1. sayfadan kuruyor; her odakta çalışsaydı karta dokunup geri
+    dönen kullanıcının biriktirdiği sayfaları silerdi. `blockUser`/`unblockUser` çağıran
+    her yeni yer başarıdan sonra `engelDegisti()` çağırmalı. Sayaç api.js'e konamaz:
+    önizleme api nesnesini `onizlemeApi` ile eziyor.
+  - İlk odak `useFocusEffect`'te de çalışır (ekran odaktayken kurulursa); ilk çekimi
+    zaten yapan ekranda o çağrı atlanmalı.
 - Avatar önbellek sayacı **diskte** (`KEYS.avatarSurumleri`). Fresco'nun disk önbelleği
   uygulama yeniden başlatmalarını aşıyor; sayaç bellekte kalırsa açılışta temel URI'ye
   dönülür ve eski görsel ağa hiç çıkmadan sunulur.
@@ -284,23 +344,46 @@ commit'ten diff çekmek:
 cd C:/projeler/dersmate && git diff <baseline>..HEAD --stat -- frontend/src
 ```
 
-Son senkron baseline'ı: **`b93422a`** (2026-09-04). Bir sonraki senkronda buradaki
-değeri güncelle, yoksa aynı diff iki kez uygulanır.
+Son senkron baseline'ı: **`6aafac7`** (2026-09-10, web #33'ün birleşmesi). Bir sonraki
+senkronda buradaki değeri güncelle, yoksa aynı diff iki kez uygulanır.
+
+`b93422a..6aafac7` aralığında `frontend/src`'ye dokunan her PR ya taşındı ya da mobilde
+karşılığı yok: #21 → mobil PR #6 (`fe8e875`); #26, #29, #30, #31, #33 →
+`ozellik/web-esitleme-26-33` dalı; #24 ve #25 → aşağıdaki "bilerek taşınmayanlar".
+#28 ve #32 yalnızca sunucu/araç, `frontend/src`'ye dokunmuyor.
 
 ⚠️ BASELINE'I GÜNCELLEMEYİ UNUTMAK SESSİZ BİR HATADIR ve bir kez yaşandı: değer
 `7f140a9`'da (25 Ağustos) kalmışken mobil aslında iki tur daha ilerlemişti, bu yüzden
 diff on günlük bitmiş işi de "yapılacak" diye gösteriyordu. Ters yönü daha kötü:
 baseline ileri kalırsa gerçek bir fark hiç görünmez.
 
-**Bilerek taşınmayan tek iş** (`0015860`, Keşfet filtre sütununun ekrana yapışması):
-web'de yan sütun sayfa ile birlikte kayıyordu, `position: sticky` ile sabitlendi.
-Mobilde filtreler yan sütunda değil ALT SAYFA MODALINDE ve modal zaten ekranda sabit —
-karşılığı yok, port edilecek bir şey yok.
+**Bilerek taşınmayan işler** — üçünün de mobilde karşılığı yok, port edilecek bir şey yok:
 
-⚠️ `api.js` yüzeyini karşılaştırmak için metot adlarını çıkarıp kümeleri karşılaştır;
-mobilde bilinçli olarak FARKLI olan üç metot var (`proofContentUrl` → `proofImageSource`,
-`avatarObjectUrl` → `avatarImageSource`, `adminProofContentUrl` → `adminProofImageSource`)
-— blob/object-URL yerine `<Image source={{uri, headers}}>` kullanıldığı için.
+- `0015860`, Keşfet filtre sütununun ekrana yapışması: web'de yan sütun sayfa ile
+  birlikte kayıyordu, `position: sticky` ile sabitlendi. Mobilde filtreler yan sütunda
+  değil ALT SAYFA MODALINDE ve modal zaten ekranda sabit.
+- Web #24 (`59fe4dd`), çerez şeridinin altındaki içeriği tıklanamaz yapması: web'in
+  `fixed` şeridi altına yer ayırmıyordu (`CookieBanner.jsx`). Mobilde şerit yok; veri
+  tercihleri alt sayfa modalında soruluyor.
+- Web #25 (`af0e531`), dar ekran menü çekmecesinin kendi perdesinin altında kalması:
+  web'in hamburger menüsü (`Layout.jsx`). Mobilde menü yok, gezinme sekme çubuğundan.
+
+⚠️ `api.js` yüzeyini karşılaştırmak için metot adlarını çıkarıp kümeleri karşılaştır.
+Bilinçli fark **4 web ↔ 6 mobil** (2026-09-11 ölçümü: web 78, mobil 80 metot):
+
+| web | mobil |
+|---|---|
+| `proofContentUrl` | `proofImageSource` |
+| `avatarObjectUrl` | `avatarImageSource` + `rememberLocalAvatar` (yalnızca mobil) |
+| `adminProofContentUrl` | `adminProofImageSource` |
+| `adminTeacherDocument` | `adminTeacherDocumentSource` |
+| — | `teacherDocumentSource` (kendi belgesini geri okuma; web'de karşılığı yok) |
+
+Gerekçe: web baytları blob olarak indirip object URL'e çeviriyor, RN'de
+`URL.createObjectURL` yok. Mobil `*Source` metotları yalnızca `{ yol }` döndürüyor;
+baytları `authedImageDataUri` axios ile indirip data URI yapıyor (`YetkiliGorsel`).
+`<Image source={{uri, headers}}>` DEĞİL, yukarıdaki ⛔'ye bak. Listede olmayan bir fark
+senkron hatasıdır.
 
 ⚠️ `verifyEmail` İKİ ARGÜMAN ALIYOR (`email`, `code`) — tek argümanlı token sürümü
 2 Eylül'de sunucudan kalktı. Bu, senkron gecikmesinin en pahalı örneği: sunucu

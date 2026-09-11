@@ -772,7 +772,7 @@ export default function Topluluk() {
     <View className="gap-3 pb-1">
       <Text className="text-sm leading-relaxed text-slate-600">
         Sınav stresinden soru çözümüne, kaynak tartışmasından tercih kararına — herkesin aynı
-        sıralarda olduğu ortak alan. Ders almak için eşleşmene gerek yok; buraya yazıp topluluğa
+        sıralarda olduğu ortak alan. Ders almak için arkadaş olmana gerek yok; buraya yazıp topluluğa
         sorabilirsin.
       </Text>
 

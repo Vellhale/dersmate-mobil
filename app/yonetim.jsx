@@ -49,7 +49,7 @@ const SEKMELER = [
     hâlâ açık itirazlar için duruyor — yeni itiraz açılamıyor (web kararı).
 
     ETİKETLER KISA: web'in "Öğretmen adayları" / "Eski itirazlar" adları üç sütunlu
-    dar şeritte iki satıra kırılıp şeridi tırtıklıyordu (Eşleşmeler'de aynı karar).
+    dar şeritte iki satıra kırılıp şeridi tırtıklıyordu (Arkadaşlar'da aynı karar).
     Sayaç kalır, uzun ad düşer.
   */
   { key: 'reports', label: 'Şikayetler', sayac: (m) => m?.openReports },

@@ -9,7 +9,7 @@ import { Logo } from './Logo'
 
   Web'de split soldaydı (marka paneli | form); telefonda eksen dikey döner:
   ÜSTTE marka paneli (brand-600 → brand-700 → slate-900 gradyanı — web aside'ının
-  birebir renk yolu), ALTTA üst köşeleri yuvarlatılmış beyaz form katmanı. Beyaz
+  birebir renk yolu; ilk çeyreği düz brand-600, logo yayı için), ALTTA üst köşeleri yuvarlatılmış beyaz form katmanı. Beyaz
   katman gradyanın ÜZERİNE biner (-mt-6): iki panel yan yana iki kutu değil, tek
   parça bir kompozisyon okunur.
 
@@ -37,6 +37,12 @@ export function AuthKabuk({ title, subtitle, children, altBilgi = true }) {
     <View className="flex-1 bg-slate-50">
       <LinearGradient
         colors={[brand[600], brand[700], ink]}
+        /* locations: gradyanın ilk çeyreği DÜZ brand-600. Logonun bağ yayı zemin renginde
+           çiziliyor (Logo.jsx → ZEMIN_MARKA = brand[600]) ve iki dairenin arasında zeminin
+           ÜSTÜNDEN geçiyor. Varsayılan duraklarla (0 / 0.5 / 1) logonun altı cihaza göre
+           gradyanın %14–19'unda, yani #0072AC–#0070A9 oluyordu: yay zeminden 1.07–1.10:1
+           ayrışıp daireler arasında ince bir çizgi olarak görünüyordu. Bu prop'u kaldırma. */
+        locations={[0.25, 0.5, 1]}
         start={{ x: 0, y: 0 }}
         end={{ x: 0.6, y: 1.2 }}
       >

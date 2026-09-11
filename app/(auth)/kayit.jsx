@@ -277,7 +277,7 @@ export default function Kayit() {
     return (
       <AuthKabuk
         title="E-postan doğrulandı"
-        subtitle="Hesabın etkin. Artık eşleşme isteği gönderebilirsin."
+        subtitle="Hesabın etkin. Artık arkadaş isteği gönderebilirsin."
         altBilgi={false}
       >
         <View className="gap-4">

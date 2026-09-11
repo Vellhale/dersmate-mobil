@@ -1,5 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { api, hydrateSession, loadSession, onAuthExpired, saveSession } from '../lib/api'
+import {
+  api,
+  hydrateSession,
+  loadSession,
+  onAuthExpired,
+  onOturumYenilendi,
+  saveSession,
+} from '../lib/api'
 import { getHwidHash } from '../lib/hwid'
 
 const AuthContext = createContext(null)
@@ -29,7 +36,7 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  // Token süresi dolduğunda (401) oturumu düşür — API katmanı bu olayı yayınlar.
+  // Oturum bittiğinde (401 ve yenileme de olmadı) düşür — API katmanı bu olayı yayınlar.
   useEffect(() => {
     return onAuthExpired(() => {
       saveSession(null)
@@ -37,9 +44,19 @@ export function AuthProvider({ children }) {
     })
   }, [])
 
-  const login = useCallback(async (email, password) => {
+  // Arka planda yenilenen oturum (rol ve isAdmin dahil) React durumuna da yansısın.
+  useEffect(() => onOturumYenilendi(setSession), [])
+
+  /*
+    rememberMe AÇIKÇA true: mobilde "Beni hatırla" kutusu yok. Web'in gerekçesi ortak
+    bilgisayar; telefon kişisel cihaz ve oturum SecureStore'da. Sunucu varsayılanı da
+    true ama ona sessizce yaslanmak, varsayılan değişirse yenilemeyi fark ettirmeden
+    kapatırdı: false giderse sunucu yenileme token'ı hiç üretmez, oturum 2 saate iner.
+    Parametre web imzasıyla aynı kalsın diye var; mobilde onu dolduran kutu yok.
+  */
+  const login = useCallback(async (email, password, rememberMe = true) => {
     const hwidHash = await getHwidHash()
-    const result = await api.login({ email, password, hwidHash })
+    const result = await api.login({ email, password, hwidHash, rememberMe })
     saveSession(result)
     setSession(result)
     return result

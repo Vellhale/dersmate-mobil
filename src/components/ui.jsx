@@ -40,6 +40,7 @@ export function Button({
   loading = false,
   disabled = false,
   onPress,
+  accessibilityLabel,
   className = '',
   children,
 }) {
@@ -49,6 +50,10 @@ export function Button({
   return (
     <Pressable
       accessibilityRole="button"
+      // Etiket yalnızca metin tek başına yetmediğinde verilir: Keşfet kartlarındaki
+      // "Engelle" düğmeleri birbirinin aynı ve TalkBack kimi engellediğini söylemeli.
+      // Verilmezse undefined kalır, RN metin çocuğunu okur.
+      accessibilityLabel={accessibilityLabel}
       // disabled prop'u ŞART: yalnızca onPress'i kaldırmak basışı engeller ama
       // NativeWind'in active: durumunu engellemez — pasif buton basınca renk
       // değiştirip "çalışıyormuş" derdi.

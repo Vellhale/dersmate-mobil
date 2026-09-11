@@ -52,6 +52,36 @@ import { ILETISIM_EPOSTA, SOZLESME_TARIHI } from '../src/lib/yasalMetinler'
   Bir gizlilik metninin yapabileceği en kötü hatalardan biri: kullanıcıya, yapabildiği
   bir şeyi yapamadığını söylemek. Silme hakkını kullanmak isteyen kişi ya haftalarca
   e-posta bekler ya vazgeçer.
+
+  ─── 2026-09-10: §6'YA İKİ PARAGRAF — SÜRÜM ARTIRILMADI (SÜRÜM BORCU) ──────────
+  Web'deki pages/Gizlilik.jsx başındaki "SÜRÜM BORCU" notunun mobil karşılığı (web #30,
+  #31). İki paragrafın yasal ağırlığı AYNI DEĞİL:
+
+   1. İSİMLE ARANABİLİRLİK + ENGELLEME — yeni ifşa değil: görünen ad §6'nın zaten
+      herkese açık saydığı kümede. Arama, açık bir bilgiye ulaşmanın YOLU.
+   2. ARKADAŞ SAYISI + ORTAK ARKADAŞLAR — YENİ BİR İFŞA: kiminle arkadaş olduğun o
+      kümede yok, bugüne kadar yalnızca iki tarafa görünüyordu. Sözleşme sürümünün
+      artması GEREKİR.
+
+  SOZLESME_SURUMU (src/lib/yasalMetinler.js) yine de ARTIRILMADI; sebep hukuki değil
+  işletimsel. Sabit sunucudakiyle (LegalDocuments.CurrentVersion) birebir aynı olmak
+  zorunda ve buradaki kopya PAKETE GÖMÜLÜ: tek taraflı artırmak, sürümü tutmayan
+  istemciyi KAYIT EKRANINDA kilitler. Metnin sürümden bir adım önde olması ise yalnızca
+  bir kayıt gecikmesi. Üstteki "Son güncelleme" de bu yüzden değişmedi: tarih sürümün
+  gününü anlatıyor, tek başına değiştirmek onu kaydedilen sürümden ayırırdı.
+
+  Kapatma sırası MOBİLLE BAŞLAR: bu depoda sürümü artır → APK'yı yayınla (mağaza
+  incelemesi dahil) → LegalDocuments.CurrentVersion + web sabitini artır → sunucuyu
+  dağıt. Borç kapanınca bu not sadeleştirilmeli.
+
+  ⚠️ İkinci paragraf Keşfet'teki "Arkadaş Ekle" sekmesini ve engellemeyi anıyor; ikisi
+  mobile #30'un portuyla geliyor. Metin o port olmadan yayına çıkarsa var olmayan bir
+  ekranı tarif eder — §7'de bir kez yaşanan hatanın tersi. Sekme adı değişirse metin
+  de değişmeli.
+
+  ⚠️ Arkadaş paragrafındaki {' '} bilerek duruyor: web'de aynı yerde eksik ve orada
+  metin "yalnızcaortak" diye birleşik görünüyor. JSX, etikete bitişik satır sonunu
+  siliyor; RN'de de aynı.
 */
 export default function Gizlilik() {
   return (
@@ -84,7 +114,7 @@ export default function Gizlilik() {
           aldığın değerlendirmeler, son giriş zamanın.
         </Paragraf>
         <Paragraf>
-          <Kalin>İçerik:</Kalin> eşleştiğin kişilerle yazıştığın mesajlar ve dersin yapıldığını
+          <Kalin>İçerik:</Kalin> arkadaşlarınla yazıştığın mesajlar ve dersin yapıldığını
           gösteren kanıt görselleri.
         </Paragraf>
         <Paragraf>
@@ -111,7 +141,7 @@ export default function Gizlilik() {
             giriş yapamazsın.
           </Madde>
           <Madde>
-            <Kalin>Eşleşme ve ders için:</Kalin> profil bilgilerin ve konu tercihlerin — kimin
+            <Kalin>Arkadaşlık ve ders için:</Kalin> profil bilgilerin ve konu tercihlerin — kimin
             kime ders anlatabileceğini bunlar belirliyor.
           </Madde>
           <Madde>
@@ -189,6 +219,29 @@ export default function Gizlilik() {
           anlattığın metin, anlatabildiğin konular, aldığın değerlendirmeler) platformdaki
           diğer kullanıcılara açıktır. E-posta adresin, telefon numaran ve cihaz kimliğin{' '}
           <Kalin>hiçbir kullanıcıya gösterilmez</Kalin>.
+        </Paragraf>
+        <Paragraf>
+          <Kalin>Arkadaş sayın</Kalin> profilinde herkese görünür. Tam arkadaş listeni
+          yalnızca sen görürsün; başka bir kullanıcı profiline baktığında yalnızca{' '}
+          <Kalin>ortak arkadaşlarınızı</Kalin> — yani zaten ikinizin de arkadaşı olan
+          kişileri — görür. Engellediğin kişiler bu sayıya, tam listene ve ortak arkadaş
+          listelerine girmez; Arkadaşlar ekranında ise arkadaşlığı sen sonlandırana kadar
+          görünmeye devam eder.
+        </Paragraf>
+        {/* ⚠️ Son cümle web'den AYRIŞTI; web'in yetişmesi gerekiyor (Gizlilik.jsx §6).
+            Eski hâli "bu sayıya ve listelere hiç girmez" diyordu. Oysa engelleme kabul
+            edilmiş arkadaşlığı kapatmıyor (UserBlocks.cs) ve Arkadaşlar ekranının ucu
+            (GetMyMatches) engel süzmüyor: engellenen arkadaş orada ve "Arkadaş (N)"
+            sayısında duruyor. Metin gerçeğe daraltıldı, uç süzülmedi: Sonlandır düğmesi
+            YALNIZCA o ekranda ve kişiyi oradan gizlemek o arkadaşlığı bitirmenin tek
+            yolunu kaldırırdı. */}
+        <Paragraf>
+          Görünen adınla <Kalin>aranabilirsin</Kalin>: Keşfet’teki “Arkadaş Ekle”
+          bölümünde adını bilen bir kullanıcı seni bulup istek gönderebilir. Bu, profilini
+          doldurmamış olsan da geçerlidir. İstemediğin kişiyi{' '}
+          <Kalin>engelleyebilirsin</Kalin> — engellediğin kişi seni aramada göremez,
+          sana istek gönderemez ve açık sohbetinize yazamaz. Engellediğin karşı tarafa
+          bildirilmez.
         </Paragraf>
         <Paragraf>
           Verini pazarlama amacıyla üçüncü taraflara <Kalin>aktarmıyoruz</Kalin> ve
