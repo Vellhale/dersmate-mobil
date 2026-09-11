@@ -154,6 +154,25 @@ function useBirikenListe(aktif, yukleyici, bagimliliklar, anahtar) {
       setError(null)
       return
     }
+
+    /*
+      YENİ SORGU ESKİ SONUÇLARI TAŞIMAZ. Önceden liste ancak 1. sayfa BAŞARIYLA dönünce
+      değişiyordu ve bu iki hataya yol açıyordu:
+      • Yazarken: "Ali"nin sonuçları "Ayşe" kutusunun altında debounce ve ağ süresi
+        boyunca GÖSTERGESİZ duruyordu. "Aranıyor…" yalnızca boş listede çiziliyor, sayaç
+        satırı da gizleniyordu.
+      • 1. sayfa düşerse: page ve hasNextPage eski sorgudan kalıyordu, kaydırınca
+        dahaGetir YENİ sorgunun 3. sayfasını ESKİ listenin sonuna ekliyordu. Ekranda iki
+        aramanın karışımı ve yeni aramanın sayısı kalıyor, hata kutusu da kayboluyordu.
+      Sıfırlama boş listeyi getiriyor (yani "Aranıyor…" görünüyor) ve hasNextPage=false
+      eski listeye ekleme yapılmasını engelliyor. yenile()'ye KONMADI: engel sonrası
+      tazeleme aynı sorguyu yeniliyor, listeyi boşaltıp titretmemeli.
+    */
+    setItems([])
+    setTotalCount(0)
+    setHasNextPage(false)
+    setPage(0)
+    basarisizHedef.current = null
     sayfaGetir(1)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aktif, ...bagimliliklar])
