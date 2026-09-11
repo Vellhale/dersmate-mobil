@@ -197,7 +197,7 @@ export default function Konusma() {
             </Text>
             <Text numberOfLines={1} className="text-xs text-slate-500">
               {active?.isClosed
-                ? 'Bu eşleşme sonlandırıldı — geçmiş okunabilir, yeni mesaj yazılamaz.'
+                ? 'Bu arkadaşlık sonlandırıldı — geçmiş okunabilir, yeni mesaj yazılamaz.'
                 : 'Ders linkini (Zoom / Meet / Discord) buradan paylaşabilirsin.'}
             </Text>
           </Pressable>
@@ -252,7 +252,7 @@ export default function Konusma() {
           <View className="flex-1 items-center justify-center p-8">
             <Text className="text-center text-sm text-slate-500">
               {active?.isClosed
-                ? 'Bu sohbette hiç mesaj yazılmadan eşleşme sonlandırıldı.'
+                ? 'Bu sohbette hiç mesaj yazılmadan arkadaşlık sonlandırıldı.'
                 : 'İlk mesajı sen yaz. Ders saatini kararlaştırıp toplantı linkini paylaşın.'}
             </Text>
           </View>
@@ -272,7 +272,7 @@ export default function Konusma() {
         {active?.isClosed ? (
           <View className="border-t border-slate-200 bg-white p-3">
             <Text className="text-center text-sm text-slate-500">
-              Bu eşleşme sonlandırıldı. Geçmişi okuyabilirsin ama yeni mesaj gönderemezsin.
+              Bu arkadaşlık sonlandırıldı. Geçmişi okuyabilirsin ama yeni mesaj gönderemezsin.
             </Text>
           </View>
         ) : (

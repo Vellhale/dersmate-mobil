@@ -5,6 +5,7 @@ import { useAsync } from '../state/useAsync'
 import { formatDateTime } from '../lib/format'
 import { seviyeEtiketi, seviyeHesapla, seviyeIlerlemeMetni } from '../lib/seviye'
 import { brand } from '../lib/theme'
+import { ArkadaslarBolumu } from './ArkadaslarBolumu'
 import { Avatar } from './Avatar'
 import { SubjectBadges } from './SubjectBadges'
 import { UniversiteRozetleri } from './UniversiteRozetleri'
@@ -43,6 +44,10 @@ import { Badge, Button, Card, EmptyState, ErrorBox, Loading } from './ui'
   gerekçe rozeti DOĞRULAMA yolunu kapatıyordu: forumda rozetli bir yorum görüp adına
   dokunan kullanıcı hiçbir işaret bulamıyordu. Sunucu profil ucuna `isStaff` ekledi
   (ProfileQueries.cs) ve rozet buraya bağlandı; ayrıntılı gerekçe YonetimRozeti.jsx'te.
+
+  ARKADAŞLAR (web #31) konu panelleri ile değerlendirmeler arasında ve AYRI UÇTAN
+  (api.userFriends) geliyor — profil yanıtına alan eklenmedi. Kurallar bileşenin kendi
+  başında (ArkadaslarBolumu.jsx).
 */
 
 export function ProfilGorunumu({ userId, kendiProfilim = false }) {
@@ -102,6 +107,15 @@ export function ProfilGorunumu({ userId, kendiProfilim = false }) {
         topics={p.wantsToLearn}
         emptyText="Henüz konu eklenmemiş."
       />
+
+      {/*
+        ARKADAŞLAR — konu panelleri ile değerlendirmeler ARASINDA (web yerleşimi).
+        Sayfa "kim → ne yapmış → ne yapabilir → başkaları ne diyor" diye okunuyor;
+        arkadaş listesi yetenek beyanı değil sosyal kanıt ve en yakın akrabası
+        değerlendirmeler. Sayaç şeridine beşinci kutu olarak KONMADI: 2×2 şerit
+        2+2+1 öksüz bir satır bırakırdı. Sayı bölümün kendi başlığında.
+      */}
+      <ArkadaslarBolumu userId={userId} kendiProfilim={benimProfilim} ad={p.displayName} />
 
       <Degerlendirmeler reviews={reviews} page={reviewPage} onPage={setReviewPage} />
     </View>

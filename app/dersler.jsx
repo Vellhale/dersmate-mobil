@@ -220,7 +220,7 @@ export default function Dersler() {
       ) : hicDersYok ? (
         <EmptyState
           title="Henüz dersin yok"
-          description="Kabul edilmiş bir eşleşmen varsa hemen ders saati belirleyebilirsin."
+          description="Bir arkadaşın varsa hemen ders saati belirleyebilirsin."
           action={<Button onPress={() => setBookOpen(true)}>Ders rezerve et</Button>}
         />
       ) : (
@@ -677,18 +677,18 @@ function BookModal({ matches, onClose, onBooked }) {
     >
       {matches.length === 0 ? (
         <EmptyState
-          title="Kabul edilmiş eşleşmen yok"
+          title="Henüz arkadaşın yok"
           description="Önce Keşfet'ten istek gönder ve karşı tarafın kabul etmesini bekle."
         />
       ) : bookable.length === 0 ? (
         <EmptyState
-          title="Bu eşleşmelerde sana anlatılacak konu yok"
-          description="Aktif eşleşmelerinde ders anlatan taraf sensin. Ders almak için Keşfet'ten yeni bir istek gönder."
+          title="Arkadaşlarında sana anlatılacak konu yok"
+          description="Mevcut arkadaşlarında ders anlatan taraf sensin. Ders almak için Keşfet'ten yeni bir istek gönder."
         />
       ) : (
         <View className="gap-4 pb-2">
           <View>
-            <Text className="mb-1 text-sm font-medium text-slate-700">Eşleşme ve konu</Text>
+            <Text className="mb-1 text-sm font-medium text-slate-700">Arkadaş ve konu</Text>
             <Text className="mb-2 text-xs text-slate-600">
               Dersi alan taraf sensin; listelenen konu karşı tarafın sana anlatacağı konudur.
             </Text>
@@ -795,7 +795,7 @@ function BookModal({ matches, onClose, onBooked }) {
           <View className="rounded-xl border border-brand-100 bg-brand-50 px-4 py-3">
             <Text className="text-xs font-semibold uppercase tracking-wide text-brand-700">Özet</Text>
             <View className="mt-2 gap-1.5">
-              <OzetSatiri ad="Konu" deger={selected?.topicName ?? 'Eşleşme seçilmedi'} soluk={!selected} />
+              <OzetSatiri ad="Konu" deger={selected?.topicName ?? 'Arkadaş seçilmedi'} soluk={!selected} />
               <OzetSatiri ad="Anlatan" deger={selected?.match.otherDisplayName ?? '—'} soluk={!selected} />
               <OzetSatiri
                 ad="Tarih ve saat"

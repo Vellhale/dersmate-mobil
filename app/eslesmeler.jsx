@@ -10,13 +10,21 @@ import { Avatar } from '../src/components/Avatar'
 import { Badge, Button, EmptyState, ErrorBox, Loading, Notice } from '../src/components/ui'
 
 /*
-  EŞLEŞMELER — web'deki pages/Matches.jsx'in portu. Tab çubuğunun üstünde yığın ekranı
+  ARKADAŞLAR — web'deki pages/Matches.jsx'in portu. Tab çubuğunun üstünde yığın ekranı
   (Akış başlığından ve profildeki kısayoldan gelinir): gelen isteği kabul etmeden ders
   akışı hiç başlayamaz — bu ekran Derslerim'in ön koşulu.
 
+  ROTA ADI BİLEREK ESKİ (/eslesmeler). Web #31'de ekran "Eşleşmeler"den "Arkadaşlar"a
+  döndü ve web adresi /arkadaslar oldu, ama eski adresi yönlendirme olarak tuttu. Mobilde
+  yol kullanıcıya görünmüyor; değiştirmek ise sessizce kırar: tur çıpası 'eslesmeler'
+  (src/lib/tur.js ↔ Akış başlığı), dersmate://eslesmeler derin bağlantısı ve kök
+  Stack.Protected listesi — yeni ad oraya eklenmezse ekran OTURUMSUZ da açılır.
+  Bileşen/API adları da (Eslesmeler, MatchKarti, myMatches…) web gibi aynı kaldı.
+
   Web kararları aynen:
-  • Üç sekme kısa adla (Gelen/Giden/Aktif): dar ekranda uzun ad iki satıra kırılıp
-    şeridi tırtıklıyordu; sayaç kalır, uzun ad düşer.
+  • Üç sekme kısa adla (Gelen/Giden/Arkadaş): dar ekranda uzun ad iki satıra kırılıp
+    şeridi tırtıklıyordu; sayaç kalır, uzun ad düşer. "Arkadaşlar" sayaçla birlikte
+    sığmadığı için kısa ad "Arkadaş" (web'de 375px'te ölçüldü).
   • Konusuz eşleşme = üniversite ağı isteği: requestedTopicName null gelir ve kart
     "Sohbet isteği" der — boş bir "Almak istediğin:" satırı basılmaz.
   • Sonlandırma tek taraflı ve geri alınamaz — tek tıkla olmaz, satır içi onay kutusu.
@@ -27,7 +35,7 @@ import { Badge, Button, EmptyState, ErrorBox, Loading, Notice } from '../src/com
 const TABS = [
   { key: 'incoming', label: 'Gelen' },
   { key: 'outgoing', label: 'Giden' },
-  { key: 'active', label: 'Aktif' },
+  { key: 'active', label: 'Arkadaş' },
 ]
 
 export default function Eslesmeler() {
@@ -52,7 +60,7 @@ export default function Eslesmeler() {
           <Text className="text-xl text-slate-500">←</Text>
         </Pressable>
         <View>
-          <Text className="text-lg font-bold text-slate-900">Eşleşmeler</Text>
+          <Text className="text-lg font-bold text-slate-900">Arkadaşlar</Text>
           <Text className="text-xs text-slate-500">
             İstek kabul edilince sohbet açılır; ders de oradan planlanır.
           </Text>
@@ -115,12 +123,12 @@ export default function Eslesmeler() {
                 /*
                   SOHBET LİSTESİ DE TAZELENMELİ.
 
-                  Eşleşme kabul edilince sunucu konuşmayı AÇIYOR ama bunu kimseye
+                  İstek kabul edilince sunucu konuşmayı AÇIYOR ama bunu kimseye
                   BİLDİRMİYOR: SignalR'ın ConversationUpdated olayı yalnızca mesaj
                   gönderiminde yayınlanıyor. InboxContext ise listeyi açılışta bir kez
                   çekip sonrasını o olaya bırakıyor. Sonuç: kullanıcı "Sohbet açıldı"
                   bildirimini görüyor, Mesajlar sekmesine geçiyor ve orada hiçbir şey
-                  yok — ilk eşleşmesiyse "Henüz sohbetin yok" boş durumu duruyor.
+                  yok — ilk arkadaşıysa "Henüz sohbetin yok" boş durumu duruyor.
                   Ancak karşı taraf mesaj yazınca ya da uygulama yeniden açılınca düzeliyor.
                 */
                 reloadConversations()
@@ -155,7 +163,7 @@ function SekmeBosDurumu({ tab, router }) {
 
   return (
     <EmptyState
-      title="Aktif eşleşmen yok"
+      title="Henüz arkadaşın yok"
       description="Bir istek kabul edildiğinde burada görünür ve sohbet açılır."
     />
   )
@@ -172,7 +180,7 @@ function MatchKarti({ match, tab, router, onChanged }) {
     setError(null)
     try {
       await api.closeMatch(match.matchId)
-      onChanged(`${match.otherDisplayName} ile eşleşme sonlandırıldı. Sohbet geçmişin duruyor.`)
+      onChanged(`${match.otherDisplayName} ile arkadaşlığın sonlandırıldı. Sohbet geçmişin duruyor.`)
     } catch (err) {
       setError(err)
     } finally {
@@ -189,7 +197,7 @@ function MatchKarti({ match, tab, router, onChanged }) {
       await api.respondMatch(match.matchId, accept)
       onChanged(
         accept
-          ? `${match.otherDisplayName} ile eşleştiniz. Sohbet açıldı — ders saatini kararlaştırın.`
+          ? `${match.otherDisplayName} ile arkadaş oldunuz. Sohbet açıldı — ders saatini kararlaştırın.`
           : 'İstek reddedildi.',
       )
     } catch (err) {
@@ -273,8 +281,8 @@ function MatchKarti({ match, tab, router, onChanged }) {
       {confirmClose && (
         <View className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
           <Text className="text-sm text-amber-900">
-            <Text className="font-semibold">{match.otherDisplayName}</Text> ile eşleşme
-            sonlandırılsın mı? Sohbet geçmişin durur ama yeni mesaj yazamazsın ve bu eşleşmeden
+            <Text className="font-semibold">{match.otherDisplayName}</Text> ile arkadaşlığın
+            sonlandırılsın mı? Sohbet geçmişin durur ama yeni mesaj yazamazsın ve bu arkadaşlıktan
             ders rezerve edilemez. Geri alınamaz.
           </Text>
           <View className="mt-3 flex-row gap-2">

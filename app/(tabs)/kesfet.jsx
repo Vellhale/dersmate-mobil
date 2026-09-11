@@ -174,7 +174,7 @@ export default function Kesfet() {
   const searchMode = debouncedTerm.trim().length > 0 || filtersTouched
 
   const categories = useAsync(() => api.categories(), [])
-  // Eşleşme modalındaki takas teklifi listesi için (Akış'takiyle aynı ihtiyaç).
+  // Arkadaş isteği modalındaki takas teklifi listesi için (Akış'takiyle aynı ihtiyaç).
   const portfolio = useAsync(() => api.myPortfolio(), [])
   const myOffers = portfolio.data?.filter((e) => e.direction === 'Offer') ?? []
 
@@ -372,7 +372,7 @@ export default function Kesfet() {
         onClose={() => setHedef(null)}
         onSent={(name) => {
           setHedef(null)
-          setNotice(`${name} kişisine eşleşme isteği gönderildi. Kabul edilince sohbet açılacak.`)
+          setNotice(`${name} kişisine arkadaş isteği gönderildi. Kabul edilince sohbet açılacak.`)
         }}
       />
 
@@ -473,7 +473,7 @@ function IlanSonucKarti({ offer, onIstek }) {
             })
           }
         >
-          Eşleşme isteği gönder
+          Arkadaş isteği gönder
         </Button>
       </View>
     </Card>
@@ -547,7 +547,7 @@ function UniversiteKarti({ kisi, onSohbet }) {
 }
 
 /*
-  SOHBET İSTEĞİ — web SohbetIstegiModali portu. Eşleşme modalından AYRI (web kararı):
+  SOHBET İSTEĞİ — web SohbetIstegiModali portu. Arkadaş isteği modalından AYRI (web kararı):
   oradaki formun tamamı konu seçimidir ve burada seçilecek konu yok.
   requestedTopicId null gider — uç konusuz isteği böyle tanır.
 */

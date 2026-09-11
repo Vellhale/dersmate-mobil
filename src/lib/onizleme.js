@@ -197,7 +197,7 @@ const KISI_DIZINI = [
   },
 ]
 
-/* ── Eşleşmeler ──────────────────────────────────────────────────────────── */
+/* ── Arkadaşlık istekleri (myMatches) ────────────────────────────────────── */
 
 const dknOnce = (dk) => new Date(Date.now() - dk * 60000).toISOString()
 const dknSonra = (dk) => new Date(Date.now() + dk * 60000).toISOString()

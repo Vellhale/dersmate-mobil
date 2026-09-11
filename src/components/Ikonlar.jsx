@@ -88,7 +88,7 @@ export function MesajIkonu(props) {
 }
 
 /** Profil: tek kişi silueti. Web'deki KisilerIkonu'nun (çoklu) tekil hâli —
-    Eşleşmeler'in çok kişili çiziminden ayrışsın. */
+    Arkadaşlar'ın çok kişili çiziminden ayrışsın. */
 export function KisiIkonu(props) {
   return (
     <Cizgi {...props}>

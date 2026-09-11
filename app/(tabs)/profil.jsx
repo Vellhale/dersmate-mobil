@@ -135,7 +135,7 @@ export default function Profil() {
             onPress={() => router.push('/eslesmeler')}
             className="min-h-[44px] flex-1 items-center justify-center rounded-xl border border-slate-200 bg-white"
           >
-            <Text className="text-sm font-medium text-slate-700">Eşleşmelerim</Text>
+            <Text className="text-sm font-medium text-slate-700">Arkadaşlarım</Text>
           </Pressable>
         </View>
 
