@@ -222,6 +222,18 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
      ekranındaki yanlış parola; çıkış da yapılmaz. `SESSION_REVOKED` sunucunun oturumları
      düşürdüğü durum ve yenileme token'ı da iptal. Onu sunmak sunucuya "hırsızlık"
      dedirtir ve kullanıcının parola sıfırladıktan SONRA açtığı taze oturumları da düşürür.
+
+     ⚠️ Bu koruma YALNIZCA erişim token'ının ömrü içinde çalışıyor (sıfırlamadan sonra en
+     fazla ~2 saat). Sunucu önce ömrü sınıyor (JwtBearer, `UseAuthentication`) ve
+     `SESSION_REVOKED`'ı yalnızca ömrü geçerli token'a döndürüyor
+     (`AccountStatusMiddleware`, kimliksiz isteği olduğu gibi geçiriyor). Telefon ertesi
+     gün açılırsa ilk istek GÖVDESİZ 401 alır ve iptal edilmiş yenileme token'ı sunulur.
+     `RefreshSession` hoşgörü penceresini yalnızca `Rotated`'a tanıdığı için bunu
+     `ReuseDetected` sayıp sıfırlamadan sonra açılan web oturumunu da düşürür. Mobil iki
+     durumu AYIRT EDEMEZ: "yalnızca süresi doldu" ile "iptal edildi ve süresi de doldu"
+     aynı gövdesiz 401. Hub fabrikası (`tazeTokenAl`) da aynı yoldan geçiyor. Kök düzeltme
+     sunucuda (hırsızlık varsayımı yalnızca pencere dışı `Rotated` token'da); web de her
+     401'de yenilediği için aynı açığı taşıyor. Sunucu düzelene kadar sınır açık.
   4. "Beni hatırla" kutusu YOK; `login` açıkça `rememberMe: true` gönderiyor. Web'in
      gerekçesi ortak bilgisayar, telefon ise kişisel cihaz. `false` giderse sunucu
      yenileme token'ı üretmez ve oturum sessizce 2 saate iner.

@@ -64,8 +64,27 @@ export const secure = {
         await SecureStore.setItemAsync(guvenliAnahtar(key), value)
       }
     } catch {
-      // Yazılamıyorsa oturum yalnızca bellekte yaşar: uygulama yeniden açılınca
-      // giriş istenir. Sessiz ama güvenli taraf.
+      /*
+        YAZILAMADI → ESKİ KAYIT SİLİNİYOR. Başarısız bir yazım diskteki eski değeri YERİNDE
+        bırakıyor: iOS'ta SecItemUpdate hata verince öğeye dokunulmuyor, Android'de
+        şifreleme prefs'e yazmadan önce patlıyor. Oturumda bu eski değer, sunucunun az önce
+        dönüştürdüğü (Rotated) bir yenileme token'ı demek. Soğuk açılış onu sunar, 30 sn'lik
+        pencere geçmişse sunucu bunu hırsızlık sayıp web dahil her yerden çıkış yaptırır.
+
+        Silmek o yolu kapatıyor: oturum bu açılışta bellekte yaşar, uygulama yeniden
+        açılınca giriş istenir. Güvenli taraf bu. Silme de başarısız olursa yapılacak bir
+        şey kalmıyor. Silme şifreli veriye dokunmuyor (Android'de yalnızca prefs'ten
+        kaldırıyor), yani yazımı kıran Keystore hatası onu kırmaz.
+
+        HWID'de bu dal fiilen boşta: getHwidHash yalnızca kayıt YOKKEN yazıyor.
+      */
+      if (value !== null && value !== undefined) {
+        try {
+          await SecureStore.deleteItemAsync(guvenliAnahtar(key))
+        } catch {
+          /* ikisi de olmadı; en azından akış kırılmaz */
+        }
+      }
     }
   },
 }
