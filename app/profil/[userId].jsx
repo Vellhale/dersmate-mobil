@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { api } from '../../src/lib/api'
+import { engelDegisti } from '../../src/lib/engelSurumu'
 import { useAsync } from '../../src/state/useAsync'
 import { EngellemeModali } from '../../src/components/EngellemeModali'
 import { ProfilGorunumu } from '../../src/components/ProfilGorunumu'
@@ -133,6 +134,8 @@ function BaskaKisiIslemleri({ kisi, onNotice }) {
     setHata(null)
     try {
       await api.unblockUser(kisi.userId)
+      // Alttaki Keşfet odakta tazelensin: kişi aramaya geri dönmeli (bkz. lib/engelSurumu).
+      engelDegisti()
       onNotice(`${kisi.displayName} için engel kaldırıldı.`)
       engeller.reload({ silent: true })
     } catch (err) {

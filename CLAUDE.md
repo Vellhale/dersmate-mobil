@@ -253,6 +253,21 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
   ve kök `Stack.Protected` listesi ona bağlı — listeye eklenmeyen yeni ad OTURUMSUZ da
   açılır. Algoritma anlamındaki "eşleşme" ise "öneri" oldu ("Şimdilik öneri yok"), metin
   eşleşmesi gibi teknik anlamlar olduğu gibi kaldı.
+- **Başka ekranda değişen veri ODAKTA tazelenir**, yeniden kurulumla değil. Web rota
+  değişiminde sayfayı söküp yeniden kuruyor ve sorgular kendiliğinden baştan koşuyor.
+  Mobilde sekme ekranları ve üstüne yığın açılan ekranlar KURULU kalıyor, `useAsync` de
+  odak dinlemiyor. Tazelenmeyen ekran geri dönülünce eski veriyi gösterir; bu hata iki
+  yerde yaşandı (profilde engellenen kişi Keşfet'te kaldı, Arkadaşlar ekranında kabul
+  edilen istek profildeki sayıya yansımadı).
+  - `ArkadaslarBolumu` her odakta sessizce tazeleniyor: değişikliklerin bir kısmı cihazda
+    olmuyor (karşı taraf kabul ediyor) ve kaybedilecek kaydırma yok.
+  - Keşfet YALNIZCA engel sürümü değiştiyse tazeleniyor (`src/lib/engelSurumu.js`).
+    `yenile()` listeyi 1. sayfadan kuruyor; her odakta çalışsaydı karta dokunup geri
+    dönen kullanıcının biriktirdiği sayfaları silerdi. `blockUser`/`unblockUser` çağıran
+    her yeni yer başarıdan sonra `engelDegisti()` çağırmalı. Sayaç api.js'e konamaz:
+    önizleme api nesnesini `onizlemeApi` ile eziyor.
+  - İlk odak `useFocusEffect`'te de çalışır (ekran odaktayken kurulursa); ilk çekimi
+    zaten yapan ekranda o çağrı atlanmalı.
 - Avatar önbellek sayacı **diskte** (`KEYS.avatarSurumleri`). Fresco'nun disk önbelleği
   uygulama yeniden başlatmalarını aşıyor; sayaç bellekte kalırsa açılışta temel URI'ye
   dönülür ve eski görsel ağa hiç çıkmadan sunulur.

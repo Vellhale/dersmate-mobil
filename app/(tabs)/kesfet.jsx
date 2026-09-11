@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FlatList, Pressable, Text, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useFocusEffect, useRouter } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { sekmeAltDolgusu } from '../../src/lib/sekmeCubugu'
 import { api } from '../../src/lib/api'
+import { engelDegisti, engelSurumu } from '../../src/lib/engelSurumu'
 import { formatDate } from '../../src/lib/format'
 import { useAsync } from '../../src/state/useAsync'
 import { useDebounced } from '../../src/hooks/useDebounced'
@@ -283,6 +284,35 @@ export default function Kesfet() {
   )
   const engelSayisi = engellilerim.data?.length ?? 0
 
+  /*
+    ENGEL BAŞKA EKRANDA DEĞİŞTİYSE ODAKTA TAZELE. Kartın profili kök yığında Keşfet'in
+    ÜSTÜNE açılıyor ve Keşfet kurulu kalıyor; web'de Discover sayfa geçişinde yeniden
+    kuruluyor. Profilde engellenen kişi sonuçlarda duruyordu, Engellediklerim eski
+    sayıyı ve eski listeyi gösteriyordu. Karttaki isteğe basan kullanıcı kendi engelini
+    sunucunun nötr "Bu kişiye istek gönderilemiyor." metninden öğreniyordu; o metin karşı
+    tarafın engeli için yazıldı.
+
+    HER ODAKTA DEĞİL, yalnızca engel sürümü değiştiyse. yenile() listeyi 1. sayfadan
+    kuruyor: bir karta dokunup profile bakan ve geri dönen kullanıcının biriktirdiği
+    sayfalar ve kaydırma yeri her dönüşte silinirdi, oysa en sık yol bu. YKS listesi
+    tazelenmiyor: ilan araması engel süzmüyor, yalnızca SearchUniversityPeers süzüyor.
+    İşleyici ref'te: yenile() her render'da yeni kapanışla kuruluyor, odak geri çağrısı
+    ise sabit kalmalı.
+  */
+  const gorulenEngelSurumu = useRef(engelSurumu())
+  const engelSonrasiTazele = useRef(null)
+  engelSonrasiTazele.current = () => {
+    gorulenEngelSurumu.current = engelSurumu()
+    engellilerim.reload({ silent: true })
+    arkadas.yenile()
+    uni.yenile()
+  }
+  useFocusEffect(
+    useCallback(() => {
+      if (gorulenEngelSurumu.current !== engelSurumu()) engelSonrasiTazele.current()
+    }, []),
+  )
+
   const aktifFiltreSayisi = useMemo(
     () =>
       [filters.categoryId, filters.minLevel, filters.minRating].filter((v) => v !== null).length +
@@ -529,10 +559,9 @@ export default function Kesfet() {
           setNotice(`${name} engellendi. Artık birbirinize istek gönderemezsiniz.`)
           /* Engellenen kişi sonuçlardan düşmeli (sunucu artık döndürmüyor) ve engel
              listesine girmeli; yalnızca listeyi tazelemek kartı ekranda bırakırdı.
-             yenile() pasif listede hiçbir şey yapmıyor — yalnızca açık sekme kurulur. */
-          engellilerim.reload({ silent: true })
-          arkadas.yenile()
-          uni.yenile()
+             yenile() pasif listede hiçbir şey yapmıyor — yalnızca açık sekme kurulur.
+             Görülen sürüm de burada eşitleniyor: sonraki odakta ikinci kez tazelenmez. */
+          engelSonrasiTazele.current()
         }}
       />
 
@@ -545,9 +574,9 @@ export default function Kesfet() {
         liste={engellilerim}
         onKaldir={async (kisi) => {
           await api.unblockUser(kisi.userId)
+          engelDegisti()
           setNotice(`${kisi.displayName} için engel kaldırıldı.`)
-          engellilerim.reload({ silent: true })
-          arkadas.yenile()
+          engelSonrasiTazele.current()
         }}
       />
     </SafeAreaView>

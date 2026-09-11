@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Text, View } from 'react-native'
 import { api } from '../lib/api'
+import { engelDegisti } from '../lib/engelSurumu'
 import { Button, ErrorBox, Field, Girdi, Modal, Notice } from './ui'
 
 /*
@@ -62,6 +63,8 @@ export function EngellemeModali({ kisi, onClose, onEngellendi }) {
     setHata(null)
     try {
       await api.blockUser(kisi.userId, not.trim() || null)
+      // Kurulu kalan Keşfet odakta tazelensin (bkz. lib/engelSurumu).
+      engelDegisti()
       onEngellendi(kisi.displayName)
     } catch (err) {
       setHata(err)

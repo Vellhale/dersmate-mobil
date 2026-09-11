@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Pressable, Text, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useFocusEffect, useRouter } from 'expo-router'
 import { api } from '../lib/api'
 import { useAsync } from '../state/useAsync'
 import { Avatar } from './Avatar'
@@ -45,6 +45,42 @@ export function ArkadaslarBolumu({ userId, kendiProfilim = false, ad }) {
   const veri = useAsync(() => api.userFriends(userId), [userId])
   // Kancalar erken dönüşlerden ÖNCE: yükleme → veri geçişinde kanca sırası değişmesin.
   const [hepsi, setHepsi] = useState(false)
+
+  /*
+    ODAKTA SESSİZ TAZELEME. Web bu bölümü rota değişiminde yeniden kuruyor, mobilde ise
+    üstüne yığın ekranı açılan sekme (Profilim) ve yığında alta kalan profil ekranları
+    KURULU kalıyor. Arkadaşlar ekranında isteği kabul edip ya da arkadaşlığı sonlandırıp
+    dönen kullanıcı eski sayıyı ve "Henüz arkadaşın yok"u görüyordu. Ortak arkadaşı
+    profilinden engelleyip geri dönülen profilde o kişi listede kalıyordu. Uygulama
+    yeniden başlayana kadar düzelmiyordu.
+
+    Her odakta, sürüm sayacı yok (Keşfet'in tersine): değişikliklerin bir kısmı cihazda
+    olmuyor, karşı taraf isteği kabul edince haber gelmiyor. Bedel odak başına küçük tek
+    bir istek. Bölümde biriktirilmiş sayfa ya da kaydırma yok, yani kaybedilecek bir şey
+    de yok.
+
+    YALNIZCA KURULUMLA AYNI ANDA gelen odak atlanıyor: ilk çekimi useAsync zaten yaptı.
+    "İlk odağı atla" DEĞİL: bölüm, profil yüklendikten sonra kuruluyor ve kullanıcı o
+    arada Arkadaşlar ekranına geçtiyse kurulum odaksız olur. O zaman ilk GERÇEK dönüş
+    atlanır ve eski liste kalırdı. Bayrağı indiren efekt useFocusEffect'ten SONRA tanımlı:
+    efektler sırayla koşuyor, kurulum anındaki odak çağrısı bayrağı hâlâ kalkık görüyor.
+
+    silent: elde veri varken bölüm null'a düşüp sayfa zıplamasın. reload ref'ten
+    okunuyor, bağımlılıktan değil: userId yerinde değişirse useAsync kendi tam yüklemesini
+    yapıyor. Burası ikinci ve SESSİZ bir istek atsaydı eski kişinin listesi yükleme
+    bayrağı olmadan ekranda kalırdı.
+  */
+  const kuruluyor = useRef(true)
+  const tazele = useRef(veri.reload)
+  tazele.current = veri.reload
+  useFocusEffect(
+    useCallback(() => {
+      if (!kuruluyor.current) tazele.current({ silent: true })
+    }, []),
+  )
+  useEffect(() => {
+    kuruluyor.current = false
+  }, [])
   const d = veri.data
 
   /* Yüklenirken bölüm HİÇ çizilmiyor (iskelet de yok, web kararı): profil kartı ayrı
