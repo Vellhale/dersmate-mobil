@@ -317,18 +317,29 @@ commit'ten diff çekmek:
 cd C:/projeler/dersmate && git diff <baseline>..HEAD --stat -- frontend/src
 ```
 
-Son senkron baseline'ı: **`b93422a`** (2026-09-04). Bir sonraki senkronda buradaki
-değeri güncelle, yoksa aynı diff iki kez uygulanır.
+Son senkron baseline'ı: **`6aafac7`** (2026-09-10, web #33'ün birleşmesi). Bir sonraki
+senkronda buradaki değeri güncelle, yoksa aynı diff iki kez uygulanır.
+
+`b93422a..6aafac7` aralığında `frontend/src`'ye dokunan her PR ya taşındı ya da mobilde
+karşılığı yok: #21 → mobil PR #6 (`fe8e875`); #26, #29, #30, #31, #33 →
+`ozellik/web-esitleme-26-33` dalı; #24 ve #25 → aşağıdaki "bilerek taşınmayanlar".
+#28 ve #32 yalnızca sunucu/araç, `frontend/src`'ye dokunmuyor.
 
 ⚠️ BASELINE'I GÜNCELLEMEYİ UNUTMAK SESSİZ BİR HATADIR ve bir kez yaşandı: değer
 `7f140a9`'da (25 Ağustos) kalmışken mobil aslında iki tur daha ilerlemişti, bu yüzden
 diff on günlük bitmiş işi de "yapılacak" diye gösteriyordu. Ters yönü daha kötü:
 baseline ileri kalırsa gerçek bir fark hiç görünmez.
 
-**Bilerek taşınmayan tek iş** (`0015860`, Keşfet filtre sütununun ekrana yapışması):
-web'de yan sütun sayfa ile birlikte kayıyordu, `position: sticky` ile sabitlendi.
-Mobilde filtreler yan sütunda değil ALT SAYFA MODALINDE ve modal zaten ekranda sabit —
-karşılığı yok, port edilecek bir şey yok.
+**Bilerek taşınmayan işler** — üçünün de mobilde karşılığı yok, port edilecek bir şey yok:
+
+- `0015860`, Keşfet filtre sütununun ekrana yapışması: web'de yan sütun sayfa ile
+  birlikte kayıyordu, `position: sticky` ile sabitlendi. Mobilde filtreler yan sütunda
+  değil ALT SAYFA MODALINDE ve modal zaten ekranda sabit.
+- Web #24 (`59fe4dd`), çerez şeridinin altındaki içeriği tıklanamaz yapması: web'in
+  `fixed` şeridi altına yer ayırmıyordu (`CookieBanner.jsx`). Mobilde şerit yok; veri
+  tercihleri alt sayfa modalında soruluyor.
+- Web #25 (`af0e531`), dar ekran menü çekmecesinin kendi perdesinin altında kalması:
+  web'in hamburger menüsü (`Layout.jsx`). Mobilde menü yok, gezinme sekme çubuğundan.
 
 ⚠️ `api.js` yüzeyini karşılaştırmak için metot adlarını çıkarıp kümeleri karşılaştır;
 mobilde bilinçli olarak FARKLI olan üç metot var (`proofContentUrl` → `proofImageSource`,
