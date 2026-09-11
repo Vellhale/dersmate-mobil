@@ -44,8 +44,18 @@ const KISILER = {
   kaldır → geri gelir" akışı önizlemede de yürünebilsin. TEK liste: engelle ilgili her
   sahte uç buna bakar (sunucuda engel isim aramasını, arkadaş bölümünü, ilanları ve
   önerileri süzüyor). Biçim BlockedUserDto ile birebir.
+
+  Başlangıçta TEK kayıt: "Engellediklerim (1)", tarih ve italik not önizlemede de
+  görünsün. Burak başka hiçbir listede yok, yani hiçbir ekranı süzmüyor. Tarih düz metin:
+  dknOnce aşağıda `const` olarak tanımlı ve burada çağrılsaydı modül yüklenirken TDZ
+  hatası verir, önizlemenin tamamı açılmazdı.
 */
-let ENGELLENENLER = []
+let ENGELLENENLER = [
+  {
+    userId: 'u-burak', displayName: 'Burak Şahin', note: 'Tanımıyorum, ısrarla yazıyor.',
+    blockedAtUtc: '2026-09-02T18:30:00Z',
+  },
+]
 const engelliMi = (userId) => ENGELLENENLER.some((e) => e.userId === userId)
 
 /* ── Katalog ─────────────────────────────────────────────────────────────── */

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { api } from '../lib/api'
 import { useAsync } from '../state/useAsync'
@@ -50,10 +50,21 @@ import { Badge, Button, Card, EmptyState, ErrorBox, Loading } from './ui'
   başında (ArkadaslarBolumu.jsx).
 */
 
-export function ProfilGorunumu({ userId, kendiProfilim = false }) {
+export function ProfilGorunumu({ userId, kendiProfilim = false, onYuklendi }) {
   const profile = useAsync(() => api.userProfile(userId), [userId])
   const [reviewPage, setReviewPage] = useState(1)
   const reviews = useAsync(() => api.userReviews(userId, reviewPage), [userId, reviewPage])
+
+  /* Profil verisi gelince çağırana verilir: başkasının profilindeki eylem düğmeleri
+     (arkadaş ekle / engelle) kişinin ADINA ihtiyaç duyuyor ve o ad yalnızca bu istekte
+     var. Alternatif aynı ucu ikinci kez çağırmaktı; profil ucu birkaç toplama sorgusu
+     koşuyor (web UserProfileView kararı).
+     Kanca ERKEN DÖNÜŞLERDEN ÖNCE: aşağıdaki `if (profile.loading) return` koşullu kanca
+     üretirdi. Çağıran KARARLI bir setState geçmeli — satır içi işlev her render'da yeni
+     kimlik demek ve efekt her seferinde yeniden koşar. */
+  useEffect(() => {
+    if (profile.data && onYuklendi) onYuklendi(profile.data)
+  }, [profile.data, onYuklendi])
 
   if (profile.loading) return <Loading />
   if (profile.error) return <ErrorBox error={profile.error} onRetry={profile.reload} />

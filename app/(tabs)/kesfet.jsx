@@ -4,12 +4,14 @@ import { useRouter } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { sekmeAltDolgusu } from '../../src/lib/sekmeCubugu'
 import { api } from '../../src/lib/api'
+import { formatDate } from '../../src/lib/format'
 import { useAsync } from '../../src/state/useAsync'
 import { useDebounced } from '../../src/hooks/useDebounced'
 import { Avatar } from '../../src/components/Avatar'
 import { SeviyeRozeti } from '../../src/components/SeviyeRozeti'
 import { YonetimRozeti } from '../../src/components/YonetimRozeti'
 import { EslesmeIstegiModali } from '../../src/components/EslesmeIstegiModali'
+import { EngellemeModali } from '../../src/components/EngellemeModali'
 import { EkranBasligi } from '../../src/components/EkranBasligi'
 import { KepIkonu, SaatIkonu, YildizIkonu } from '../../src/components/Ikonlar'
 import { Badge, Button, Card, EmptyState, ErrorBox, Field, Girdi, Loading, Modal, Notice, Spinner } from '../../src/components/ui'
@@ -25,9 +27,15 @@ import { amber, brand, slate } from '../../src/lib/theme'
      mobil listede sayfa değiştirme düğmesi başparmağa ters — FlatList onEndReached
      sayfaları BİRİKTİRİR. Filtre/arama değişince liste sıfırdan kurulur.
 
-  İki sekme web'den aynen: YKS (konu/ilan araması) ve Üniversite (okul/bölüm ağı).
-  İki durum nesnesi AYRI (web kararı): ortak nesne, sekme geçişinde yazılanı silmek
-  ya da bir kipin alanını diğerinin sorgusuna sızdırmak zorunda bırakırdı.
+  Üç sekme web'den aynen: YKS (konu/ilan araması), Üniversite (okul/bölüm ağı) ve Arkadaş
+  Ekle (isimle kişi araması, web #30). Üç durum nesnesi AYRI (web kararı): ortak nesne,
+  sekme geçişinde yazılanı silmek ya da bir kipin alanını diğerinin sorgusuna sızdırmak
+  zorunda bırakırdı — isim `term`e bağlansaydı sekme değişince yazılan ad ilan aramasına
+  dönüşürdü.
+
+  ⚠️ `!universiteKipi` artık "YKS" demek DEĞİL. YKS'ye özgü her dal `yksKipi`ye bakar;
+  iki sekme varsayan bir koşul kalırsa Arkadaş Ekle'de YKS sorgusu koşar ve ilan kartı
+  çizilir.
 */
 
 const VARSAYILAN_FILTRELER = {
@@ -39,9 +47,21 @@ const VARSAYILAN_FILTRELER = {
 
 const UNIVERSITE_VARSAYILAN = { university: '', department: '' }
 
+/*
+  En az iki harf (web ARKADAS_MIN_HARF). Sunucu daha kısa ismi HATA VERMEDEN yok sayıyor ve
+  üniversite ağını döndürüyor (SearchUniversityPeers): alt sınır burada uygulanmazsa
+  kullanıcı rastgele bir kalabalık görür. Tek harf zaten neredeyse herkesi getiren,
+  sorusu olmayan bir sorgu.
+*/
+const ARKADAS_MIN_HARF = 2
+
 const SEKMELER = [
   { key: 'yks', label: 'YKS' },
   { key: 'universite', label: 'Üniversite' },
+  /* "Şu kişi burada mı" sorusu. Üniversite sekmesine bir isim alanı olarak konsaydı,
+     üniversitesini yazmamış kişiler orada görünmediği için alan çalışmıyor gibi dururdu
+     (web kararı). */
+  { key: 'arkadas', label: 'Arkadaş Ekle' },
 ]
 
 const SAYFA_BOYU = 20
@@ -148,6 +168,18 @@ function useBirikenListe(aktif, yukleyici, bagimliliklar, anahtar) {
       if (!kilit.current && hasNextPage) sayfaGetir(page + 1)
     },
     yenidenDene: () => sayfaGetir(basarisizHedef.current ?? (page === 0 ? 1 : page)),
+    /*
+      YENİDEN KUR — engelleme/engel kaldırma sonrası (web'deki reload({ silent }) karşılığı).
+      1. sayfadan kurulur: engellenen kartı yerelde silmek, sunucu saf ofset sayfaladığı için
+      bir SONRAKİ sayfada bir kişiyi atlatırdı (düşen kişiyle herkes bir sıra kayıyor;
+      yukarıdaki tekilleştirme çift kaydı yakalar, atlamayı yakalamaz). Birikmiş sayfaların
+      kaybı, engelleme gibi seyrek bir işlemde kabul edilebilir.
+      Pasif listede HİÇBİR ŞEY yapmaz: yoksa "adını yaz" durumunda kısa isimle istek gider
+      ve sunucu ismi yok sayıp üniversite ağını döndürür.
+    */
+    yenile: () => {
+      if (aktif) sayfaGetir(1)
+    },
   }
 }
 
@@ -160,9 +192,15 @@ export default function Kesfet() {
   const [filtreAcik, setFiltreAcik] = useState(false)
   const [hedef, setHedef] = useState(null)
   const [sohbetHedefi, setSohbetHedefi] = useState(null)
+  const [engelHedefi, setEngelHedefi] = useState(null)
+  const [engelListesiAcik, setEngelListesiAcik] = useState(false)
   const [notice, setNotice] = useState(null)
+  // İsim kutusu `term`e BAĞLANMAZ (web kararı — üstteki blok yorumu).
+  const [arkadasIsim, setArkadasIsim] = useState('')
 
+  const yksKipi = sekme === 'yks'
   const universiteKipi = sekme === 'universite'
+  const arkadasKipi = sekme === 'arkadas'
   const debouncedTerm = useDebounced(term)
 
   const filtersTouched =
@@ -179,7 +217,7 @@ export default function Kesfet() {
   const myOffers = portfolio.data?.filter((e) => e.direction === 'Offer') ?? []
 
   const yks = useBirikenListe(
-    !universiteKipi && searchMode,
+    yksKipi && searchMode,
     (page, pageSize) =>
       api.searchOffers({ ...filters, search: debouncedTerm.trim(), page, pageSize }),
     [debouncedTerm, filters.categoryId, filters.sort, filters.minLevel, filters.minRating],
@@ -202,6 +240,30 @@ export default function Kesfet() {
     (k) => k.userId,
   )
 
+  /*
+    İSİMLE ARAMA — üniversite ağıyla AYNI uç (web kararı: aynı sıralama, sayfalama ve engel
+    elemesini ikinci kez yazmamak için). Sunucu `name` gelince üniversite şartını düşürüyor.
+    İki harften kısa sorgu HİÇ atılmıyor: liste pasif kalıyor.
+  */
+  const gecikmeliIsim = useDebounced(arkadasIsim)
+  const isimSorgusu = gecikmeliIsim.trim()
+  const isimYeterli = isimSorgusu.length >= ARKADAS_MIN_HARF
+
+  const arkadas = useBirikenListe(
+    arkadasKipi && isimYeterli,
+    (page, pageSize) => api.searchUniversityPeers({ name: isimSorgusu, page, pageSize }),
+    [isimSorgusu],
+    (k) => k.userId,
+  )
+
+  // Engellediklerim yalnızca bu sekmede yükleniyor (web kararı): her Keşfet açılışında bir
+  // istek daha atmanın karşılığı yok, liste yalnızca burada görünüyor.
+  const engellilerim = useAsync(
+    () => (arkadasKipi ? api.myBlocks() : Promise.resolve(null)),
+    [arkadasKipi],
+  )
+  const engelSayisi = engellilerim.data?.length ?? 0
+
   const aktifFiltreSayisi = useMemo(
     () =>
       [filters.categoryId, filters.minLevel, filters.minRating].filter((v) => v !== null).length +
@@ -215,24 +277,27 @@ export default function Kesfet() {
     setFiltreAcik(false)
   }
 
-  const liste = universiteKipi ? uni : yks
+  const liste = arkadasKipi ? arkadas : universiteKipi ? uni : yks
 
   const baslikBolumu = (
     <View className="gap-3 pb-3">
-      {/* Sekme şeridi */}
-      <View className="flex-row self-start rounded-xl bg-slate-100 p-1">
+      {/* Sekme şeridi — üç sekme EŞİT GENİŞLİKTE (Arkadaşlar ekranındaki kalıp). Eski
+          self-start şerit üç sekmeyle 360 dp ve 1.3 yazı ölçeğinde ~346 dp tutuyor,
+          kullanılabilir genişlik 328 dp: son sekme ekran dışına düşüp dokunulamaz olurdu.
+          flex-1 ile uzun ad sekmenin içinde sarıyor, hedef 44 dp kalıyor. */}
+      <View className="flex-row rounded-xl bg-slate-100 p-1">
         {SEKMELER.map((item) => (
           <Pressable
             key={item.key}
             accessibilityRole="tab"
             accessibilityState={{ selected: sekme === item.key }}
             onPress={() => setSekme(item.key)}
-            className={`min-h-[44px] justify-center rounded-lg px-4 ${
+            className={`min-h-[44px] flex-1 items-center justify-center rounded-lg px-2 ${
               sekme === item.key ? 'bg-white' : ''
             }`}
           >
             <Text
-              className={`text-sm font-medium ${
+              className={`text-center text-sm font-medium ${
                 sekme === item.key ? 'text-brand-700' : 'text-slate-600'
               }`}
             >
@@ -243,9 +308,11 @@ export default function Kesfet() {
       </View>
 
       <Text className="text-sm text-slate-600">
-        {universiteKipi
-          ? 'Aynı üniversiteden ya da okumak istediğin bölümden öğrencileri bul.'
-          : 'Katalogdaki tüm ders ilanlarında ara; önerilerin Akış sekmesinde.'}
+        {arkadasKipi
+          ? 'Adını bildiğin birini bul ve arkadaş isteği gönder. Ders ilanı vermemiş, profilini doldurmamış kişiler de burada çıkar.'
+          : universiteKipi
+            ? 'Aynı üniversiteden ya da okumak istediğin bölümden öğrencileri bul.'
+            : 'Katalogdaki tüm ders ilanlarında ara; önerilerin Akış sekmesinde.'}
       </Text>
 
       {notice && (
@@ -256,7 +323,29 @@ export default function Kesfet() {
 
       {/* Arama kutusu ÜNİVERSİTE SEKMESİNDE YOK (web kararı): o kutu konu/ders arar,
           üniversite ağında konu kavramı yok — çalışmayan bir denetim olurdu. */}
-      {universiteKipi ? (
+      {arkadasKipi ? (
+        /* Kutu İSİM arıyor. Düğme "Filtre" değil: bu sekmede alt sayfanın içi engel listesi,
+           "Filtre" yazsaydı açan kişi filtre arar, bulamazdı. Engellediklerim YALNIZCA burada
+           (web kararı): engelleme bu sekmenin ikizi — kapsam "herkes aranabilir" diye
+           açıldığında bedeli olarak geldi. Başka bir yere konsaydı engelini geri almak
+           isteyen kullanıcı onu aramak zorunda kalırdı. */
+        <View className="flex-row gap-2">
+          <View className="flex-1">
+            <Girdi
+              value={arkadasIsim}
+              onChangeText={setArkadasIsim}
+              placeholder="Adını yaz…"
+              accessibilityLabel="İsimle ara"
+              autoCorrect={false}
+              autoComplete="off"
+              returnKeyType="search"
+            />
+          </View>
+          <Button variant="secondary" onPress={() => setEngelListesiAcik(true)}>
+            Engellediklerim{engelSayisi > 0 ? ` (${engelSayisi})` : ''}
+          </Button>
+        </View>
+      ) : universiteKipi ? (
         <View className="gap-2">
           <Girdi
             value={uniFiltre.university}
@@ -291,18 +380,34 @@ export default function Kesfet() {
 
       <ErrorBox error={liste.error} onRetry={liste.yenidenDene} />
 
-      {!universiteKipi && searchMode && !liste.ilkYukleme && !liste.error && (
+      {yksKipi && searchMode && !liste.ilkYukleme && !liste.error && (
         <Text className="text-sm font-semibold text-slate-800">{liste.totalCount} ilan</Text>
       )}
       {universiteKipi && !liste.ilkYukleme && !liste.error && liste.items.length > 0 && (
         <Text className="text-sm font-semibold text-slate-800">{liste.totalCount} öğrenci</Text>
       )}
+      {arkadasKipi && isimYeterli && !liste.ilkYukleme && !liste.error && liste.items.length > 0 && (
+        <Text className="text-sm font-semibold text-slate-800">{liste.totalCount} kişi</Text>
+      )}
     </View>
   )
 
-  const bosDurum = liste.ilkYukleme ? (
+  /* Arkadaş Ekle'de ÜÇ AYRI boş durum (web kararı): davet (hiç yazılmamış ya da kısa),
+     aranıyor, sonuç yok. Tek bir "bulunamadı", henüz aramamış kullanıcıya "aradık, yok"
+     derdi — bu yüzden "adını yaz" dalı yükleniyor dalından ÖNCE. */
+  const bosDurum = arkadasKipi && !isimYeterli ? (
+    <EmptyState
+      title="Aradığın kişinin adını yaz"
+      description={`Adının en az ${ARKADAS_MIN_HARF} harfini yazdığında sonuçlar burada çıkar. Ders ilanı olmayan, profilini doldurmamış kişiler de bulunur.`}
+    />
+  ) : liste.ilkYukleme ? (
     <Loading label="Aranıyor…" />
-  ) : liste.error ? null : universiteKipi ? (
+  ) : liste.error ? null : arkadasKipi ? (
+    <EmptyState
+      title="Kimseyi bulamadık"
+      description="Adı platformda yazdığı şekliyle dene. Kişi henüz kayıtlı olmayabilir."
+    />
+  ) : universiteKipi ? (
     <EmptyState
       title="Kimseyi bulamadık"
       description="Üniversite ya da bölüm adını değiştirip tekrar dene."
@@ -330,12 +435,19 @@ export default function Kesfet() {
 
       <FlatList
         data={liste.items}
-        keyExtractor={(item) => (universiteKipi ? item.userId : item.offerId)}
+        keyExtractor={(item) => (yksKipi ? item.offerId : item.userId)}
         renderItem={({ item }) =>
-          universiteKipi ? (
-            <UniversiteKarti kisi={item} onSohbet={setSohbetHedefi} />
-          ) : (
+          yksKipi ? (
             <IlanSonucKarti offer={item} onIstek={setHedef} />
+          ) : (
+            /* Arkadaş Ekle kartı YENİDEN YAZILMADI: iki listede gösterilen şey aynı, bir kişi
+               (web kararı). Yalnızca istek metni değişiyor. */
+            <UniversiteKarti
+              kisi={item}
+              onSohbet={setSohbetHedefi}
+              onEngelle={setEngelHedefi}
+              istekMetni={arkadasKipi ? 'Arkadaş isteği gönder' : 'Sohbet isteği gönder'}
+            />
           )
         }
         contentContainerClassName="gap-3 p-4"
@@ -363,7 +475,7 @@ export default function Kesfet() {
         onChange={setFilters}
         onReset={resetAll}
         categories={categories.data ?? []}
-        resultCount={searchMode && !universiteKipi && !liste.ilkYukleme ? liste.totalCount : null}
+        resultCount={searchMode && yksKipi && !liste.ilkYukleme ? liste.totalCount : null}
       />
 
       <EslesmeIstegiModali
@@ -378,10 +490,45 @@ export default function Kesfet() {
 
       <SohbetIstegiModali
         kisi={sohbetHedefi}
+        arkadaslik={arkadasKipi}
         onClose={() => setSohbetHedefi(null)}
         onSent={(name) => {
           setSohbetHedefi(null)
-          setNotice(`${name} kişisine sohbet isteği gönderildi. Kabul edilince sohbet açılacak.`)
+          setNotice(
+            arkadasKipi
+              ? `${name} kişisine arkadaş isteği gönderildi. Kabul edilince sohbet açılacak.`
+              : `${name} kişisine sohbet isteği gönderildi. Kabul edilince sohbet açılacak.`,
+          )
+        }}
+      />
+
+      <EngellemeModali
+        kisi={engelHedefi}
+        onClose={() => setEngelHedefi(null)}
+        onEngellendi={(name) => {
+          setEngelHedefi(null)
+          setNotice(`${name} engellendi. Artık birbirinize istek gönderemezsiniz.`)
+          /* Engellenen kişi sonuçlardan düşmeli (sunucu artık döndürmüyor) ve engel
+             listesine girmeli; yalnızca listeyi tazelemek kartı ekranda bırakırdı.
+             yenile() pasif listede hiçbir şey yapmıyor — yalnızca açık sekme kurulur. */
+          engellilerim.reload({ silent: true })
+          arkadas.yenile()
+          uni.yenile()
+        }}
+      />
+
+      {/* Kaldır bildirimi alt sayfanın ARKASINDA, liste başlığında çıkıyor — web'in dar
+          ekran çekmecesiyle aynı. Alt sayfanın içine ikinci bir bildirim konmadı: satırın
+          listeden düşmesi zaten geri bildirim. */}
+      <EngellilerModali
+        open={engelListesiAcik}
+        onClose={() => setEngelListesiAcik(false)}
+        liste={engellilerim}
+        onKaldir={async (kisi) => {
+          await api.unblockUser(kisi.userId)
+          setNotice(`${kisi.displayName} için engel kaldırıldı.`)
+          engellilerim.reload({ silent: true })
+          arkadas.yenile()
         }}
       />
     </SafeAreaView>
@@ -481,11 +628,12 @@ function IlanSonucKarti({ offer, onIstek }) {
 }
 
 /*
-  ÜNİVERSİTE KARTI — web UniversiteKarti portu. KARTTA DERS/KONU YOK (bilinçli): kayıt
-  bir ilan değil, kişinin okuduğu yer. BÖLÜM VURGULU (marka pill), üniversite düz satır.
+  ÜNİVERSİTE KARTI — web UniversiteKarti portu; Arkadaş Ekle sonuçları da AYNI kartı
+  kullanıyor (yalnızca istek metni farklı). KARTTA DERS/KONU YOK (bilinçli): kayıt bir
+  ilan değil, kişinin okuduğu yer. BÖLÜM VURGULU (marka pill), üniversite düz satır.
   1–10 genel seviye rozeti burada da var: seviye kişiye ait, konuya değil.
 */
-function UniversiteKarti({ kisi, onSohbet }) {
+function UniversiteKarti({ kisi, onSohbet, onEngelle, istekMetni = 'Sohbet isteği gönder' }) {
   const router = useRouter()
 
   return (
@@ -507,9 +655,17 @@ function UniversiteKarti({ kisi, onSohbet }) {
             <SeviyeRozeti kaynak={{ level: kisi.level }} boyut="sm" ton="acik" />
           </View>
 
+          {/* ÜNİVERSİTESİ YOKSA KATILMA TARİHİ. Üniversite sekmesinde bu dal hiç çalışmaz
+              (sorgu üniversitesi olanları getiriyor); Arkadaş Ekle'de ise aynı adı taşıyan
+              iki kişiyi ayırt eden tek işaret — yoksa kullanıcı yanlış kişiye istek
+              gönderir (web kararı). */}
           {kisi.university ? (
             <Text numberOfLines={1} className="mt-1.5 text-sm text-slate-600">
               {kisi.university}
+            </Text>
+          ) : kisi.createdAtUtc ? (
+            <Text className="mt-1.5 text-sm text-slate-500">
+              {formatDate(kisi.createdAtUtc)} tarihinde katıldı
             </Text>
           ) : null}
 
@@ -539,8 +695,23 @@ function UniversiteKarti({ kisi, onSohbet }) {
         </View>
       ) : null}
 
-      <View className="mt-4">
-        <Button onPress={() => onSohbet(kisi)}>Sohbet isteği gönder</Button>
+      {/* ENGELLE İKİNCİL VE DAR: kartın işi tanıştırmak, engelleme istisna — eşit ağırlıkta
+          iki düğme listeyi oylamaya çevirirdi. Yine de kartın ÜZERİNDE, menüye saklanmadı:
+          rahatsız eden biriyle karşılaşan kullanıcı onu ararken vazgeçmemeli (web kararı).
+          Etikette ad var: TalkBack kart başına aynı "Engelle"yi okumasın. */}
+      <View className="mt-4 flex-row gap-2">
+        <Button className="flex-1" onPress={() => onSohbet(kisi)}>
+          {istekMetni}
+        </Button>
+        {onEngelle && (
+          <Button
+            variant="secondary"
+            accessibilityLabel={`${kisi.displayName} kişisini engelle`}
+            onPress={() => onEngelle(kisi)}
+          >
+            Engelle
+          </Button>
+        )}
       </View>
     </Card>
   )
@@ -550,8 +721,13 @@ function UniversiteKarti({ kisi, onSohbet }) {
   SOHBET İSTEĞİ — web SohbetIstegiModali portu. Arkadaş isteği modalından AYRI (web kararı):
   oradaki formun tamamı konu seçimidir ve burada seçilecek konu yok.
   requestedTopicId null gider — uç konusuz isteği böyle tanır.
+
+  ⚠️ `arkadaslik` YALNIZCA METNİ değiştiriyor: iki sekmeden de aynı konusuz istek gidiyor.
+  Sunucuda "arkadaşlık" diye ayrı bir tür yok ve olmamalı — kabul/ret, sohbet açılışı ve
+  engel kontrolü ikinci kez yazılırdı. Fark kullanıcının niyeti: "aynı okuldan biriyle
+  tanışayım" ile "şu arkadaşımı ekleyeyim".
 */
-function SohbetIstegiModali({ kisi, onClose, onSent }) {
+function SohbetIstegiModali({ kisi, arkadaslik = false, onClose, onSent }) {
   const [hata, setHata] = useState(null)
   const [busy, setBusy] = useState(false)
   const [sonKisi, setSonKisi] = useState(null)
@@ -585,7 +761,7 @@ function SohbetIstegiModali({ kisi, onClose, onSent }) {
     <Modal
       open={Boolean(kisi)}
       onClose={onClose}
-      title="Sohbet isteği"
+      title={arkadaslik ? 'Arkadaş isteği' : 'Sohbet isteği'}
       footer={
         <>
           <Button variant="secondary" onPress={onClose}>
@@ -616,6 +792,105 @@ function SohbetIstegiModali({ kisi, onClose, onSent }) {
           <ErrorBox error={hata} />
         </View>
       )}
+    </Modal>
+  )
+}
+
+/*
+  ENGELLEDİKLERİM — web EngellilerPaneli'nin alt sayfa hâli (web'in dar ekrandaki düğme +
+  çekmece ikilisi). Sayfanın başlığı zaten "Engellediklerim" dediği için panelin kendi
+  başlığı tekrarlanmıyor (web'de de yalnızca geniş ekranda var).
+
+  YALNIZCA KENDİ ENGELLEDİKLERİ: "beni kimler engelledi" listesi sunucuda da yok ve
+  istenmemeli — engellemeyi misillemeye çevirirdi. Kaldır ONAY SORMUYOR, engelleme soruyor:
+  asimetri bilinçli (bkz. EngellemeModali). Sayfalama yok; liste doğal olarak kısa
+  (web DEVAM-EDILECEK'te kabul edilmiş sınır).
+*/
+function EngellilerModali({ open, onClose, liste, onKaldir }) {
+  const [calisan, setCalisan] = useState(null)
+  const [hata, setHata] = useState(null)
+
+  // Kapatılıp yeniden açılınca önceki kaldırma hatası taşınmasın.
+  useEffect(() => {
+    if (open) setHata(null)
+  }, [open])
+
+  async function kaldir(kisi) {
+    if (calisan) return
+    setCalisan(kisi.userId)
+    setHata(null)
+    try {
+      await onKaldir(kisi)
+    } catch (err) {
+      setHata(err)
+    } finally {
+      setCalisan(null)
+    }
+  }
+
+  const kayitlar = liste.data ?? []
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Engellediklerim"
+      footer={<Button onPress={onClose}>Kapat</Button>}
+    >
+      <View className="gap-3 pb-2">
+        <Text className="text-xs text-slate-500">
+          Engellediğin kişiler aramada çıkmaz, birbirinize istek gönderemezsiniz. Engellendiği
+          karşı tarafa bildirilmez.
+        </Text>
+
+        {/* onRetry kaldırma hatasını da TEMİZLİYOR: liste.reload() yalnızca listenin kendi
+            hatasını siliyor; `hata` kalsaydı başarılı tazelemeden sonra da kutu ekranda
+            dururdu (web #33'ün Profile.jsx'te düzelttiği ilke — web'in panelinde eksik). */}
+        <ErrorBox
+          error={hata ?? liste.error}
+          onRetry={() => {
+            setHata(null)
+            liste.reload()
+          }}
+        />
+
+        {liste.loading ? (
+          <Loading label="Yükleniyor…" />
+        ) : kayitlar.length === 0 ? (
+          <Text className="text-sm text-slate-500">Kimseyi engellemedin.</Text>
+        ) : (
+          <View>
+            {kayitlar.map((kisi, i) => (
+              <View
+                key={kisi.userId}
+                className={`flex-row items-center gap-2 py-2 ${i > 0 ? 'border-t border-slate-200' : ''}`}
+              >
+                <View className="min-w-0 flex-1">
+                  <Text numberOfLines={1} className="text-sm font-medium text-slate-800">
+                    {kisi.displayName}
+                  </Text>
+                  <Text className="text-xs text-slate-500">{formatDate(kisi.blockedAtUtc)}</Text>
+                  {/* Not YALNIZCA engelleyene görünüyor — karşı taraf ne engellendiğini ne de
+                      not yazıldığını görüyor. */}
+                  {kisi.note ? (
+                    <Text className="mt-0.5 text-xs italic text-slate-500">{kisi.note}</Text>
+                  ) : null}
+                </View>
+                {/* Bir satır çalışırken diğer satırların düğmeleri pasif (web kararı). */}
+                <Button
+                  variant="ghost"
+                  loading={calisan === kisi.userId}
+                  disabled={calisan !== null}
+                  accessibilityLabel={`${kisi.displayName} için engeli kaldır`}
+                  onPress={() => kaldir(kisi)}
+                >
+                  Kaldır
+                </Button>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
     </Modal>
   )
 }
