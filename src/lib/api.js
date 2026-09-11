@@ -2,6 +2,7 @@ import axios from 'axios'
 import Constants from 'expo-constants'
 import { Platform } from 'react-native'
 import { KEYS, prefs, secure } from './storage'
+import { getHwidHash } from './hwid'
 import { ONIZLEME, ONIZLEME_OTURUMU, onizlemeApi } from './onizleme'
 
 /*
@@ -148,6 +149,18 @@ export function onAuthExpired(listener) {
   return () => authExpiredListeners.delete(listener)
 }
 
+/*
+  Oturum arka planda yenilendiğinde AuthContext'in React durumunu tazelemesi için.
+  Yenileme yanıtı rolü ve isAdmin'i de taze getiriyor; durum güncellenmezse yönetim
+  ekranının kapısı ve görünen ad eski oturumla kalırdı.
+*/
+const oturumYenilendiDinleyicileri = new Set()
+
+export function onOturumYenilendi(dinleyici) {
+  oturumYenilendiDinleyicileri.add(dinleyici)
+  return () => oturumYenilendiDinleyicileri.delete(dinleyici)
+}
+
 /* ---------- Axios istemcisi ---------- */
 
 const client = axios.create({
@@ -191,9 +204,118 @@ function varsayilanHataMetni(status) {
   return `Beklenmeyen hata (HTTP ${status}).`
 }
 
+function ulasilamadiHatasi() {
+  return new ApiError(
+    'Sunucuya ulaşılamadı. API çalışıyor mu ve telefonla aynı ağda mı?',
+    'NETWORK_ERROR',
+    0,
+  )
+}
+
+/*
+  ─── OTURUM YENİLEME ───────────────────────────────────────────────────────
+  Erişim token'ı 2 saat, yenileme token'ı 60 gün yaşıyor. Web'deki oturumuYenile'nin
+  mobil karşılığı. Web'in üç tuzağı burada da geçerli, son ikisi mobile özgü:
+
+  1. YENİLEME `client` ÜZERİNDEN GİTMEZ. Yanıt interceptor'ı yenilemenin kendi 401'inde
+     oturumu düşürürdü. İstek interceptor'ı da Authorization ekler: damgası geçmiş bir
+     token'la gidilirse AccountStatusMiddleware isteği SESSION_REVOKED ile keser.
+     Çıplak axios kullanılıyor, başlıksız.
+  2. TEK UÇUŞ ŞART. Token her kullanımda dönüşüyor. Açılışta paralel 401 alan istekler
+     ayrı ayrı yenilese ikincisi iptal edilmiş token sunar; 30 sn'den sonra sunucu bunu
+     HIRSIZLIK sayar ve kullanıcıyı web dahil her yerden atar.
+  3. YENİ OTURUM DİSKE YAZILMADAN dönülmez (saveSession'ın aksine await'li). Diskte
+     eski token kalırsa bir sonraki soğuk açılış iptal edilmiş token sunar, yani aynı
+     hırsızlık deseni. SecureStore yazımı yine de sessizce başarısız olabilir
+     (storage.js hatayı yutuyor); bu kabul edilmiş bir risk.
+  4. (mobil) GEÇİCİ HATADA OTURUM SİLİNMEZ: yanıtsız ağ hatası, 429 ve 5xx. Web her
+     başarısızlıkta siliyor. Telefon sık sık çevrimdışı açılıyor; token hâlâ
+     geçerliyken 60 günlük oturumu bir metro dönüşünde silmek özelliği boşa çıkarırdı.
+     Geri kalan her 4xx çıkıştır: token ölü, hesap/cihaz engelli ya da uç yok.
+  5. (mobil) YOL /api/v1. Web ön eksiz /api/session/refresh çağırıyor; mağazadaki sürüm
+     onu çağırırsa o takma ad bir daha kaldırılamaz.
+*/
+const YENILEME_YOLU = '/api/v1/session/refresh'
+let yenilemeSozu = null
+
+/**
+ * { durum: 'yenilendi' } | { durum: 'reddedildi' } → çıkış | { durum: 'yok' } → çıkış
+ * (bu sürümden önce açılmış oturum) | { durum: 'ag', hata } → oturum korunur.
+ */
+function oturumuYenile() {
+  // Uçuş varsa ona katıl, ikinci bir istek gönderme.
+  if (yenilemeSozu) return yenilemeSozu
+
+  yenilemeSozu = (async () => {
+    const oturum = loadSession()
+    if (!oturum?.refreshToken) return { durum: 'yok' }
+
+    let yanit
+    try {
+      yanit = await axios.post(
+        `${API_BASE}${YENILEME_YOLU}`,
+        { refreshToken: oturum.refreshToken, hwidHash: await getHwidHash() },
+        { timeout: 30000 },
+      )
+    } catch (err) {
+      const status = err?.response?.status
+      if (status && status !== 429 && status < 500) return { durum: 'reddedildi' }
+      const data = err?.response?.data
+      return {
+        durum: 'ag',
+        hata: status
+          ? new ApiError(data?.detail ?? varsayilanHataMetni(status), data?.title ?? 'UNKNOWN', status)
+          : ulasilamadiHatasi(),
+      }
+    }
+
+    /* Uçuş sürerken çıkış yapıldıysa yanıt YAZILMAZ: yazılsaydı çıkış yapan kullanıcı
+       sessizce geri girerdi. Arada yeni giriş yapıldıysa geçerli olan o oturum. */
+    if (loadSession() !== oturum) return { durum: getToken() ? 'yenilendi' : 'yok' }
+
+    // Yanıt giriş yanıtıyla AYNI (LoginResult): rol ve isAdmin dahil oturumun TAMAMI değişir.
+    sessionCache = yanit.data
+    hydrated = true
+    await secure.set(KEYS.session, JSON.stringify(yanit.data))
+    oturumYenilendiDinleyicileri.forEach((l) => l(yanit.data))
+    return { durum: 'yenilendi' }
+  })().finally(() => {
+    yenilemeSozu = null
+  })
+
+  return yenilemeSozu
+}
+
 client.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    /*
+      401 → bir kez yenile → TEK KEZ tekrar dene. Bayrak, tekrarın da 401 dönmesi
+      hâlinde döngüye girmeyi önlüyor. INVALID_CREDENTIALS'ta yenileme denenmez:
+      o 401 oturumu değil parolayı reddediyor (aşağıdaki nota bakın).
+    */
+    const yapilandirma = error.config
+    if (
+      error.response?.status === 401 &&
+      yapilandirma &&
+      !yapilandirma.__yenilendi &&
+      error.response.data?.title !== 'INVALID_CREDENTIALS' &&
+      loadSession()?.refreshToken
+    ) {
+      yapilandirma.__yenilendi = true
+
+      /* Bu istek ESKİ token'la gitmiş ve bu arada başka bir istek oturumu yenilemiş
+         olabilir. O durumda bir dönüşüm daha gereksiz: doğrudan yeni token'la dene. */
+      const giden = yapilandirma.headers?.get?.('Authorization') ?? yapilandirma.headers?.Authorization
+      if (giden && giden !== `Bearer ${getToken()}`) return client.request(yapilandirma)
+
+      const sonuc = await oturumuYenile()
+      // Tekrarda istek interceptor'ı Authorization'ı yeni token'la yazıyor.
+      if (sonuc.durum === 'yenilendi') return client.request(yapilandirma)
+      if (sonuc.durum === 'ag') throw sonuc.hata
+      // 'reddedildi' | 'yok' → aşağıdaki 401 yolu oturumu düşürür.
+    }
+
     if (error.response) {
       const { status, data } = error.response
 
@@ -227,11 +349,7 @@ client.interceptors.response.use(
       )
     }
     if (axios.isCancel(error) || error.code === 'ERR_CANCELED') throw error
-    throw new ApiError(
-      'Sunucuya ulaşılamadı. API çalışıyor mu ve telefonla aynı ağda mı?',
-      'NETWORK_ERROR',
-      0,
-    )
+    throw ulasilamadiHatasi()
   },
 )
 
@@ -398,24 +516,44 @@ export const api = {
     return request(`/api/v1/discovery/offers?${params.toString()}`)
   },
 
-  /** Üniversite ağı araması. searchOffers ile aynı kural: boş/null filtreler sorguya eklenmez. */
+  /**
+   * Üniversite ağı / isimle kişi araması. searchOffers ile aynı kural: boş/null
+   * filtreler sorguya eklenmez.
+   *
+   * `name` verildiğinde sunucu üniversite şartını düşürüyor ("Arkadaş Ekle" akışı).
+   * Alan listesi BEYAZ LİSTE ve öyle kalmalı: ekranın kendi durumu aynı nesnede
+   * taşınıyor ve yayıldığında sorguya sızardı.
+   */
   searchUniversityPeers: (filters) => {
     const params = new URLSearchParams()
-    // Yalnızca ucun tanıdığı dört alan geçsin; ekrandaki diğer durum sorguya sızmasın.
-    const { university, department, page, pageSize } = filters
-    for (const [key, value] of Object.entries({ university, department, page, pageSize })) {
+    const { university, department, name, page, pageSize } = filters
+    for (const [key, value] of Object.entries({ university, department, name, page, pageSize })) {
       if (value === null || value === undefined || value === '') continue
       params.set(key, String(value))
     }
     return request(`/api/v1/discovery/users?${params.toString()}`)
   },
 
-  // --- Portföy & eşleştirme ---
+  // --- Portföy & arkadaşlık ---
   myPortfolio: () => request('/api/v1/portfolio/entries'),
   addPortfolioEntry: (payload) =>
     request('/api/v1/portfolio/entries', { method: 'POST', body: payload }),
   removePortfolioEntry: (id) => request(`/api/v1/portfolio/entries/${id}`, { method: 'DELETE' }),
   suggestions: (limit = 20) => request(`/api/v1/portfolio/suggestions?limit=${limit}`),
+
+  // --- Engelleme ---
+  /*
+    Yönetim yaptırımlarından (ban/askı) AYRI bir kavram: kişisel bir tercih, kimseye
+    bildirilmiyor ve denetim izi tutulmuyor. Uç `api/blocks` altında, moderasyon
+    uçlarının yanında DEĞİL — karıştırılması, kullanıcıya "şikayet ettim" sandırırdı.
+
+    "Beni kimler engelledi" diye bir çağrı YOK ve eklenmemeli (sunucuda da yok):
+    o liste engellemeyi misillemeye çevirirdi.
+  */
+  blockUser: (userId, note = null) =>
+    request('/api/v1/blocks', { method: 'POST', body: { userId, note } }),
+  unblockUser: (userId) => request(`/api/v1/blocks/${userId}`, { method: 'DELETE' }),
+  myBlocks: () => request('/api/v1/blocks'),
 
   myMatches: () => request('/api/v1/matches'),
   // Konusuz (üniversite ağı) istekte requestedTopicId null gönderilebilir.
@@ -488,6 +626,16 @@ export const api = {
 
   // --- Profil ve değerlendirmeler ---
   userProfile: (userId) => request(`/api/v1/users/${userId}/profile`),
+
+  /*
+    Arkadaş bölümü AYRI UÇTA, bilerek: profil yanıtına alan eklemek eski istemcilerin
+    ayrıştırıcısını kırabilirdi; ayrı uç eski istemci tarafından hiç çağrılmaz.
+
+    Dönen: { friendCount, isSelf, friends[], mutualCount, mutualFriends[] }
+    friends yalnızca kendi profilinde dolu — bu kural SUNUCUDA, istemcide değil.
+    Satırlarda avatar YOK: avatarImageSource(userId) ile çizilir.
+  */
+  userFriends: (userId) => request(`/api/v1/users/${userId}/friends`),
 
   /** Oturumdaki kullanıcının profili — çağıranların userId taşımasını gerektirmez. */
   myProfile: () => {

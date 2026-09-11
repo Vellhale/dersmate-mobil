@@ -1,5 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { api, hydrateSession, loadSession, onAuthExpired, saveSession } from '../lib/api'
+import {
+  api,
+  hydrateSession,
+  loadSession,
+  onAuthExpired,
+  onOturumYenilendi,
+  saveSession,
+} from '../lib/api'
 import { getHwidHash } from '../lib/hwid'
 
 const AuthContext = createContext(null)
@@ -37,9 +44,18 @@ export function AuthProvider({ children }) {
     })
   }, [])
 
+  // Arka planda yenilenen oturum (rol ve isAdmin dahil) React durumuna da yansısın.
+  useEffect(() => onOturumYenilendi(setSession), [])
+
+  /*
+    rememberMe AÇIKÇA true: mobilde "Beni hatırla" kutusu yok. Web'in gerekçesi ortak
+    bilgisayar; telefon kişisel cihaz ve oturum SecureStore'da. Sunucu varsayılanı da
+    true ama ona sessizce yaslanmak, varsayılan değişirse yenilemeyi fark ettirmeden
+    kapatırdı.
+  */
   const login = useCallback(async (email, password) => {
     const hwidHash = await getHwidHash()
-    const result = await api.login({ email, password, hwidHash })
+    const result = await api.login({ email, password, hwidHash, rememberMe: true })
     saveSession(result)
     setSession(result)
     return result

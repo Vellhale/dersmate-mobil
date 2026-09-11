@@ -208,6 +208,23 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
   reddettiği için sunucu günlüğünde sorgu bile görünmüyor. Web'in blob + object URL
   çözümü mobilde data URI olarak karşılanıyor.
 
+- **Oturum yenileme** (`src/lib/api.js` → `oturumuYenile`) web'le aynı sözleşmeyi
+  kullanıyor: tek uçuş, 401 → yenile → bir kez tekrar dene. Dört yerde bilerek ayrılıyor:
+  1. Yol `/api/v1/session/refresh`. Web ön eksiz `/api/session/refresh` çağırıyor;
+     mağazadaki sürüm onu çağırırsa o takma ad sunucudan bir daha kaldırılamaz.
+  2. Geçici hatada (yanıtsız ağ hatası, 429, 5xx) oturum SİLİNMEZ, istek hata metniyle
+     düşer. Web her başarısızlıkta çıkış yaptırıyor. Bedeli: yanıtı yolda kaybolan
+     (sunucuda dönüşmüş) bir yenilemenin eski token'ı 30 sn'den geç yeniden sunulursa
+     sunucu bunu hırsızlık sayıp her yerden çıkış yaptırır. Nadir, kabul edildi.
+  3. `INVALID_CREDENTIALS` 401'inde yenileme denenmez ve çıkış yapılmaz ("Hesabımı sil"
+     ekranında yanlış parola). Web bu ayrımı yapmıyor.
+  4. "Beni hatırla" kutusu YOK; `login` açıkça `rememberMe: true` gönderiyor. Web'in
+     gerekçesi ortak bilgisayar, telefon ise kişisel cihaz.
+
+  Sunucuda çıkış ucu yok: çıkış yalnızca yerel oturumu siliyor, yenileme token'ı
+  sunucuda 60 gün geçerli kalıyor (web'de de öyle). SignalR negotiate isteği axios'tan
+  geçmediği için yenileme tetiklemez; hub, bir REST çağrısı token'ı yeniledikten sonra
+  kendi yeniden deneme döngüsüyle bağlanır (web ile parite).
 - Avatar önbellek sayacı **diskte** (`KEYS.avatarSurumleri`). Fresco'nun disk önbelleği
   uygulama yeniden başlatmalarını aşıyor; sayaç bellekte kalırsa açılışta temel URI'ye
   dönülür ve eski görsel ağa hiç çıkmadan sunulur.
