@@ -368,10 +368,22 @@ baseline ileri kalırsa gerçek bir fark hiç görünmez.
 - Web #25 (`af0e531`), dar ekran menü çekmecesinin kendi perdesinin altında kalması:
   web'in hamburger menüsü (`Layout.jsx`). Mobilde menü yok, gezinme sekme çubuğundan.
 
-⚠️ `api.js` yüzeyini karşılaştırmak için metot adlarını çıkarıp kümeleri karşılaştır;
-mobilde bilinçli olarak FARKLI olan üç metot var (`proofContentUrl` → `proofImageSource`,
-`avatarObjectUrl` → `avatarImageSource`, `adminProofContentUrl` → `adminProofImageSource`)
-— blob/object-URL yerine `<Image source={{uri, headers}}>` kullanıldığı için.
+⚠️ `api.js` yüzeyini karşılaştırmak için metot adlarını çıkarıp kümeleri karşılaştır.
+Bilinçli fark **4 web ↔ 6 mobil** (2026-09-11 ölçümü: web 78, mobil 80 metot):
+
+| web | mobil |
+|---|---|
+| `proofContentUrl` | `proofImageSource` |
+| `avatarObjectUrl` | `avatarImageSource` + `rememberLocalAvatar` (yalnızca mobil) |
+| `adminProofContentUrl` | `adminProofImageSource` |
+| `adminTeacherDocument` | `adminTeacherDocumentSource` |
+| — | `teacherDocumentSource` (kendi belgesini geri okuma; web'de karşılığı yok) |
+
+Gerekçe: web baytları blob olarak indirip object URL'e çeviriyor, RN'de
+`URL.createObjectURL` yok. Mobil `*Source` metotları yalnızca `{ yol }` döndürüyor;
+baytları `authedImageDataUri` axios ile indirip data URI yapıyor (`YetkiliGorsel`).
+`<Image source={{uri, headers}}>` DEĞİL, yukarıdaki ⛔'ye bak. Listede olmayan bir fark
+senkron hatasıdır.
 
 ⚠️ `verifyEmail` İKİ ARGÜMAN ALIYOR (`email`, `code`) — tek argümanlı token sürümü
 2 Eylül'de sunucudan kalktı. Bu, senkron gecikmesinin en pahalı örneği: sunucu
