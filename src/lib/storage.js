@@ -15,6 +15,13 @@ import * as SecureStore from 'expo-secure-store'
     değerler). SecureStore'un boyut sınırı (2 KB/anahtar) ve maliyeti var; her şeyi
     oraya koymak hem gereksiz hem yavaş.
 
+    Oturum TEK anahtarda ve öyle KALMALI. Boyut sorun değil (2026-09-11 ölçümü): tipik
+    ~565 B, en kötü (100 karakterlik Türkçe ad + 320 karakterlik e-posta + admin)
+    ~1,94 KB; yenileme token'ı 43 karakter. expo-secure-store 55.0.0'dan beri iOS'taki
+    bayt uyarısı da yok. Asıl sebep ATOMİKLİK: token'ı ayrı anahtara bölmek, iki yazma
+    arasında ölen uygulamada diske yeni erişim + İPTAL EDİLMİŞ eski yenileme token'ı
+    bırakır. Sunucu o token sunulunca hırsızlık sayar ve her cihazdan çıkış yaptırır.
+
   İKİSİ DE ASYNC: web'deki senkron localStorage.getItem alışkanlığı buraya taşınamaz.
   Oturum açılışta BİR KEZ okunur ve bellekte tutulur (bkz. api.js) — her istekte
   await'li depolama okuması yapılmaz.

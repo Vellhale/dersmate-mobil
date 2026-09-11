@@ -190,7 +190,8 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
 
 - `localStorage` → oturum + HWID **SecureStore**'da, tercihler AsyncStorage'da
   (`src/lib/storage.js`). Oturum açılışta BİR KEZ okunur, sonrası bellekte —
-  `getToken()` senkron kalmalı (axios interceptor + SignalR accessTokenFactory).
+  `getToken()` senkron kalmalı (axios interceptor; SignalR fabrikası `tazeTokenAl` de
+  onu okur).
 - Kimlik gerektiren görseller (avatar, kanıt) → baytlar **axios ile indirilip** data URI
   olarak veriliyor (`src/components/YetkiliGorsel.jsx`).
 
@@ -209,22 +210,31 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
   çözümü mobilde data URI olarak karşılanıyor.
 
 - **Oturum yenileme** (`src/lib/api.js` → `oturumuYenile`) web'le aynı sözleşmeyi
-  kullanıyor: tek uçuş, 401 → yenile → bir kez tekrar dene. Dört yerde bilerek ayrılıyor:
+  kullanıyor: tek uçuş, 401 → yenile → bir kez tekrar dene. Beş yerde bilerek ayrılıyor:
   1. Yol `/api/v1/session/refresh`. Web ön eksiz `/api/session/refresh` çağırıyor;
      mağazadaki sürüm onu çağırırsa o takma ad sunucudan bir daha kaldırılamaz.
   2. Geçici hatada (yanıtsız ağ hatası, 429, 5xx) oturum SİLİNMEZ, istek hata metniyle
      düşer. Web her başarısızlıkta çıkış yaptırıyor. Bedeli: yanıtı yolda kaybolan
      (sunucuda dönüşmüş) bir yenilemenin eski token'ı 30 sn'den geç yeniden sunulursa
      sunucu bunu hırsızlık sayıp her yerden çıkış yaptırır. Nadir, kabul edildi.
-  3. `INVALID_CREDENTIALS` 401'inde yenileme denenmez ve çıkış yapılmaz ("Hesabımı sil"
-     ekranında yanlış parola). Web bu ayrımı yapmıyor.
+  3. Yalnızca GÖVDESİZ 401 yenilenir (`tokenOlduMu`: JwtBearer'ın token reddi); web her
+     401'de yeniliyor. Gövdeli 401'ler yenilenmez. `INVALID_CREDENTIALS` "Hesabımı sil"
+     ekranındaki yanlış parola; çıkış da yapılmaz. `SESSION_REVOKED` sunucunun oturumları
+     düşürdüğü durum ve yenileme token'ı da iptal. Onu sunmak sunucuya "hırsızlık"
+     dedirtir ve kullanıcının parola sıfırladıktan SONRA açtığı taze oturumları da düşürür.
   4. "Beni hatırla" kutusu YOK; `login` açıkça `rememberMe: true` gönderiyor. Web'in
-     gerekçesi ortak bilgisayar, telefon ise kişisel cihaz.
+     gerekçesi ortak bilgisayar, telefon ise kişisel cihaz. `false` giderse sunucu
+     yenileme token'ı üretmez ve oturum sessizce 2 saate iner.
+  5. SignalR token fabrikası async ve yenileme farkında (`tazeTokenAl`); web'inki senkron
+     `getToken()`. Sunucu JWT ölünce hub'ı kapatıyor ve negotiate'in 401'i tekrar
+     denenmiyor. Senkron fabrikayla, Mesajlar'da bekleyen kullanıcının canlı akışı bir
+     REST isteği token'ı yenileyene kadar sessizce dururdu.
+
+  Oturum SecureStore'da TEK anahtarda ve yazımlar sıraya sokuluyor (`saveSession`).
+  Yenileme token'ını ayrı anahtara bölme; gerekçe `storage.js`'te.
 
   Sunucuda çıkış ucu yok: çıkış yalnızca yerel oturumu siliyor, yenileme token'ı
-  sunucuda 60 gün geçerli kalıyor (web'de de öyle). SignalR negotiate isteği axios'tan
-  geçmediği için yenileme tetiklemez; hub, bir REST çağrısı token'ı yeniledikten sonra
-  kendi yeniden deneme döngüsüyle bağlanır (web ile parite).
+  sunucuda 60 gün geçerli kalıyor (web'de de öyle).
 - Avatar önbellek sayacı **diskte** (`KEYS.avatarSurumleri`). Fresco'nun disk önbelleği
   uygulama yeniden başlatmalarını aşıyor; sayaç bellekte kalırsa açılışta temel URI'ye
   dönülür ve eski görsel ağa hiç çıkmadan sunulur.

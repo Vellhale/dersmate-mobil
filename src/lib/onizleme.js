@@ -27,7 +27,10 @@ const BEN = {
   isAdmin: false,
 }
 
-export const ONIZLEME_OTURUMU = { ...BEN }
+/* Oturum LoginResult biçiminde, refreshToken dahil (web #29). Önizlemede hiç sunulmaz:
+   oturumuYenile önizlemede ağa çıkmıyor ve oturumu düşürmüyor. BEN'e eklenmedi, çünkü
+   o nesne kişi olarak da kullanılıyor. */
+export const ONIZLEME_OTURUMU = { ...BEN, refreshToken: 'onizleme-yenileme' }
 
 const KISILER = {
   elif: { userId: 'u-elif', displayName: 'Elif Yılmaz' },

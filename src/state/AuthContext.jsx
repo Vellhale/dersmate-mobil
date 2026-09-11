@@ -36,7 +36,7 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  // Token süresi dolduğunda (401) oturumu düşür — API katmanı bu olayı yayınlar.
+  // Oturum bittiğinde (401 ve yenileme de olmadı) düşür — API katmanı bu olayı yayınlar.
   useEffect(() => {
     return onAuthExpired(() => {
       saveSession(null)
@@ -51,11 +51,12 @@ export function AuthProvider({ children }) {
     rememberMe AÇIKÇA true: mobilde "Beni hatırla" kutusu yok. Web'in gerekçesi ortak
     bilgisayar; telefon kişisel cihaz ve oturum SecureStore'da. Sunucu varsayılanı da
     true ama ona sessizce yaslanmak, varsayılan değişirse yenilemeyi fark ettirmeden
-    kapatırdı.
+    kapatırdı: false giderse sunucu yenileme token'ı hiç üretmez, oturum 2 saate iner.
+    Parametre web imzasıyla aynı kalsın diye var; mobilde onu dolduran kutu yok.
   */
-  const login = useCallback(async (email, password) => {
+  const login = useCallback(async (email, password, rememberMe = true) => {
     const hwidHash = await getHwidHash()
-    const result = await api.login({ email, password, hwidHash, rememberMe: true })
+    const result = await api.login({ email, password, hwidHash, rememberMe })
     saveSession(result)
     setSession(result)
     return result

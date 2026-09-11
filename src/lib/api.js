@@ -13,8 +13,8 @@ import { ONIZLEME, ONIZLEME_OTURUMU, onizlemeApi } from './onizleme'
 
   1. fetch → axios (istek üzerine). ProblemDetails eşlemesi interceptor'da tek yerde.
   2. localStorage (senkron) → SecureStore (async). Oturum açılışta BİR KEZ okunup
-     bellekte tutuluyor; getToken() senkron kalıyor ki interceptor ve SignalR
-     accessTokenFactory beklemeden çalışsın.
+     bellekte tutuluyor; getToken() senkron kalıyor ki interceptor beklemeden çalışsın
+     (SignalR fabrikası da onu okuyor, bkz. tazeTokenAl).
 */
 
 /*
@@ -127,11 +127,25 @@ export function loadSession() {
   return sessionCache
 }
 
+/*
+  KALICILIK SIRASI — dönüşümlü yenileme token'ı yüzünden artık önemli.
+
+  Bellek SENKRON güncelleniyor: getToken() bir sonraki istekte taze token'ı görsün.
+  SecureStore yazımları ise SIRAYA sokuluyor. Sırasız iki yazma yarışır ve eskisi sona
+  kalırsa diskte İPTAL EDİLMİŞ bir yenileme token'ı ya da çıkıştan sonra geri dirilen
+  bir oturum kalır. Sonraki soğuk açılış onu sunar; sunucu bunu hırsızlık sayıp
+  kullanıcıyı her cihazdan atar. secure.set hatasını yuttuğu için zincir kırılmaz.
+
+  Dönen söz yazımın bittiğini bildirir; beklemek zorunlu değil (oturumuYenile bekliyor).
+*/
+let kalicilikSirasi = Promise.resolve()
+
 export function saveSession(session) {
   sessionCache = session
   hydrated = true
-  // Kalıcılık arka planda; bellek zaten güncel olduğu için beklenmesi gerekmiyor.
-  secure.set(KEYS.session, session ? JSON.stringify(session) : null)
+  const deger = session ? JSON.stringify(session) : null
+  kalicilikSirasi = kalicilikSirasi.then(() => secure.set(KEYS.session, deger))
+  return kalicilikSirasi
 }
 
 export function getToken() {
@@ -147,6 +161,10 @@ const authExpiredListeners = new Set()
 export function onAuthExpired(listener) {
   authExpiredListeners.add(listener)
   return () => authExpiredListeners.delete(listener)
+}
+
+function oturumuDusur() {
+  authExpiredListeners.forEach((l) => l())
 }
 
 /*
@@ -215,7 +233,7 @@ function ulasilamadiHatasi() {
 /*
   ─── OTURUM YENİLEME ───────────────────────────────────────────────────────
   Erişim token'ı 2 saat, yenileme token'ı 60 gün yaşıyor. Web'deki oturumuYenile'nin
-  mobil karşılığı. Web'in üç tuzağı burada da geçerli, son ikisi mobile özgü:
+  mobil karşılığı. Web'in üç tuzağı burada da geçerli; 4-6 mobile özgü:
 
   1. YENİLEME `client` ÜZERİNDEN GİTMEZ. Yanıt interceptor'ı yenilemenin kendi 401'inde
      oturumu düşürürdü. İstek interceptor'ı da Authorization ekler: damgası geçmiş bir
@@ -224,16 +242,17 @@ function ulasilamadiHatasi() {
   2. TEK UÇUŞ ŞART. Token her kullanımda dönüşüyor. Açılışta paralel 401 alan istekler
      ayrı ayrı yenilese ikincisi iptal edilmiş token sunar; 30 sn'den sonra sunucu bunu
      HIRSIZLIK sayar ve kullanıcıyı web dahil her yerden atar.
-  3. YENİ OTURUM DİSKE YAZILMADAN dönülmez (saveSession'ın aksine await'li). Diskte
-     eski token kalırsa bir sonraki soğuk açılış iptal edilmiş token sunar, yani aynı
-     hırsızlık deseni. SecureStore yazımı yine de sessizce başarısız olabilir
-     (storage.js hatayı yutuyor); bu kabul edilmiş bir risk.
+  3. YENİ OTURUM DİSKE YAZILMADAN dönülmez: saveSession'ın yazma sırasına girip
+     bekleniyor. Diskte eski token kalırsa bir sonraki soğuk açılış iptal edilmiş token
+     sunar, yani aynı hırsızlık deseni. SecureStore yazımı yine de sessizce başarısız
+     olabilir (storage.js hatayı yutuyor); bu kabul edilmiş bir risk.
   4. (mobil) GEÇİCİ HATADA OTURUM SİLİNMEZ: yanıtsız ağ hatası, 429 ve 5xx. Web her
      başarısızlıkta siliyor. Telefon sık sık çevrimdışı açılıyor; token hâlâ
      geçerliyken 60 günlük oturumu bir metro dönüşünde silmek özelliği boşa çıkarırdı.
      Geri kalan her 4xx çıkıştır: token ölü, hesap/cihaz engelli ya da uç yok.
   5. (mobil) YOL /api/v1. Web ön eksiz /api/session/refresh çağırıyor; mağazadaki sürüm
      onu çağırırsa o takma ad bir daha kaldırılamaz.
+  6. (mobil) YALNIZCA GÖVDESİZ 401 YENİLENİR; web her 401'de yeniliyor. Bkz. tokenOlduMu.
 */
 const YENILEME_YOLU = '/api/v1/session/refresh'
 let yenilemeSozu = null
@@ -247,6 +266,9 @@ function oturumuYenile() {
   if (yenilemeSozu) return yenilemeSozu
 
   yenilemeSozu = (async () => {
+    // Önizlemede sunucu yok: ağa çıkma, oturumu da düşürme.
+    if (ONIZLEME) return { durum: 'ag', hata: ulasilamadiHatasi() }
+
     const oturum = loadSession()
     if (!oturum?.refreshToken) return { durum: 'yok' }
 
@@ -269,15 +291,25 @@ function oturumuYenile() {
       }
     }
 
+    const yeni = yanit.data
+    /* 200 ama LoginResult değil: sunucuya hiç varılmamış olabilir (kapalı ağların giriş
+       sayfası her isteğe 200 HTML döndürür). Kaydedilseydi yenileme token'ı kaybolurdu;
+       sunucu reddetmediği için çıkış da değil. */
+    if (!yeni?.accessToken || !yeni?.refreshToken) {
+      return { durum: 'ag', hata: ulasilamadiHatasi() }
+    }
+
     /* Uçuş sürerken çıkış yapıldıysa yanıt YAZILMAZ: yazılsaydı çıkış yapan kullanıcı
        sessizce geri girerdi. Arada yeni giriş yapıldıysa geçerli olan o oturum. */
     if (loadSession() !== oturum) return { durum: getToken() ? 'yenilendi' : 'yok' }
 
     // Yanıt giriş yanıtıyla AYNI (LoginResult): rol ve isAdmin dahil oturumun TAMAMI değişir.
-    sessionCache = yanit.data
-    hydrated = true
-    await secure.set(KEYS.session, JSON.stringify(yanit.data))
-    oturumYenilendiDinleyicileri.forEach((l) => l(yanit.data))
+    await saveSession(yeni)
+
+    /* Yazım beklenirken çıkış yapıldıysa disk doğru (silme sıraya arkadan girdi), ama
+       dinleyiciye haber verilirse React durumu oturumu geri diriltirdi. */
+    if (loadSession() !== yeni) return { durum: getToken() ? 'yenilendi' : 'yok' }
+    oturumYenilendiDinleyicileri.forEach((l) => l(yeni))
     return { durum: 'yenilendi' }
   })().finally(() => {
     yenilemeSozu = null
@@ -286,27 +318,119 @@ function oturumuYenile() {
   return yenilemeSozu
 }
 
+/*
+  SignalR accessTokenFactory için (useChatHub). Hub istekleri axios'tan geçmiyor, yani
+  aşağıdaki 401 → yenile yolu onları kapsamıyor. Sunucu JWT ölünce hub'ı kendisi
+  kapatıyor (CloseOnAuthenticationExpiration) ve SignalR negotiate'in 401'ini tekrar
+  DENEMİYOR (AccessTokenHttpClient). getToken() doğrudan verilseydi yeniden bağlanma
+  ölü token'la dönerdi. Mesajlar'da bekleyen kullanıcı hiç REST isteği atmadığı için de
+  canlı akış SESSİZCE dururdu. Bu yüzden token ölmek üzereyse önce yenileniyor; aynı
+  tek uçuşa katılarak.
+
+  Negotiate 401'inde "zorla yenile" YOK: SignalR hatası durum kodunu taşımıyor ve o 401
+  SESSION_REVOKED de olabilir (yenilemek hırsızlık tespitini tetikler). Cihaz saati
+  gerideyse token geçerli sanılır ve hub ilk REST yenilemesine kadar bağlanamaz; 2
+  saatten fazla ilerideyse her bağlanmada gereksiz ama zararsız bir dönüşüm olur.
+
+  ASLA fırlatmaz: fabrika fırlatırsa hub hiç başlamaz.
+*/
+const PROAKTIF_PAY_SN = 60
+
+export async function tazeTokenAl() {
+  try {
+    const token = getToken()
+    if (!token || !loadSession()?.refreshToken) return token ?? ''
+
+    const bitis = tokenBitisi(token)
+    if (bitis !== null && bitis - PROAKTIF_PAY_SN <= Date.now() / 1000) {
+      const sonuc = await oturumuYenile()
+      // Sunucu reddetti: bir REST isteği de aynı kararı verirdi, oturum şimdi düşer.
+      if (sonuc.durum === 'reddedildi' && getToken() === token) oturumuDusur()
+    }
+    return getToken() ?? ''
+  } catch {
+    return getToken() ?? ''
+  }
+}
+
+/*
+  JWT'nin exp'i (Unix saniye); çözülemezse null ve proaktif yenileme yapılmaz. atob'a
+  yaslanılmıyor, varlığı JS motoruna bağlı; küçük bir base64url çözücü yetiyor. Baytlar
+  tek tek karaktere çevriliyor: Türkçe adın UTF-8 baytları bozuk görünür ama JSON
+  geçerli kalır, exp zaten sayı.
+*/
+const B64URL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+
+function tokenBitisi(token) {
+  try {
+    const govde = String(token).split('.')[1] ?? ''
+    let tampon = 0
+    let bit = 0
+    let metin = ''
+    for (const harf of govde) {
+      const deger = B64URL.indexOf(harf)
+      if (deger < 0) continue
+      tampon = ((tampon << 6) | deger) & 0xffffff
+      bit += 6
+      if (bit >= 8) {
+        bit -= 8
+        metin += String.fromCharCode((tampon >> bit) & 0xff)
+      }
+    }
+    const exp = JSON.parse(metin).exp
+    return Number.isFinite(exp) ? exp : null
+  } catch {
+    return null
+  }
+}
+
+/*
+  YENİLENEBİLİR 401 = GÖVDESİZ 401. Süresi dolmuş ya da geçersiz JWT'yi JwtBearer
+  gövdesiz reddediyor (sunucuda OnChallenge özelleştirmesi yok). Gövdeli (problem+json)
+  401'ler başka şey söylüyor ve yenileme orada ya işe yaramaz ya ZARARLIDIR:
+  • INVALID_CREDENTIALS: yazılan parola yanlış, oturum sağlam (aşağıdaki not).
+  • SESSION_REVOKED: parola sıfırlama, hesap silme ya da yaptırım oturumları düşürdü;
+    yenileme token'ı da iptal edildi. Onu sunmak sunucuya "hırsızlık" dedirtir
+    (Rotated dışı her iptal ReuseDetected sayılıyor) ve kullanıcının sıfırlamadan SONRA
+    açtığı taze oturumları da düşürtür.
+  • USER_NOT_FOUND: hesap yok.
+
+  Karar gövdeye (data.title) değil content-type'a bakıyor: görsel istekleri
+  (responseType: 'blob') gövdeyi ayrıştırmıyor, orada title hep boş görünür.
+  ⚠️ Sunucu bir gün süresi dolan token'ın 401'ine gövde eklerse burası güncellenmeli;
+  yoksa yenileme sessizce durur ve kullanıcı yine 2 saatte bir düşer.
+*/
+function tokenOlduMu(response) {
+  if (response?.status !== 401) return false
+  const tur = response.headers?.get?.('content-type') ?? response.headers?.['content-type']
+  return !String(tur ?? '').includes('json')
+}
+
+// İsteğin gerçekten taşıdığı başlık (istek interceptor'ı yazdı); yoksa null.
+function gidenBaslik(config) {
+  return config?.headers?.get?.('Authorization') ?? config?.headers?.Authorization ?? null
+}
+
 client.interceptors.response.use(
   (response) => response,
   async (error) => {
     /*
-      401 → bir kez yenile → TEK KEZ tekrar dene. Bayrak, tekrarın da 401 dönmesi
-      hâlinde döngüye girmeyi önlüyor. INVALID_CREDENTIALS'ta yenileme denenmez:
-      o 401 oturumu değil parolayı reddediyor (aşağıdaki nota bakın).
+      Gövdesiz 401 → bir kez yenile → TEK KEZ tekrar dene. Bayrak, tekrarın da 401
+      dönmesi hâlinde döngüye girmeyi önlüyor. Gövdeli 401'ler (INVALID_CREDENTIALS,
+      SESSION_REVOKED) yenilenmez: bkz. tokenOlduMu.
     */
     const yapilandirma = error.config
     if (
-      error.response?.status === 401 &&
+      tokenOlduMu(error.response) &&
       yapilandirma &&
       !yapilandirma.__yenilendi &&
-      error.response.data?.title !== 'INVALID_CREDENTIALS' &&
       loadSession()?.refreshToken
     ) {
       yapilandirma.__yenilendi = true
 
       /* Bu istek ESKİ token'la gitmiş ve bu arada başka bir istek oturumu yenilemiş
          olabilir. O durumda bir dönüşüm daha gereksiz: doğrudan yeni token'la dene. */
-      const giden = yapilandirma.headers?.get?.('Authorization') ?? yapilandirma.headers?.Authorization
+      const giden = gidenBaslik(yapilandirma)
       if (giden && giden !== `Bearer ${getToken()}`) return client.request(yapilandirma)
 
       const sonuc = await oturumuYenile()
@@ -330,11 +454,17 @@ client.interceptors.response.use(
         olduğunu anlamıyor.
 
         Ayrım kod üzerinden: INVALID_CREDENTIALS "yazdığın parola yanlış" demek, jetonun
-        süresi dolduğunda sunucu bu kodu döndürmüyor (gövdesiz 401 geliyor).
+        süresi dolduğunda sunucu bu kodu döndürmüyor (gövdesiz 401 geliyor). Yenileme de
+        aynı ayrımı yapıyor: yalnızca gövdesiz 401 yenilenir (bkz. tokenOlduMu).
+
+        Yayın yenileme kararından SONRA (web'deki taşımanın karşılığı) ve bir ek koşulla:
+        401'i alan istek GÜNCEL oturumla gitmiş olmalı. Uçuşta çıkış ya da başka hesapla
+        giriş yapıldıysa eski isteğin 401'i yeni oturumu düşürmemeli.
       */
       const parolaHatasi = data?.title === 'INVALID_CREDENTIALS'
-      if (status === 401 && !parolaHatasi) {
-        authExpiredListeners.forEach((l) => l())
+      const guncelBaslik = getToken() ? `Bearer ${getToken()}` : null
+      if (status === 401 && !parolaHatasi && gidenBaslik(error.config) === guncelBaslik) {
+        oturumuDusur()
       }
       // Kod arayüzde gösterilmiyor (bkz. ErrorBox); teşhis için konsolda kalıyor.
       if (data?.title) {
