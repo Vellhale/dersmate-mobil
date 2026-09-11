@@ -25,10 +25,19 @@ import { SOZLESME_TARIHI } from '../src/lib/yasalMetinler'
   ⚠️ TUTULAMAYACAK SÖZ VERME KURALI: bu sayfada anlatılan her mekanizmanın kodda
   karşılığı var. Bir maddeyi değiştirmeden önce kodun hâlâ öyle davrandığını doğrula.
 
-  MOBİLE ÖZGÜ TEK EKLEME §6'da: eşleşmeyi tek taraflı sonlandırma. Web metninde yok ama
+  MOBİLE ÖZGÜ TEK EKLEME §6'da: arkadaşlığı tek taraflı sonlandırma. Web metninde yok ama
   kodda VAR (closeMatch — app/eslesmeler.jsx) ve mağaza incelemesinin kullanıcı üretimli
   içerik için aradığı "rahatsız eden kişiyle iletişimi kesebilme" şartının karşılığı bu.
-  Var olan bir yeteneği yazmak vaat değil, tarif.
+  Var olan bir yeteneği yazmak vaat değil, tarif. Cümle ekranı ADIYLA anıyor: o dosyanın
+  başlığı değişirse bu metin de değişmeli.
+
+  2026-09-10: web #31'in ürün geneli yeniden adlandırması (arkadaşlık) buraya taşındı.
+  "Yeni mesaj gelmez" SONLANDIRILAN kaydın sohbeti için doğru: sohbet tek bir kayda bağlı
+  (Conversation.MatchId), CloseMatch yalnızca onu kapatıyor ve yazma o kaydın durumuna
+  bakıyor (ConversationAccess.GetForWriteAsync). Aynı çiftin başka konuda kabul edilmiş
+  bir kaydı varsa arkadaşlık onun üzerinden sürer, onun sohbeti açık kalır. Kişiyle
+  iletişimi TÜMDEN kesen yol engelleme (SendMessageHandler engeli sohbetten bağımsız
+  sınıyor); o Gizlilik §6'da anlatılıyor ve burada ayrıca vaat edilmedi.
 */
 export default function Kosullar() {
   const router = useRouter()
@@ -116,8 +125,8 @@ export default function Kosullar() {
         </Paragraf>
         <Paragraf>
           Rahatsız eden biriyle iletişimi kesmek için yönetimi beklemek zorunda değilsin:
-          eşleşmeyi Eşleşmeler ekranından tek taraflı sonlandırabilirsin. Sonlandırılan
-          eşleşmeden sana yeni mesaj gelmez.
+          arkadaşlığı Arkadaşlar ekranından tek taraflı sonlandırabilirsin. Sonlandırılan
+          arkadaşlıktan sana yeni mesaj gelmez.
         </Paragraf>
         <Paragraf>Yönetimin uygulayabileceği yaptırımlar:</Paragraf>
         <Maddeler>
