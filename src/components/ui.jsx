@@ -70,7 +70,9 @@ export function Button({
                   ${v.kutu} ${pasif ? 'opacity-50' : ''} ${className}`}
     >
       {loading && <ActivityIndicator size="small" color={variant === 'secondary' || variant === 'ghost' ? slate[600] : '#fff'} />}
-      <Text className={`text-sm font-medium ${v.yazi}`}>{children}</Text>
+      {/* text-center: shrink ile iki satıra saran etiket sola yaslanıyordu (320 dp'de
+          kart düğmesinde ikinci satır 40 dp sola kayıktı). Tek satırda etkisi yok. */}
+      <Text className={`text-center text-sm font-medium ${v.yazi}`}>{children}</Text>
     </Pressable>
   )
 }
@@ -122,6 +124,15 @@ export function Badge({ tone = 'neutral', className = '', children }) {
 
 export function Spinner({ boy = 'small', renk = brand[600] }) {
   return <ActivityIndicator size={boy} color={renk} />
+}
+
+/**
+ * İskelet bloğu — veri gelene kadar gerçek öğenin YERİNİ ayıran gri kutu. Yüzey dili tek yerde
+ * kalsın diye burada (CLAUDE.md → "Dokunma ve yüzey dili"); boyutu çağıran className ile verir.
+ * Yalnızca yer değiştiren içerikte kullanılır: bekleme göstergesi olarak Loading/Spinner var.
+ */
+export function IskeletBlok({ className = '' }) {
+  return <View className={`rounded-lg bg-slate-200/70 ${className}`} />
 }
 
 export function Loading({ label = 'Yükleniyor…' }) {

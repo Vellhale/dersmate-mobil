@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { api } from '../src/lib/api'
 import { useAsync } from '../src/state/useAsync'
@@ -42,7 +42,29 @@ export default function Eslesmeler() {
   const router = useRouter()
   const { reloadConversations } = useInbox()
   const matches = useAsync(() => api.myMatches(), [])
-  const [tab, setTab] = useState('incoming')
+
+  /*
+    ODAKTA SESSİZ TAZELEME (CLAUDE.md → "Başka ekranda değişen veri ODAKTA tazelenir").
+    Bu ekrandan açılan bir profil ekranda başka bir Arkadaşlar ekranına götürebiliyor ya da
+    orada istek gönderilip engel konabiliyor; dönüldüğünde liste eski kalıyor ve zaten
+    yanıtlanmış isteğe "Kabul et" basmak sunucudan 409 alıyordu. Kurulumla aynı anda gelen
+    odak atlanıyor (ArkadaslarBolumu kalıbı): ilk çekimi useAsync zaten yaptı.
+  */
+  const tazele = useRef(matches.reload)
+  tazele.current = matches.reload
+  const kuruluyor = useRef(true)
+  useFocusEffect(
+    useCallback(() => {
+      if (!kuruluyor.current) tazele.current({ silent: true })
+    }, []),
+  )
+  useEffect(() => {
+    kuruluyor.current = false
+  }, [])
+  /* Başlangıç sekmesi adresten gelebilir (Profilim → "Arkadaşlarım" → ?sekme=active).
+     Bilinmeyen değer Gelen'e düşer: bildirimden gelen kullanıcının niyeti istekler. */
+  const { sekme } = useLocalSearchParams()
+  const [tab, setTab] = useState(() => (TABS.some((t) => t.key === sekme) ? sekme : 'incoming'))
   const [notice, setNotice] = useState(null)
 
   const lists = matches.data ?? { incoming: [], outgoing: [], active: [] }

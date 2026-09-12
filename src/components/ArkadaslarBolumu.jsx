@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { api } from '../lib/api'
+import { seviyeEtiketi, seviyeHesapla } from '../lib/seviye'
 import { useAsync } from '../state/useAsync'
 import { Avatar } from './Avatar'
 import { SeviyeRozeti } from './SeviyeRozeti'
@@ -124,11 +125,15 @@ export function ArkadaslarBolumu({ userId, kendiProfilim = false, ad }) {
         <Text className="text-sm text-slate-600">
           {/* ⚠️ "Arkadaş Ekle" bölümü Keşfet'e web #30'un portuyla geliyor; o sekme olmadan
               yayına çıkan metin var olmayan bir yeri tarif eder (gizlilik.jsx §6 notu). */}
+          {/* Hiç arkadaşı olmayan kişide "ortak arkadaşınız yok" yanıltıcı: sorun ortaklık
+              değil, liste boş. Sayı zaten başlıkta "0 arkadaş" diyor. */}
           {kendi
             ? sayi === 0
               ? 'Henüz arkadaşın yok. Keşfet’teki “Arkadaş Ekle” bölümünden adını bildiğin birini bulabilirsin.'
               : 'Arkadaşların gösterilemedi.'
-            : `${ad} ile ortak arkadaşınız yok.`}
+            : sayi === 0
+              ? `${ad} henüz kimseyle arkadaş değil.`
+              : `${ad} ile ortak arkadaşınız yok.`}
         </Text>
       ) : (
         <View accessibilityLabel={kendi ? 'Arkadaş listesi' : 'Ortak arkadaşlar'}>
@@ -138,9 +143,10 @@ export function ArkadaslarBolumu({ userId, kendiProfilim = false, ad }) {
             <Pressable
               key={k.userId}
               accessibilityRole="link"
-              accessibilityLabel={`${k.displayName} profilini aç`}
+              // Rozet ekran okuyucuya ayrı öğe olarak gitmiyor: seviye satırın etiketinde.
+              accessibilityLabel={`${k.displayName}, ${seviyeEtiketi(seviyeHesapla({ level: k.level }))}. Profilini aç`}
               onPress={() => router.push(`/profil/${k.userId}`)}
-              className={`min-h-[44px] flex-row items-center gap-3 py-2 ${
+              className={`min-h-[44px] flex-row items-center gap-3 py-2 active:bg-slate-50 ${
                 i > 0 ? 'border-t border-slate-100' : ''
               }`}
             >
@@ -148,7 +154,11 @@ export function ArkadaslarBolumu({ userId, kendiProfilim = false, ad }) {
               <Text numberOfLines={1} className="min-w-0 flex-1 text-sm font-medium text-brand-700">
                 {k.displayName}
               </Text>
-              <SeviyeRozeti kaynak={{ level: k.level }} boyut="sm" ton="acik" />
+              {/* Sarmalayıcı ŞART: SeviyeRozeti kökünde `self-start` taşıyor ve satırın
+                  items-center'ını eziyordu — rozet avatar ve isimden ~4 px yukarıda duruyordu. */}
+              <View className="shrink-0">
+                <SeviyeRozeti kaynak={{ level: k.level }} boyut="sm" ton="acik" />
+              </View>
             </Pressable>
           ))}
         </View>

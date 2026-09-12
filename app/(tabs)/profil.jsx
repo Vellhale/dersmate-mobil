@@ -132,7 +132,9 @@ export default function Profil() {
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.push('/eslesmeler')}
+            // "Arkadaşlarım" ARKADAŞ listesini açmalı; parametresiz rota Gelen isteklerle
+            // açılıyordu. Akış başlığındaki ikon parametresiz kalıyor: orada niyet istekler.
+            onPress={() => router.push('/eslesmeler?sekme=active')}
             className="min-h-[44px] flex-1 items-center justify-center rounded-xl border border-slate-200 bg-white"
           >
             <Text className="text-sm font-medium text-slate-700">Arkadaşlarım</Text>
