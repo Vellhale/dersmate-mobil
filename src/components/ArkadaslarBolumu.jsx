@@ -169,7 +169,8 @@ export function ArkadaslarBolumu({ userId, kendiProfilim = false, ad }) {
               <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
                 <Avatar userId={k.userId} name={k.displayName} size="sm" />
               </View>
-              <Text numberOfLines={1} className="min-w-0 flex-1 text-sm font-medium text-brand-700">
+              {/* İki satıra kadar: büyük yazıda tek satırlık ad kesiliyordu; satır zaten min 44. */}
+              <Text numberOfLines={2} className="min-w-0 flex-1 text-sm font-medium text-brand-700">
                 {k.displayName}
               </Text>
               {/* Sarmalayıcı ŞART: SeviyeRozeti kökünde `self-start` taşıyor ve satırın

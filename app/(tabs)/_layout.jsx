@@ -5,7 +5,7 @@ import { Tabs, usePathname } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTurCipasi } from '../../src/lib/tur'
 import { CUBUK_BOSLUGU, CUBUK_YUKSEKLIGI } from '../../src/lib/sekmeCubugu'
-import { brand, beyaz, ink, rose, slate, zemin } from '../../src/lib/theme'
+import { brand, beyaz, gece, ink, rose, slate, zemin } from '../../src/lib/theme'
 import { AramaIkonu, ArtiDaireIkonu, EvIkonu, KisiIkonu, MesajIkonu } from '../../src/components/Ikonlar'
 import { useInbox } from '../../src/state/InboxContext'
 
@@ -246,7 +246,8 @@ export default function TabsLayout() {
           bottom: CUBUK_BOSLUGU + guvenli.bottom,
           height: CUBUK_YUKSEKLIGI,
           // Referans hap neredeyse siyah; lacivert (slate-900) fazla renkli kalıyordu.
-          backgroundColor: '#111318',
+          // Değer theme.js'te: renk DEĞERİ gereken yerler hex'i elle yazmıyor (CLAUDE.md).
+          backgroundColor: gece,
           borderTopWidth: 0,
           borderRadius: CUBUK_YUKSEKLIGI / 2,
           overflow: 'hidden',

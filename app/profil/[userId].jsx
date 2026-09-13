@@ -137,7 +137,7 @@ function EylemIskeleti() {
     • arkadaş  → "Arkadaşsınız."               + Mesaj gönder
     • gelen    → "Sana arkadaş isteği gönderdi." + İsteğini yanıtla
     • giden    → "İsteğin yanıt bekliyor."       + pasif İstek gönderildi
-    • yok      → "Henüz arkadaş değilsiniz."     + Arkadaş ekle
+    • yok      → "Henüz arkadaş değilsiniz."     + Arkadaş isteği gönder
   Engelle her hâlde sağda ve ikincil — Keşfet kartıyla AYNI SIRA.
 
   BİLGİ GELMEDEN İLİŞKİ EYLEMİ ÇİZİLMİYOR: eskiden engel listesi yüklenirken "Arkadaş ekle"
@@ -360,16 +360,18 @@ function BaskaKisiIslemleri({ kisi, onNotice }) {
                   İstek gönderildi
                 </Button>
               ) : (
-                /* Erişilebilir ad GÖRÜNEN ETİKETLE BAŞLIYOR (WCAG 2.5.3): Sesle Denetim kullanan
-                   "Arkadaş ekle'ye dokun" dediğinde düğme bulunabilmeli. Ad ayrı: "X kişisini
-                   arkadaş ekle" bozuk Türkçeydi. */
+                /* ADI "Arkadaş isteği gönder": Akış, YKS ve Arkadaş Ekle kartlarındaki aynı isteğin
+                   adı bu; profilde "Arkadaş ekle" diye ayrışıyordu. Burada ONAY SAYFASI YOK (kartlarda
+                   var) ve bu bilinçli: onay sayfasının tek işi kimi eklediğini göstermek, profil
+                   ekranının kendisi zaten o kişinin tam kimliği.
+                   Erişilebilir ad görünen etiketle başlıyor (WCAG 2.5.3), ad ayrı. */
                 <Button
                   className="min-w-[55%] flex-1"
                   loading={busy}
-                  accessibilityLabel={`Arkadaş ekle, ${kisi.displayName}`}
+                  accessibilityLabel={`Arkadaş isteği gönder, ${kisi.displayName}`}
                   onPress={istekGonder}
                 >
-                  Arkadaş ekle
+                  Arkadaş isteği gönder
                 </Button>
               )}
               {engelleDugmesi}

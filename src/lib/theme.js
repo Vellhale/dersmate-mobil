@@ -14,6 +14,9 @@ export const brand = tailwindConfig.theme.extend.colors.brand
 export const ink = '#0F172A' // slate-900 — koyu zemin (splash, koyu paneller)
 export const zemin = '#F8FAFC' // slate-50 — sayfa zemini (web'de body)
 export const beyaz = '#FFFFFF'
+/** Yüzen sekme çubuğunun zemini — referans tasarımın neredeyse siyahı. Mobil'e özgü (web'de
+    karşılığı yok); slate-900 (ink) hap için fazla lacivert kalıyordu. */
+export const gece = '#111318'
 
 export const slate = {
   50: '#F8FAFC',

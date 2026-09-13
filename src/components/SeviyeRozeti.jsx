@@ -61,11 +61,16 @@ export function SeviyeRozeti({ kaynak, boyut = 'md', ton = 'koyu', etiketli = tr
       // accessibilityLabel hiç okunmaz (bu üç bileşende de aynı hata vardı).
       accessible
       accessibilityLabel={`${seviyeEtiketi(seviye)} (${EN_YUKSEK_SEVIYE} üzerinden)${ilerlemeVar ? ` — ${seviyeIlerlemeMetni(kaynak)}` : ''}`}
-      className={`flex-row items-center self-start rounded-full ${t.kabuk} ${b.kabuk}`}
+      /* Etiketsizken sağdaki pr-2 yalnızca "Seviye" kelimesi için vardı; madalyonun sağında
+         asimetrik bir boşluk bırakıyordu. */
+      className={`flex-row items-center self-start rounded-full ${t.kabuk} ${etiketli ? b.kabuk : 'p-0.5'}`}
     >
       <View className={`items-center justify-center rounded-full ${t.madalyon} ${b.madalyon}`}>
         <Text
           className={`font-bold ${t.madalyonYazi}`}
+          // Madalyon dp cinsinden sabit bir daire; rakam yazı ölçeğiyle sınırsız büyürse daireden
+          // taşıyordu. Seviye bilgisi ayrıca etikette ve profil sayacında okunuyor.
+          maxFontSizeMultiplier={1.3}
           style={{ fontSize: b.rakam, lineHeight: b.rakam + 2, fontVariant: ['tabular-nums'] }}
         >
           {seviye}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AccessibilityInfo, FlatList, Pressable, Text, View } from 'react-native'
+import { AccessibilityInfo, FlatList, Pressable, Text, View, useWindowDimensions } from 'react-native'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { sekmeAltDolgusu } from '../../src/lib/sekmeCubugu'
@@ -441,10 +441,12 @@ export default function Kesfet() {
             returnKeyType="search"
           />
           <View className="flex-row items-center justify-between gap-2">
-            <Text className="text-sm font-semibold text-slate-800">
+            {/* shrink-0: büyük yazıda sayı "1 ki/şi" diye bölünüyordu; daralan taraf düğme. */}
+            <Text className="shrink-0 text-sm font-semibold text-slate-800">
               {aramaBitti && liste.items.length > 0 ? `${liste.totalCount} kişi` : ''}
             </Text>
-            <Button variant="ghost" onPress={() => setEngelListesiAcik(true)}>
+            {/* İkincil: YKS sekmesindeki "Filtre" ile aynı yüzey. ghost iken düz metin gibi okunuyordu. */}
+            <Button variant="secondary" onPress={() => setEngelListesiAcik(true)}>
               Engellediklerim{engelSayisi > 0 ? ` (${engelSayisi})` : ''}
             </Button>
           </View>
@@ -1045,6 +1047,11 @@ function SohbetIstegiModali({ kisi, arkadaslik = false, onClose, onSent, onHata 
   sayfa açık kaldıkça sabit. Yeniden açılışta liste sunucudan temiz kuruluyor.
 */
 function EngellilerModali({ open, onClose, liste, onKaldir }) {
+  /* Büyük yazıda (>= 1.5) düğme adın ALTINA iniyor: sabit 150 px düğme ad sütununu daraltıp
+     iki satırlık adı da kesiyordu. Sabit genişlik korunuyor (yükleme ve "Kaldırıldı" dönüşünde
+     satır yüksekliği değişmesin), yalnızca yerleşim sütuna dönüyor. */
+  const { fontScale } = useWindowDimensions()
+  const sutun = fontScale >= 1.5
   const [calisan, setCalisan] = useState(null)
   const [hata, setHata] = useState(null)
   // userId → kaldırılmadan önceki kayıt (satırı aynı içerikle çizmek için).
@@ -1126,9 +1133,9 @@ function EngellilerModali({ open, onClose, liste, onKaldir }) {
               return (
                 <View
                   key={kisi.userId}
-                  className={`flex-row items-center gap-2 py-2 ${i > 0 ? 'border-t border-slate-200' : ''}`}
+                  className={`${sutun ? 'items-start gap-2' : 'flex-row items-center gap-2'} py-2 ${i > 0 ? 'border-t border-slate-200' : ''}`}
                 >
-                  <View className="min-w-0 flex-1">
+                  <View className={sutun ? 'self-stretch' : 'min-w-0 flex-1'}>
                     {/* İki satıra kadar: sabit 150 px düğme ad sütununu 320 dp'de 122 px'e indiriyor ve
                         onaysız "Engeli kaldır" listesinde kimliği taşıyan tek şey olan ad kesiliyordu. */}
                     <Text

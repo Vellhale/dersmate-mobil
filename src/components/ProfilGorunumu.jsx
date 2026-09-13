@@ -420,11 +420,18 @@ function MetrikCubugu({ label, value }) {
 
   return (
     <View className="flex-row items-center gap-3">
-      <Text className="w-20 shrink-0 text-xs text-slate-600">{label}</Text>
+      {/* Genişlikler SABİT kalıyor (çubuk başlangıçları hizalı olsun diye); büyük yazıda metin
+          sabit kutuya sığmayınca "Zaman/lama" diye bölünüyordu — artık küçülerek sığıyor. */}
+      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} className="w-20 shrink-0 text-xs text-slate-600">
+        {label}
+      </Text>
       <View className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200">
         <View className="h-full rounded-full bg-brand-500" style={{ width: `${oran}%` }} />
       </View>
       <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.6}
         className="w-8 shrink-0 text-right text-xs font-semibold text-slate-700"
         style={{ fontVariant: ['tabular-nums'] }}
       >
