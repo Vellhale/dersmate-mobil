@@ -122,23 +122,18 @@ export default function Profil() {
 
         {/* Tab çubuğuna girmeyen iki bölümün ikinci girişi (ilki Akış başlığında):
             profil, "benimle ilgili her şey"in doğal toplanma yeri. */}
+        {/* ui.jsx Button: hemen üstteki "Fotoğrafı değiştir" ile aynı yüzey. Eskiden elle
+            yazılmış Pressable'lardı (köşe 12, kenar slate-200) ve üstteki satırla (köşe 8,
+            kenar slate-300) alt alta farklı görünüyordu. */}
         <View className="flex-row gap-2">
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push('/dersler')}
-            className="min-h-[44px] flex-1 items-center justify-center rounded-xl border border-slate-200 bg-white"
-          >
-            <Text className="text-sm font-medium text-slate-700">Derslerim</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            // "Arkadaşlarım" ARKADAŞ listesini açmalı; parametresiz rota Gelen isteklerle
-            // açılıyordu. Akış başlığındaki ikon parametresiz kalıyor: orada niyet istekler.
-            onPress={() => router.push('/eslesmeler?sekme=active')}
-            className="min-h-[44px] flex-1 items-center justify-center rounded-xl border border-slate-200 bg-white"
-          >
-            <Text className="text-sm font-medium text-slate-700">Arkadaşlarım</Text>
-          </Pressable>
+          <Button variant="secondary" className="flex-1" onPress={() => router.push('/dersler')}>
+            Derslerim
+          </Button>
+          {/* "Arkadaşlarım" ARKADAŞ listesini açmalı; parametresiz rota Gelen isteklerle
+              açılıyordu. Akış başlığındaki ikon parametresiz kalıyor: orada niyet istekler. */}
+          <Button variant="secondary" className="flex-1" onPress={() => router.push('/eslesmeler?sekme=active')}>
+            Arkadaşlarım
+          </Button>
         </View>
 
         {/* Yönetim girişi YALNIZCA yetkili hesapta çizilir. Asıl kapı sunucuda (403);

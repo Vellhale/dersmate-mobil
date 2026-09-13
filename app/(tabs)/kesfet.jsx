@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { FlatList, Pressable, Text, View } from 'react-native'
-import { useFocusEffect, useRouter } from 'expo-router'
+import { AccessibilityInfo, FlatList, Platform, Pressable, Text, View } from 'react-native'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { sekmeAltDolgusu } from '../../src/lib/sekmeCubugu'
 import { api } from '../../src/lib/api'
@@ -208,6 +208,22 @@ function useBirikenListe(aktif, yukleyici, bagimliliklar, anahtar) {
 export default function Kesfet() {
   const guvenli = useSafeAreaInsets()
   const [sekme, setSekme] = useState('yks')
+
+  /*
+    DIŞARIDAN SEKME SEÇİMİ (?sekme=arkadas): Profilim'deki "Arkadaş bul" gibi girişler doğru
+    sekmeyi açabilsin. Keşfet bir SEKME ekranı ve kurulu kalıyor — başlangıç değeri bir kez
+    okunsaydı ikinci girişte işe yaramazdı. Parametre uygulanınca BOŞALTILIYOR: aynı değerle
+    yeniden gelindiğinde efekt yine koşsun, kullanıcının kendi seçtiği sekme de sonraki
+    odakta ezilmesin. `undefined` değil boş dize: web'de setParams({ sekme: undefined })
+    adresi değiştirmiyordu (ölçüldü) ve ikinci "Arkadaş bul" hiçbir şey yapmazdı.
+  */
+  const router = useRouter()
+  const { sekme: istenenSekme } = useLocalSearchParams()
+  useEffect(() => {
+    if (!istenenSekme) return
+    if (SEKMELER.some((s) => s.key === istenenSekme)) setSekme(istenenSekme)
+    router.setParams({ sekme: '' })
+  }, [istenenSekme, router])
   const [term, setTerm] = useState('')
   const [filters, setFilters] = useState(VARSAYILAN_FILTRELER)
   const [uniFiltre, setUniFiltre] = useState(UNIVERSITE_VARSAYILAN)
@@ -409,7 +425,9 @@ export default function Kesfet() {
             returnKeyType="search"
           />
           <View className="flex-row items-center justify-between gap-2">
-            <Text className="text-sm font-semibold text-slate-800">
+            {/* Canlı bölge (Android): odak arama kutusunda kalırken sonuç sayısı sessizce
+                değişiyordu. iOS karşılığı aşağıdaki duyuru efekti. */}
+            <Text accessibilityLiveRegion="polite" className="text-sm font-semibold text-slate-800">
               {!isimKisa && !isimBekliyor && !liste.ilkYukleme && !liste.error && liste.items.length > 0
                 ? `${liste.totalCount} kişi`
                 : ''}
@@ -467,6 +485,21 @@ export default function Kesfet() {
   /* Arkadaş Ekle'de ÜÇ AYRI boş durum (web kararı): davet (hiç yazılmamış ya da kısa),
      aranıyor, sonuç yok. Tek bir "bulunamadı", henüz aramamış kullanıcıya "aradık, yok"
      derdi — bu yüzden "adını yaz" dalı yükleniyor dalından ÖNCE. */
+  /*
+    ARAMA SONUCU DUYURUSU (iOS; Android canlı bölgeyi kullanıyor). İsim yazan VoiceOver
+    kullanıcısı aramanın bitip bitmediğini ve kaç kişi bulunduğunu duymuyordu. Sorgu başına
+    BİR kez: aynı sonuç yeniden çizildiğinde tekrar okunmasın.
+  */
+  const duyurulanSorgu = useRef(null)
+  const aramaBitti = arkadasKipi && !isimKisa && !isimBekliyor && !liste.ilkYukleme && !liste.error
+  useEffect(() => {
+    if (Platform.OS !== 'ios' || !aramaBitti || duyurulanSorgu.current === isimSorgusu) return
+    duyurulanSorgu.current = isimSorgusu
+    AccessibilityInfo.announceForAccessibility(
+      liste.totalCount > 0 ? `${liste.totalCount} kişi bulundu` : 'Kimseyi bulamadık',
+    )
+  }, [aramaBitti, isimSorgusu, liste.totalCount])
+
   const bosDurum = arkadasKipi && isimKisa ? (
     /* Kapsam ("ilanı olmayanlar da çıkar") üstteki açıklamada zaten yazıyor; kutu yalnızca
        kuralı söylüyor — eskiden aynı cümle aynı anda iki kez okunuyordu. */
@@ -605,7 +638,14 @@ export default function Kesfet() {
         onClose={() => setEngelHedefi(null)}
         onEngellendi={(name) => {
           setEngelHedefi(null)
-          setNotice(`${name} engellendi. Artık birbirinize istek gönderemezsiniz.`)
+          /* Engellediklerim YALNIZCA Arkadaş Ekle sekmesinde. Üniversite sekmesinden engelleyen
+             kullanıcı kişinin listeden düştüğünü görüyor ama geri almanın yerini hiçbir yerde
+             okumuyordu. */
+          setNotice(
+            universiteKipi
+              ? `${name} engellendi. Geri almak için: Arkadaş Ekle › Engellediklerim.`
+              : `${name} engellendi. Artık birbirinize istek gönderemezsiniz.`,
+          )
           /* Engellenen kişi sonuçlardan düşmeli (sunucu artık döndürmüyor) ve engel
              listesine girmeli; yalnızca listeyi tazelemek kartı ekranda bırakırdı.
              yenile() pasif listede hiçbir şey yapmıyor — yalnızca açık sekme kurulur.
