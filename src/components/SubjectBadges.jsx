@@ -85,7 +85,8 @@ export function SubjectBadges({ userId, kendiProfilim = false }) {
             accessibilityRole="button"
             accessibilityState={{ expanded: ilerlemeAcik }}
             onPress={() => setIlerlemeAcik((v) => !v)}
-            hitSlop={12}
+            // 14: metin satırı 16 px, 16 + 14 + 14 = 44 (12 ile 40'ta kalıyordu).
+            hitSlop={14}
           >
             <Text className="text-xs font-medium text-brand-700">
               {ilerlemeAcik ? 'İlerlemeyi gizle' : `İlerleme (${rozetsiz.length})`}

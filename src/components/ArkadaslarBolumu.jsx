@@ -2,10 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { api } from '../lib/api'
+import { seviyeEtiketi, seviyeHesapla } from '../lib/seviye'
 import { useAsync } from '../state/useAsync'
 import { Avatar } from './Avatar'
 import { SeviyeRozeti } from './SeviyeRozeti'
-import { Card, ErrorBox } from './ui'
+import { Button, Card, ErrorBox } from './ui'
 
 /*
   PROFİLİN ARKADAŞ BÖLÜMÜ — web'deki components/ArkadaslarBolumu.jsx'in portu (web #31).
@@ -85,11 +86,15 @@ export function ArkadaslarBolumu({ userId, kendiProfilim = false, ad }) {
 
   /* Yüklenirken bölüm HİÇ çizilmiyor (iskelet de yok, web kararı): profil kartı ayrı
      istekle geliyor ve araya boş bir kutu koymak sayfayı iki kez zıplatırdı. */
-  if (veri.loading) return null
+  /* Hata varken yeni deneme sürüyorsa kart KORUNUYOR: sessiz olmayan reload `loading`
+     açıyordu ve kart tamamen kaybolup sayfa zıplıyordu. Başlık da hatada yazılıyor —
+     konu panelleri ile değerlendirmeler arasında neyin yüklenemediği okunmuyordu. */
+  if (veri.loading && !veri.error) return null
   if (veri.error) {
     return (
       <Card>
-        <ErrorBox error={veri.error} onRetry={veri.reload} />
+        <Text className="mb-3 text-sm font-medium text-slate-700">Arkadaşlar</Text>
+        <ErrorBox error={veri.error} onRetry={() => veri.reload({ silent: true })} />
       </Card>
     )
   }
@@ -121,15 +126,29 @@ export function ArkadaslarBolumu({ userId, kendiProfilim = false, ad }) {
       )}
 
       {kisiler.length === 0 ? (
-        <Text className="text-sm text-slate-600">
-          {/* ⚠️ "Arkadaş Ekle" bölümü Keşfet'e web #30'un portuyla geliyor; o sekme olmadan
-              yayına çıkan metin var olmayan bir yeri tarif eder (gizlilik.jsx §6 notu). */}
-          {kendi
-            ? sayi === 0
-              ? 'Henüz arkadaşın yok. Keşfet’teki “Arkadaş Ekle” bölümünden adını bildiğin birini bulabilirsin.'
-              : 'Arkadaşların gösterilemedi.'
-            : `${ad} ile ortak arkadaşınız yok.`}
-        </Text>
+        <View className="gap-3">
+          <Text className="text-sm text-slate-600">
+            {/* Hiç arkadaşı olmayan kişide "ortak arkadaşınız yok" yanıltıcı: sorun ortaklık
+                değil, liste boş. Sayı zaten başlıkta "0 arkadaş" diyor. */}
+            {kendi
+              ? sayi === 0
+                ? 'Henüz arkadaşın yok. Adını bildiğin birini bulup arkadaş isteği gönderebilirsin.'
+                : 'Arkadaşların gösterilemedi.'
+              : sayi === 0
+                ? `${ad} henüz kimseyle arkadaş değil.`
+                : `${ad} ile ortak arkadaşınız yok.`}
+          </Text>
+          {/* Metin eskiden bir yeri TARİF ediyordu ("Keşfet'teki Arkadaş Ekle bölümü") ama oraya
+              götürmüyordu: Keşfet her açılışta YKS sekmesinde başlıyor, kullanıcı üçüncü sekmeyi
+              kendisi bulmak zorundaydı. Düğme doğrudan o sekmeyi açıyor. */}
+          {kendi && sayi === 0 && (
+            <View className="flex-row">
+              <Button variant="secondary" onPress={() => router.push('/kesfet?sekme=arkadas')}>
+                Arkadaş bul
+              </Button>
+            </View>
+          )}
+        </View>
       ) : (
         <View accessibilityLabel={kendi ? 'Arkadaş listesi' : 'Ortak arkadaşlar'}>
           {gorunen.map((k, i) => (
@@ -138,17 +157,31 @@ export function ArkadaslarBolumu({ userId, kendiProfilim = false, ad }) {
             <Pressable
               key={k.userId}
               accessibilityRole="link"
-              accessibilityLabel={`${k.displayName} profilini aç`}
+              // Rozet ekran okuyucuya ayrı öğe olarak gitmiyor: seviye satırın etiketinde.
+              accessibilityLabel={`${k.displayName}, ${seviyeEtiketi(seviyeHesapla({ level: k.level }))}. Profilini aç`}
               onPress={() => router.push(`/profil/${k.userId}`)}
-              className={`min-h-[44px] flex-row items-center gap-3 py-2 ${
+              className={`min-h-[44px] flex-row items-center gap-3 py-2 active:bg-slate-50 ${
                 i > 0 ? 'border-t border-slate-100' : ''
               }`}
             >
-              <Avatar userId={k.userId} name={k.displayName} size="sm" />
-              <Text numberOfLines={1} className="min-w-0 flex-1 text-sm font-medium text-brand-700">
+              {/* Satırın etiketi adı ve seviyeyi zaten söylüyor; avatar ve rozet kendi `accessible`
+                  bayraklarıyla Android'de ayrı durak olup ikinci kez okunuyordu. */}
+              <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+                <Avatar userId={k.userId} name={k.displayName} size="sm" />
+              </View>
+              {/* İki satıra kadar: büyük yazıda tek satırlık ad kesiliyordu; satır zaten min 44. */}
+              <Text numberOfLines={2} className="min-w-0 flex-1 text-sm font-medium text-brand-700">
                 {k.displayName}
               </Text>
-              <SeviyeRozeti kaynak={{ level: k.level }} boyut="sm" ton="acik" />
+              {/* Sarmalayıcı ŞART: SeviyeRozeti kökünde `self-start` taşıyor ve satırın
+                  items-center'ını eziyordu — rozet avatar ve isimden ~4 px yukarıda duruyordu. */}
+              {/* ETİKETSİZ madalyon: "Seviye" kelimesi her satırda tekrar ediyor ve 320 dp'de
+                  satırın ~%28'ini alıp adı kırpıyordu ("Ayşe Nur Karao…"). Seviye bilgisi
+                  kaybolmuyor: satırın erişilebilirlik etiketi "6. Seviye" diyor
+                  (topluluk.jsx'teki dar satırla aynı kullanım). */}
+              <View className="shrink-0" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+                <SeviyeRozeti kaynak={{ level: k.level }} boyut="sm" ton="acik" etiketli={false} />
+              </View>
             </Pressable>
           ))}
         </View>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Pressable, ScrollView, Text, View } from 'react-native'
+import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { sekmeAltDolgusu } from '../../src/lib/sekmeCubugu'
@@ -27,6 +27,12 @@ import { VeriTercihleriBaglantisi } from '../../src/components/IzinSayfasi'
 export default function Profil() {
   const guvenli = useSafeAreaInsets()
   const router = useRouter()
+  /* Büyük yazı ölçeğinde iki düğmeli satırlar alt alta (bkz. kısayol satırları). Sütunda
+     flex-1 verilmez: tabanı 0 olan düğme yüksekliği min-h'ye çökerdi. */
+  const { fontScale } = useWindowDimensions()
+  const buyukYazi = fontScale >= 1.3
+  const satirSinifi = buyukYazi ? 'gap-2' : 'flex-row gap-2'
+  const dugmeSinifi = buyukYazi ? '' : 'flex-1'
   const { session, logout } = useAuth()
 
   const [dialog, setDialog] = useState(null)
@@ -111,32 +117,31 @@ export default function Profil() {
         )}
         <ErrorBox error={avatarError} />
 
-        <View className="flex-row gap-2">
-          <Button variant="secondary" className="flex-1" loading={avatarBusy} onPress={fotografDegistir}>
+        {/* Büyük yazı ölçeğinde (>= 1.3) iki düğmeli satırlar ALT ALTA: 320 dp'de 140 px'lik
+            düğmeye tek sözcüklü uzun etiket sığmayıp harf ortasından bölünüyordu. */}
+        <View className={satirSinifi}>
+          <Button variant="secondary" className={dugmeSinifi} loading={avatarBusy} onPress={fotografDegistir}>
             Fotoğrafı değiştir
           </Button>
-          <Button className="flex-1" onPress={() => setDialog('edit')}>
+          <Button className={dugmeSinifi} onPress={() => setDialog('edit')}>
             Profili düzenle
           </Button>
         </View>
 
         {/* Tab çubuğuna girmeyen iki bölümün ikinci girişi (ilki Akış başlığında):
             profil, "benimle ilgili her şey"in doğal toplanma yeri. */}
-        <View className="flex-row gap-2">
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push('/dersler')}
-            className="min-h-[44px] flex-1 items-center justify-center rounded-xl border border-slate-200 bg-white"
-          >
-            <Text className="text-sm font-medium text-slate-700">Derslerim</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push('/eslesmeler')}
-            className="min-h-[44px] flex-1 items-center justify-center rounded-xl border border-slate-200 bg-white"
-          >
-            <Text className="text-sm font-medium text-slate-700">Arkadaşlarım</Text>
-          </Pressable>
+        {/* ui.jsx Button: hemen üstteki "Fotoğrafı değiştir" ile aynı yüzey. Eskiden elle
+            yazılmış Pressable'lardı (köşe 12, kenar slate-200) ve üstteki satırla (köşe 8,
+            kenar slate-300) alt alta farklı görünüyordu. */}
+        <View className={satirSinifi}>
+          <Button variant="secondary" className={dugmeSinifi} onPress={() => router.push('/dersler')}>
+            Derslerim
+          </Button>
+          {/* "Arkadaşlarım" ARKADAŞ listesini açmalı; parametresiz rota Gelen isteklerle
+              açılıyordu. Akış başlığındaki ikon parametresiz kalıyor: orada niyet istekler. */}
+          <Button variant="secondary" className={dugmeSinifi} onPress={() => router.push('/eslesmeler?sekme=active')}>
+            Arkadaşlarım
+          </Button>
         </View>
 
         {/* Yönetim girişi YALNIZCA yetkili hesapta çizilir. Asıl kapı sunucuda (403);
@@ -324,7 +329,8 @@ function HesabiSilModali({ open, onClose, onDeleted }) {
 
 function AltBaglanti({ onPress, children }) {
   return (
-    <Pressable accessibilityRole="link" onPress={onPress} className="min-h-[44px] justify-center">
+    // min-w: kısa etiketli bağlantı ('Gizlilik') 44 px genişliğin altında kalıyordu.
+    <Pressable accessibilityRole="link" onPress={onPress} className="min-h-[44px] min-w-[44px] items-center justify-center">
       <Text className="text-sm text-slate-500">{children}</Text>
     </Pressable>
   )

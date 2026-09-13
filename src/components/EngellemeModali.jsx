@@ -80,6 +80,14 @@ export function EngellemeModali({ kisi, onClose, onEngellendi }) {
       title="Kişiyi engelle"
       footer={
         <>
+          {/* HATA DÜĞMELERİN ÜSTÜNDE, kaydırma alanının sonunda DEĞİL: 360x640 ve altında
+              içerik kaydırılıyor ve Engelle'ye basınca oluşan hata görünmeyen yere
+              düşüyordu. Footer satırı flex-wrap: tam genişlik kutu düğmeleri alta iter. */}
+          {hata ? (
+            <View className="w-full">
+              <ErrorBox error={hata} />
+            </View>
+          ) : null}
           <Button variant="secondary" onPress={onClose}>
             Vazgeç
           </Button>
@@ -98,11 +106,23 @@ export function EngellemeModali({ kisi, onClose, onEngellendi }) {
           <View className="gap-1">
             {MADDELER.map((madde) => (
               <View key={madde} className="flex-row gap-2">
-                <Text className="text-xs text-slate-400">•</Text>
+                {/* Nokta metinle AYNI punto ve satır yüksekliğinde: text-xs iken satırın
+                    ~3 px üstünde duruyordu. */}
+                <Text className="text-sm leading-relaxed text-slate-400">•</Text>
                 <Text className="flex-1 text-sm leading-relaxed text-slate-600">{madde}</Text>
               </View>
             ))}
           </View>
+
+          {/* UYARI NOTUN ÜSTÜNDE: not isteğe bağlı, uyarı değil. Eskiden en sondaydı ve 320x568'de
+              ilk görünümde yalnızca üst kenarı seçiliyordu — taciz yaşayan kullanıcının
+              okuması gereken tek cümle kaydırmanın arkasında kalıyordu.
+              Web'in amber kutusu yerine ui.jsx'teki uyarı yüzeyi: aynı ton, yeni yüzey
+              icat edilmiyor; punto 14 küçük ekranda daha okunur. */}
+          <Notice tone="warning">
+            Taciz ya da kural ihlali varsa engellemek yetmez — dersin sayfasından şikayet et ki
+            yönetimin haberi olsun.
+          </Notice>
 
           {/* Not SUNUCUDA da yalnızca engelleyene dönüyor (GetMyBlocksHandler); karşı
               taraf ne engellendiğini ne de not yazıldığını görüyor. */}
@@ -110,17 +130,18 @@ export function EngellemeModali({ kisi, onClose, onEngellendi }) {
             label="Kendine not (isteğe bağlı)"
             hint="Yalnızca sen görürsün. Neden engellediğini sonra hatırlamak için."
           >
-            <Girdi value={not} onChangeText={setNot} maxLength={500} placeholder="Örn. tanımıyorum" />
+            {/* ÇOK SATIRLI: 500 karakter kabul eden tek satırlık kutuda ~78 karakterden sonra
+                yazılan notun başı görünmüyordu. */}
+            <Girdi
+              value={not}
+              onChangeText={setNot}
+              maxLength={500}
+              multiline
+              textAlignVertical="top"
+              className="h-20"
+              placeholder="Örn. tanımıyorum"
+            />
           </Field>
-
-          {/* Web'in amber kutusu yerine ui.jsx'teki uyarı yüzeyi: aynı ton, yeni yüzey
-              icat edilmiyor; punto 14 küçük ekranda daha okunur. */}
-          <Notice tone="warning">
-            Taciz ya da kural ihlali varsa engellemek yetmez — dersin sayfasından şikayet et ki
-            yönetimin haberi olsun.
-          </Notice>
-
-          <ErrorBox error={hata} />
         </View>
       )}
     </Modal>

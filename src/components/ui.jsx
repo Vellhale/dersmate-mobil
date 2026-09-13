@@ -1,5 +1,6 @@
-import { cloneElement, isValidElement } from 'react'
+import { cloneElement, isValidElement, useEffect } from 'react'
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   KeyboardAvoidingView,
   Modal as RNModal,
@@ -11,7 +12,7 @@ import {
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { brand, slate } from '../lib/theme'
+import { beyaz, brand, slate } from '../lib/theme'
 
 /*
   YÜZEY DİLİ — web'deki components/ui.jsx'in RN portu. Kararlar aynen taşındı:
@@ -69,8 +70,10 @@ export function Button({
       className={`min-h-[44px] shrink flex-row items-center justify-center gap-2 rounded-lg px-4 py-2
                   ${v.kutu} ${pasif ? 'opacity-50' : ''} ${className}`}
     >
-      {loading && <ActivityIndicator size="small" color={variant === 'secondary' || variant === 'ghost' ? slate[600] : '#fff'} />}
-      <Text className={`text-sm font-medium ${v.yazi}`}>{children}</Text>
+      {loading && <ActivityIndicator size="small" color={variant === 'secondary' || variant === 'ghost' ? slate[600] : beyaz} />}
+      {/* text-center: shrink ile iki satıra saran etiket sola yaslanıyordu (320 dp'de
+          kart düğmesinde ikinci satır 40 dp sola kayıktı). Tek satırda etkisi yok. */}
+      <Text className={`text-center text-sm font-medium ${v.yazi}`}>{children}</Text>
     </Pressable>
   )
 }
@@ -122,6 +125,15 @@ export function Badge({ tone = 'neutral', className = '', children }) {
 
 export function Spinner({ boy = 'small', renk = brand[600] }) {
   return <ActivityIndicator size={boy} color={renk} />
+}
+
+/**
+ * İskelet bloğu — veri gelene kadar gerçek öğenin YERİNİ ayıran gri kutu. Yüzey dili tek yerde
+ * kalsın diye burada (CLAUDE.md → "Dokunma ve yüzey dili"); boyutu çağıran className ile verir.
+ * Yalnızca yer değiştiren içerikte kullanılır: bekleme göstergesi olarak Loading/Spinner var.
+ */
+export function IskeletBlok({ className = '' }) {
+  return <View className={`rounded-lg bg-slate-200/70 ${className}`} />
 }
 
 export function Loading({ label = 'Yükleniyor…' }) {
@@ -210,6 +222,24 @@ const NOTICE_TONLARI = {
 
 /** Kısa süreli bilgi/başarı bildirimi (sayfa üstünde) — web Notice'in portu. */
 export function Notice({ tone = 'success', children, onDismiss }) {
+  /*
+    BİLDİRİM DUYURULUYOR. "Engellendi", "istek gönderildi", "engel kaldırıldı" gibi sonuçlar
+    ekranda beliriyor ama ekran okuyucu kullanıcısı hiçbir şey duymuyordu; odak sökülen
+    düğmeyle birlikte kaybolduğu için işlemin olup olmadığını listeyi yeniden tarayarak
+    anlıyordu. Canlı bölge DEĞİL, açık duyuru: bildirim çoğu zaman bir alt sayfanın
+    ARKASINDA çiziliyor ve Android'de etkin olmayan pencerenin canlı bölgesi okunmuyor.
+    Metin başına bir kez (bağımlılık metnin kendisi). Kanca erken dönüşten ÖNCE.
+
+    YALNIZCA KAPATILABİLİR bildirim duyuruluyor (onDismiss): projede geçici sonuç
+    bildirimleri kapatılabilir, sayfaya gömülü sabit bilgi kutuları (ör. engelleme onayındaki
+    şikayet uyarısı) değil. Hepsi duyurulsaydı alt sayfa açılır açılmaz ekran okuyucu başlığı
+    okumadan uyarı kutusunu okuyordu (ölçüldü).
+  */
+  const duyuru = onDismiss && typeof children === 'string' ? children : null
+  useEffect(() => {
+    if (duyuru) AccessibilityInfo.announceForAccessibility(duyuru)
+  }, [duyuru])
+
   if (!children) return null
   const t = NOTICE_TONLARI[tone] ?? NOTICE_TONLARI.success
   return (

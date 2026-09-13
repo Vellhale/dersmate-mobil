@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { FlatList, Pressable, Text, View } from 'react-native'
-import { useFocusEffect, useRouter } from 'expo-router'
+import { AccessibilityInfo, FlatList, Pressable, Text, View, useWindowDimensions } from 'react-native'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { sekmeAltDolgusu } from '../../src/lib/sekmeCubugu'
 import { api } from '../../src/lib/api'
 import { engelDegisti, engelSurumu } from '../../src/lib/engelSurumu'
+import { ILISKI } from '../../src/lib/iliski'
+import { useIliskiler } from '../../src/state/useIliskiler'
 import { formatDate } from '../../src/lib/format'
+import { seviyeEtiketi, seviyeHesapla } from '../../src/lib/seviye'
 import { useAsync } from '../../src/state/useAsync'
 import { useDebounced } from '../../src/hooks/useDebounced'
 import { Avatar } from '../../src/components/Avatar'
@@ -84,12 +87,17 @@ function useBirikenListe(aktif, yukleyici, bagimliliklar, anahtar) {
   const [ilkYukleme, setIlkYukleme] = useState(false)
   const [ekYukleme, setEkYukleme] = useState(false)
   const [error, setError] = useState(null)
+  /* Ekrandaki sonucun HANGİ SORGUYA ait olduğu. Sorgu değiştiği ilk render'da liste henüz
+     sıfırlanmamış ve eski sorgunun sonucunu taşıyor; bu anahtar olmadan o kare "bitti"
+     sanılıyordu (iOS duyurusu sonuç varken "Kimseyi bulamadık" dedi, ölçüldü). */
+  const [sonucAnahtari, setSonucAnahtari] = useState(null)
   const seq = useRef(0)
   const kilit = useRef(false)
   const basarisizHedef = useRef(null)
 
   async function sayfaGetir(hedefSayfa) {
     const benimSeq = ++seq.current
+    const sorguAnahtari = JSON.stringify(bagimliliklar)
     kilit.current = true
     if (hedefSayfa === 1) setIlkYukleme(true)
     else setEkYukleme(true)
@@ -108,6 +116,7 @@ function useBirikenListe(aktif, yukleyici, bagimliliklar, anahtar) {
       setTotalCount(data.totalCount)
       setHasNextPage(Boolean(data.hasNextPage ?? data.page < data.totalPages))
       setPage(hedefSayfa)
+      if (hedefSayfa === 1) setSonucAnahtari(sorguAnahtari)
       basarisizHedef.current = null
     } catch (err) {
       if (seq.current === benimSeq) {
@@ -135,6 +144,7 @@ function useBirikenListe(aktif, yukleyici, bagimliliklar, anahtar) {
       setTotalCount(0)
       setHasNextPage(false)
       setPage(0)
+      setSonucAnahtari(null)
 
       /*
         YÜKLEME BAYRAKLARI DA SIFIRLANMALI.
@@ -173,6 +183,7 @@ function useBirikenListe(aktif, yukleyici, bagimliliklar, anahtar) {
     setTotalCount(0)
     setHasNextPage(false)
     setPage(0)
+    setSonucAnahtari(null)
     basarisizHedef.current = null
     sayfaGetir(1)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -181,6 +192,7 @@ function useBirikenListe(aktif, yukleyici, bagimliliklar, anahtar) {
   return {
     items,
     totalCount,
+    sonucAnahtari,
     error,
     ilkYukleme,
     ekYukleme,
@@ -206,6 +218,22 @@ function useBirikenListe(aktif, yukleyici, bagimliliklar, anahtar) {
 export default function Kesfet() {
   const guvenli = useSafeAreaInsets()
   const [sekme, setSekme] = useState('yks')
+
+  /*
+    DIŞARIDAN SEKME SEÇİMİ (?sekme=arkadas): Profilim'deki "Arkadaş bul" gibi girişler doğru
+    sekmeyi açabilsin. Keşfet bir SEKME ekranı ve kurulu kalıyor — başlangıç değeri bir kez
+    okunsaydı ikinci girişte işe yaramazdı. Parametre uygulanınca BOŞALTILIYOR: aynı değerle
+    yeniden gelindiğinde efekt yine koşsun, kullanıcının kendi seçtiği sekme de sonraki
+    odakta ezilmesin. `undefined` değil boş dize: web'de setParams({ sekme: undefined })
+    adresi değiştirmiyordu (ölçüldü) ve ikinci "Arkadaş bul" hiçbir şey yapmazdı.
+  */
+  const router = useRouter()
+  const { sekme: istenenSekme } = useLocalSearchParams()
+  useEffect(() => {
+    if (!istenenSekme) return
+    if (SEKMELER.some((s) => s.key === istenenSekme)) setSekme(istenenSekme)
+    router.setParams({ sekme: '' })
+  }, [istenenSekme, router])
   const [term, setTerm] = useState('')
   const [filters, setFilters] = useState(VARSAYILAN_FILTRELER)
   const [uniFiltre, setUniFiltre] = useState(UNIVERSITE_VARSAYILAN)
@@ -268,6 +296,15 @@ export default function Kesfet() {
   const gecikmeliIsim = useDebounced(arkadasIsim)
   const isimSorgusu = gecikmeliIsim.trim()
   const isimYeterli = isimSorgusu.length >= ARKADAS_MIN_HARF
+  /*
+    YAZILAN ile SORGULANAN ayrı: gecikme (~370 ms) boyunca eskiden önceki aramanın sonucu
+    ya da "Kimseyi bulamadık" göstergesiz ekranda kalıyordu — "el"den "ele" geçen
+    kullanıcı bir an Elif'i, bir an boş durumu görüyordu. Yazılan kısa ise davet hemen
+    geliyor; sorgu yazılana yetişmediyse liste gizlenip "Aranıyor…" çıkıyor.
+  */
+  const yazilanIsim = arkadasIsim.trim()
+  const isimKisa = yazilanIsim.length < ARKADAS_MIN_HARF
+  const isimBekliyor = !isimKisa && yazilanIsim !== isimSorgusu
 
   const arkadas = useBirikenListe(
     arkadasKipi && isimYeterli,
@@ -275,6 +312,12 @@ export default function Kesfet() {
     [isimSorgusu],
     (k) => k.userId,
   )
+  // Ekrandaki sonuç YAZILAN sorguya mı ait? (bkz. useBirikenListe → sonucAnahtari)
+  const sonucGuncel = arkadas.sonucAnahtari === JSON.stringify([isimSorgusu])
+  /* Arama gerçekten bitti mi: sayı, boş durum ve duyuru AYNI koşula bakıyor — ayrı koşullar
+     bir karede "1 kişi", bir karede "Kimseyi bulamadık" gösteriyordu. */
+  const aramaBitti =
+    arkadasKipi && !isimKisa && !isimBekliyor && sonucGuncel && !arkadas.ilkYukleme && !arkadas.error
 
   // Engellediklerim yalnızca bu sekmede yükleniyor (web kararı): her Keşfet açılışında bir
   // istek daha atmanın karşılığı yok, liste yalnızca burada görünüyor.
@@ -283,6 +326,9 @@ export default function Kesfet() {
     [arkadasKipi],
   )
   const engelSayisi = engellilerim.data?.length ?? 0
+
+  // Kişi gösteren iki sekmede kartlar ilişkiyi biliyor (bkz. lib/iliski.js).
+  const iliskiler = useIliskiler(universiteKipi || arkadasKipi)
 
   /*
     ENGEL BAŞKA EKRANDA DEĞİŞTİYSE ODAKTA TAZELE. Kartın profili kök yığında Keşfet'in
@@ -306,6 +352,8 @@ export default function Kesfet() {
     engellilerim.reload({ silent: true })
     arkadas.yenile()
     uni.yenile()
+    // Engel bekleyen istekleri kapatıyor: kartlardaki ilişki de değişti.
+    iliskiler.yenile()
   }
   useFocusEffect(
     useCallback(() => {
@@ -341,7 +389,7 @@ export default function Kesfet() {
             accessibilityRole="tab"
             accessibilityState={{ selected: sekme === item.key }}
             onPress={() => setSekme(item.key)}
-            className={`min-h-[44px] flex-1 items-center justify-center rounded-lg px-2 ${
+            className={`min-h-[44px] flex-1 items-center justify-center rounded-lg px-2 py-1.5 ${
               sekme === item.key ? 'bg-white' : ''
             }`}
           >
@@ -378,21 +426,30 @@ export default function Kesfet() {
            (web kararı): engelleme bu sekmenin ikizi — kapsam "herkes aranabilir" diye
            açıldığında bedeli olarak geldi. Başka bir yere konsaydı engelini geri almak
            isteyen kullanıcı onu aramak zorunda kalırdı. */
-        <View className="flex-row gap-2">
-          <View className="flex-1">
-            <Girdi
-              value={arkadasIsim}
-              onChangeText={setArkadasIsim}
-              placeholder="Adını yaz…"
-              accessibilityLabel="İsimle ara"
-              autoCorrect={false}
-              autoComplete="off"
-              returnKeyType="search"
-            />
+        /* KUTU TAM GENİŞLİK, Engellediklerim ALTTA. Eskiden ikisi yan yanaydı ve ikincil
+           düğme (150 dp) aramanın kendisinden (130 dp) genişti; 320 dp'de ve (12) gibi bir
+           sayıda kutu 122 dp'ye iniyor, yazılan adın yalnızca son sözcüğü görünüyordu.
+           Düğme sonuç sayısıyla aynı satırı paylaşıyor: yeni bir satır açılmıyor. */
+        <View className="gap-1">
+          <Girdi
+            value={arkadasIsim}
+            onChangeText={setArkadasIsim}
+            placeholder="Ad soyad ara…"
+            accessibilityLabel="İsimle ara"
+            autoCorrect={false}
+            autoComplete="off"
+            returnKeyType="search"
+          />
+          <View className="flex-row items-center justify-between gap-2">
+            {/* shrink-0: büyük yazıda sayı "1 ki/şi" diye bölünüyordu; daralan taraf düğme. */}
+            <Text className="shrink-0 text-sm font-semibold text-slate-800">
+              {aramaBitti && liste.items.length > 0 ? `${liste.totalCount} kişi` : ''}
+            </Text>
+            {/* İkincil: YKS sekmesindeki "Filtre" ile aynı yüzey. ghost iken düz metin gibi okunuyordu. */}
+            <Button variant="secondary" onPress={() => setEngelListesiAcik(true)}>
+              Engellediklerim{engelSayisi > 0 ? ` (${engelSayisi})` : ''}
+            </Button>
           </View>
-          <Button variant="secondary" onPress={() => setEngelListesiAcik(true)}>
-            Engellediklerim{engelSayisi > 0 ? ` (${engelSayisi})` : ''}
-          </Button>
         </View>
       ) : universiteKipi ? (
         <View className="gap-2">
@@ -435,26 +492,57 @@ export default function Kesfet() {
       {universiteKipi && !liste.ilkYukleme && !liste.error && liste.items.length > 0 && (
         <Text className="text-sm font-semibold text-slate-800">{liste.totalCount} öğrenci</Text>
       )}
-      {arkadasKipi && isimYeterli && !liste.ilkYukleme && !liste.error && liste.items.length > 0 && (
-        <Text className="text-sm font-semibold text-slate-800">{liste.totalCount} kişi</Text>
-      )}
+      {/* Arkadaş Ekle'nin sonuç sayısı arama kutusunun altındaki satırda (yukarıda). */}
     </View>
   )
 
   /* Arkadaş Ekle'de ÜÇ AYRI boş durum (web kararı): davet (hiç yazılmamış ya da kısa),
      aranıyor, sonuç yok. Tek bir "bulunamadı", henüz aramamış kullanıcıya "aradık, yok"
      derdi — bu yüzden "adını yaz" dalı yükleniyor dalından ÖNCE. */
-  const bosDurum = arkadasKipi && !isimYeterli ? (
+  /*
+    ARAMA SONUCU DUYURUSU — iki platformda da açık duyuru, sorgu başına BİR kez. İsim yazan
+    ekran okuyucu kullanıcısı aramanın bitip bitmediğini duymuyordu. İlk sürümde Android için
+    görünen sayıya canlı bölge konmuştu: sıfır sonuçta metin boş kaldığı için "Kimseyi
+    bulamadık" hiç okunmuyordu. Koşul `aramaBitti` (sonucGuncel dahil): eski sorgunun sonucu
+    taşınan ara karede duyuru yapılıp sorgu "duyuruldu" diye kilitleniyordu.
+  */
+  const duyurulanSorgu = useRef(null)
+  useEffect(() => {
+    if (!aramaBitti || duyurulanSorgu.current === isimSorgusu) return
+    duyurulanSorgu.current = isimSorgusu
+    AccessibilityInfo.announceForAccessibility(
+      liste.totalCount > 0 ? `${liste.totalCount} kişi bulundu` : 'Kimseyi bulamadık',
+    )
+  }, [aramaBitti, isimSorgusu, liste.totalCount])
+
+  const bosDurum = arkadasKipi && isimKisa ? (
+    /* Kapsam ("ilanı olmayanlar da çıkar") üstteki açıklamada zaten yazıyor; kutu yalnızca
+       kuralı söylüyor — eskiden aynı cümle aynı anda iki kez okunuyordu. */
     <EmptyState
       title="Aradığın kişinin adını yaz"
-      description={`Adının en az ${ARKADAS_MIN_HARF} harfini yazdığında sonuçlar burada çıkar. Ders ilanı olmayan, profilini doldurmamış kişiler de bulunur.`}
+      description={`En az ${ARKADAS_MIN_HARF} harf yazınca sonuçlar burada çıkar.`}
     />
+  ) : arkadasKipi && (isimBekliyor || (!sonucGuncel && !liste.error)) ? (
+    <Loading label="Aranıyor…" />
   ) : liste.ilkYukleme ? (
     <Loading label="Aranıyor…" />
   ) : liste.error ? null : arkadasKipi ? (
+    /* Engellediğin kişi aramada ÇIKMIYOR. Onu arayan kullanıcıya yalnızca "kayıtlı
+       olmayabilir" demek yanlış yere baktırırdı — özellikle profilden engelleyip dönünce. */
     <EmptyState
       title="Kimseyi bulamadık"
-      description="Adı platformda yazdığı şekliyle dene. Kişi henüz kayıtlı olmayabilir."
+      description={
+        engelSayisi > 0
+          ? 'Adı platformda yazdığı şekliyle dene. Engellediğin kişiler aramada çıkmaz.'
+          : 'Adı platformda yazdığı şekliyle dene. Kişi henüz kayıtlı olmayabilir.'
+      }
+      action={
+        engelSayisi > 0 ? (
+          <Button variant="secondary" onPress={() => setEngelListesiAcik(true)}>
+            Engellediklerime bak
+          </Button>
+        ) : null
+      }
     />
   ) : universiteKipi ? (
     <EmptyState
@@ -483,7 +571,7 @@ export default function Kesfet() {
       <EkranBasligi baslik="Keşfet" />
 
       <FlatList
-        data={liste.items}
+        data={arkadasKipi && (isimKisa || isimBekliyor || !sonucGuncel) ? [] : liste.items}
         keyExtractor={(item) => (yksKipi ? item.offerId : item.userId)}
         renderItem={({ item }) =>
           yksKipi ? (
@@ -493,6 +581,8 @@ export default function Kesfet() {
                (web kararı). Yalnızca istek metni değişiyor. */
             <UniversiteKarti
               kisi={item}
+              iliski={iliskiler.iliski(item.userId)}
+              iliskiYukleniyor={iliskiler.yukleniyor}
               onSohbet={setSohbetHedefi}
               onEngelle={setEngelHedefi}
               istekMetni={arkadasKipi ? 'Arkadaş isteği gönder' : 'Sohbet isteği gönder'}
@@ -506,7 +596,9 @@ export default function Kesfet() {
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={baslikBolumu}
         ListEmptyComponent={bosDurum}
-        onEndReached={liste.dahaGetir}
+        /* Liste gizliyken (yazılan sorguya yetişilmedi) bağlanmıyor: boş veride
+           VirtualizedList onEndReached'i tetikliyor ve ESKİ sorgunun sonraki sayfası isteniyordu. */
+        onEndReached={arkadasKipi && (isimKisa || isimBekliyor || !sonucGuncel) ? undefined : liste.dahaGetir}
         onEndReachedThreshold={0.4}
         ListFooterComponent={
           liste.ekYukleme ? (
@@ -541,12 +633,17 @@ export default function Kesfet() {
         kisi={sohbetHedefi}
         arkadaslik={arkadasKipi}
         onClose={() => setSohbetHedefi(null)}
-        onSent={(name) => {
+        // Red çoğu zaman ilişkinin karttakinden farklı olduğunu söylüyor (409): kart düzelsin.
+        onHata={() => iliskiler.yenile()}
+        onSent={(kisi) => {
           setSohbetHedefi(null)
+          // Kart hemen "İstek gönderildi"ye dönüyor: bildirim kaydırılmış listede ekran
+          // dışında kalabiliyor, geri bildirimin asıl yeri dokunulan kart.
+          iliskiler.istekGonderildi(kisi.userId)
           setNotice(
             arkadasKipi
-              ? `${name} kişisine arkadaş isteği gönderildi. Kabul edilince sohbet açılacak.`
-              : `${name} kişisine sohbet isteği gönderildi. Kabul edilince sohbet açılacak.`,
+              ? `${kisi.displayName} kişisine arkadaş isteği gönderildi. Kabul edilince sohbet açılacak.`
+              : `${kisi.displayName} kişisine sohbet isteği gönderildi. Kabul edilince sohbet açılacak.`,
           )
         }}
       />
@@ -556,7 +653,14 @@ export default function Kesfet() {
         onClose={() => setEngelHedefi(null)}
         onEngellendi={(name) => {
           setEngelHedefi(null)
-          setNotice(`${name} engellendi. Artık birbirinize istek gönderemezsiniz.`)
+          /* Engellediklerim YALNIZCA Arkadaş Ekle sekmesinde. Üniversite sekmesinden engelleyen
+             kullanıcı kişinin listeden düştüğünü görüyor ama geri almanın yerini hiçbir yerde
+             okumuyordu. */
+          setNotice(
+            universiteKipi
+              ? `${name} engellendi. Geri almak için: Arkadaş Ekle › Engellediklerim.`
+              : `${name} engellendi. Artık birbirinize istek gönderemezsiniz.`,
+          )
           /* Engellenen kişi sonuçlardan düşmeli (sunucu artık döndürmüyor) ve engel
              listesine girmeli; yalnızca listeyi tazelemek kartı ekranda bırakırdı.
              yenile() pasif listede hiçbir şey yapmıyor — yalnızca açık sekme kurulur.
@@ -681,26 +785,59 @@ function IlanSonucKarti({ offer, onIstek }) {
   ilan değil, kişinin okuduğu yer. BÖLÜM VURGULU (marka pill), üniversite düz satır.
   1–10 genel seviye rozeti burada da var: seviye kişiye ait, konuya değil.
 */
-function UniversiteKarti({ kisi, onSohbet, onEngelle, istekMetni = 'Sohbet isteği gönder' }) {
+function UniversiteKarti({
+  kisi,
+  iliski = null,
+  iliskiYukleniyor = false,
+  onSohbet,
+  onEngelle,
+  istekMetni = 'Sohbet isteği gönder',
+}) {
   const router = useRouter()
+
+  /*
+    BAĞLANTI ETİKETİ GÖRÜNEN BİLGİDEN KURULUYOR. RN'de accessibilityLabel çocuk metinlerin
+    YERİNE okunuyor; eskiden yalnızca "X profilini aç" deniyordu ve aynı adı taşıyan iki kişiyi
+    ayırt eden üniversite ya da katılma tarihi (aşağıdaki yorum) ekran okuyucuya hiç gitmiyordu.
+    Avatar ve rozetler kendi `accessible` bayraklarıyla Android'de ayrı durak oluyordu: gizli.
+  */
+  const kimlikEtiketi = [
+    kisi.displayName,
+    seviyeEtiketi(seviyeHesapla({ level: kisi.level })),
+    kisi.isStaff ? 'yönetim hesabı' : null,
+    iliski?.durum === ILISKI.arkadas ? 'arkadaşın' : null,
+    kisi.university ?? (kisi.createdAtUtc ? `${formatDate(kisi.createdAtUtc)} tarihinde katıldı` : null),
+    kisi.ratingCount > 0
+      ? `${Number(kisi.averageRating).toFixed(1)} puan, ${kisi.ratingCount} değerlendirme`
+      : 'henüz değerlendirilmemiş',
+  ]
+    .filter(Boolean)
+    .join(', ')
+  // Birincil düğmeler de kişiyi söylüyor (Engelle'deki kural); etiket görünen metinle başlıyor.
+  const adli = (metin) => `${metin}, ${kisi.displayName}`
 
   return (
     <Card>
       <Pressable
         accessibilityRole="link"
-        accessibilityLabel={`${kisi.displayName} profilini aç`}
+        accessibilityLabel={`${kimlikEtiketi}. Profilini aç`}
         onPress={() => router.push(`/profil/${kisi.userId}`)}
         className="flex-row items-start gap-4"
       >
-        <Avatar userId={kisi.userId} name={kisi.displayName} size="lg" className="border-2 border-white" />
+        <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+          <Avatar userId={kisi.userId} name={kisi.displayName} size="lg" className="border-2 border-white" />
+        </View>
 
         <View className="min-w-0 flex-1">
           <View className="flex-row flex-wrap items-center gap-x-2 gap-y-1">
             <Text className="shrink text-base font-semibold text-brand-700" numberOfLines={2}>
               {kisi.displayName}
             </Text>
-            {kisi.isStaff && <YonetimRozeti kucuk />}
-            <SeviyeRozeti kaynak={{ level: kisi.level }} boyut="sm" ton="acik" />
+            <View className="flex-row flex-wrap items-center gap-x-2 gap-y-1" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+              {kisi.isStaff && <YonetimRozeti kucuk />}
+              <SeviyeRozeti kaynak={{ level: kisi.level }} boyut="sm" ton="acik" />
+              {iliski?.durum === ILISKI.arkadas && <Badge tone="success">Arkadaşın</Badge>}
+            </View>
           </View>
 
           {/* ÜNİVERSİTESİ YOKSA KATILMA TARİHİ. Üniversite sekmesinde bu dal hiç çalışmaz
@@ -718,12 +855,13 @@ function UniversiteKarti({ kisi, onSohbet, onEngelle, istekMetni = 'Sohbet iste�
           ) : null}
 
           {kisi.ratingCount > 0 ? (
-            <View className="mt-1.5 flex-row items-center gap-1.5">
+            /* flex-wrap + shrink: büyük yazıda "(N değerlendirme)" kart kenarını ve ekranı aşıyordu. */
+            <View className="mt-1.5 flex-row flex-wrap items-center gap-x-1.5">
               <YildizIkonu renk={amber[500]} boy={14} />
               <Text className="text-xs font-semibold text-slate-700">
                 {Number(kisi.averageRating).toFixed(1)}
               </Text>
-              <Text className="text-xs text-slate-600">({kisi.ratingCount} değerlendirme)</Text>
+              <Text className="shrink text-xs text-slate-600">({kisi.ratingCount} değerlendirme)</Text>
             </View>
           ) : (
             /* Üniversite kartında puan tek sinyal — yokluğu da bilgi (web kararı). */
@@ -747,10 +885,51 @@ function UniversiteKarti({ kisi, onSohbet, onEngelle, istekMetni = 'Sohbet iste�
           iki düğme listeyi oylamaya çevirirdi. Yine de kartın ÜZERİNDE, menüye saklanmadı:
           rahatsız eden biriyle karşılaşan kullanıcı onu ararken vazgeçmemeli (web kararı).
           Etikette ad var: TalkBack kart başına aynı "Engelle"yi okumasın. */}
-      <View className="mt-4 flex-row gap-2">
-        <Button className="flex-1" onPress={() => onSohbet(kisi)}>
-          {istekMetni}
-        </Button>
+      {/* İLİŞKİYE GÖRE BİRİNCİL EYLEM (bkz. lib/iliski.js). Eskiden her kartta aynı istek
+          düğmesi vardı: arkadaşa ve sana istek atmış kişiye gereksiz bir bekleyen istek
+          gidiyor, aynı yöne ikinci denemede sunucunun 409'u okunuyordu. İlişki bilgisi
+          gelene kadar düğme PASİF — "ilişki yok" varsayılıp basılabilir olmasın. İlişki
+          listesi hata verirse eski davranışa düşülüyor (istek düğmesi): aynı yöndeki
+          yinelemeyi sunucu zaten reddediyor ve bütün listeyi bir yan isteğe kilitlemek
+          orantısız olurdu. */}
+      {/* flex-wrap + birincil min %55: büyük yazıda Engelle genişleyip birincil düğmeyi daraltıyor,
+          birincil etiket harf ortasından bölünüyordu. O ölçekte Engelle alt satıra iniyor;
+          varsayılan boyutta satır tek sıra kalıyor (135 + 8 + 80 ≤ 246, 320 dp). */}
+      <View className="mt-4 flex-row flex-wrap gap-2">
+        {iliski?.durum === ILISKI.arkadas ? (
+          /* Kartta İKİNCİL, profilde birincil — bilinçli: keşif listesinin işi yeni biriyle
+             tanıştırmak, zaten arkadaş olunan kişi listede öne çıkmamalı. Profilde ise o kişiye
+             bakan kullanıcının en olası niyeti yazışmak. */
+          iliski.conversationId ? (
+            <Button
+              variant="secondary"
+              className="min-w-[55%] flex-1"
+              accessibilityLabel={adli('Mesaj gönder')}
+              onPress={() => router.push(`/sohbet/${iliski.conversationId}`)}
+            >
+              Mesaj gönder
+            </Button>
+          ) : (
+            <View className="min-w-[55%] flex-1" />
+          )
+        ) : iliski?.durum === ILISKI.gelen ? (
+          <Button className="min-w-[55%] flex-1" accessibilityLabel={adli('İsteğini yanıtla')} onPress={() => router.push('/eslesmeler')}>
+            İsteğini yanıtla
+          </Button>
+        ) : iliski?.durum === ILISKI.giden ? (
+          <Button variant="secondary" className="min-w-[55%] flex-1" accessibilityLabel={adli('İstek gönderildi')} disabled>
+            İstek gönderildi
+          </Button>
+        ) : (
+          <Button
+            className="min-w-[55%] flex-1"
+            accessibilityLabel={adli(istekMetni)}
+            disabled={iliskiYukleniyor}
+            onPress={() => onSohbet(kisi)}
+          >
+            {istekMetni}
+          </Button>
+        )}
         {onEngelle && (
           <Button
             variant="secondary"
@@ -775,7 +954,7 @@ function UniversiteKarti({ kisi, onSohbet, onEngelle, istekMetni = 'Sohbet iste�
   engel kontrolü ikinci kez yazılırdı. Fark kullanıcının niyeti: "aynı okuldan biriyle
   tanışayım" ile "şu arkadaşımı ekleyeyim".
 */
-function SohbetIstegiModali({ kisi, arkadaslik = false, onClose, onSent }) {
+function SohbetIstegiModali({ kisi, arkadaslik = false, onClose, onSent, onHata }) {
   const [hata, setHata] = useState(null)
   const [busy, setBusy] = useState(false)
   const [sonKisi, setSonKisi] = useState(null)
@@ -797,9 +976,10 @@ function SohbetIstegiModali({ kisi, arkadaslik = false, onClose, onSent }) {
         requestedTopicId: null,
         offeredTopicId: null,
       })
-      onSent(kisi.displayName)
+      onSent(kisi)
     } catch (err) {
       setHata(err)
+      onHata?.(err)
     } finally {
       setBusy(false)
     }
@@ -853,14 +1033,39 @@ function SohbetIstegiModali({ kisi, arkadaslik = false, onClose, onSent }) {
   istenmemeli — engellemeyi misillemeye çevirirdi. Kaldır ONAY SORMUYOR, engelleme soruyor:
   asimetri bilinçli (bkz. EngellemeModali). Sayfalama yok; liste doğal olarak kısa
   (web DEVAM-EDILECEK'te kabul edilmiş sınır).
+
+  ⚠️ KALDIRILAN SATIR YERİNDE KALIYOR, alt sayfa kapanana kadar. İki denemeden sonra
+  varılan karar, ikisi de ölçüldü:
+    1. Eskiden satır liste tazelenene kadar (~250-550 ms) duruyor, düğmeler yeniden
+       etkinleşiyordu; tazeleme gelince satırlar kayıyordu.
+    2. Satırı başarı anında düşürmek pencereyi kapatmadı, ÖNE aldı: satır düştüğü karede
+       düğmeler de etkinleşiyor, alt sayfa alta yaslı olduğu için komşu satırın "Engeli
+       kaldır"ı parmağın altına geliyordu (elementFromPoint başka kişinin düğmesini döndürdü).
+  İkinci dokunuş BAŞKA BİRİNİN engelini kaldırıyor ve sunucu kaydı sildiği için not ve tarih
+  geri gelmiyor. Onay sormamanın bedeli ancak HİÇBİR SATIR KAYMIYORSA kabul edilebilir:
+  kaldırılan kişi aynı yükseklikte, düğmesiz "Kaldırıldı" satırına dönüşüyor ve sıra alt
+  sayfa açık kaldıkça sabit. Yeniden açılışta liste sunucudan temiz kuruluyor.
 */
 function EngellilerModali({ open, onClose, liste, onKaldir }) {
+  /* Büyük yazıda (>= 1.5) düğme adın ALTINA iniyor: sabit 150 px düğme ad sütununu daraltıp
+     iki satırlık adı da kesiyordu. Sabit genişlik korunuyor (yükleme ve "Kaldırıldı" dönüşünde
+     satır yüksekliği değişmesin), yalnızca yerleşim sütuna dönüyor. */
+  const { fontScale } = useWindowDimensions()
+  const sutun = fontScale >= 1.5
   const [calisan, setCalisan] = useState(null)
   const [hata, setHata] = useState(null)
+  // userId → kaldırılmadan önceki kayıt (satırı aynı içerikle çizmek için).
+  const [kaldirilanlar, setKaldirilanlar] = useState(() => new Map())
+  // Açık kaldığı sürece görülen SIRA: sunucu listesi değişse de satırların yeri değişmesin.
+  const sira = useRef([])
 
-  // Kapatılıp yeniden açılınca önceki kaldırma hatası taşınmasın.
+  // Her açılış temiz: önceki hata, "Kaldırıldı" satırları ve sabit sıra taşınmasın.
   useEffect(() => {
-    if (open) setHata(null)
+    if (open) {
+      setHata(null)
+      setKaldirilanlar(new Map())
+      sira.current = []
+    }
   }, [open])
 
   async function kaldir(kisi) {
@@ -869,6 +1074,7 @@ function EngellilerModali({ open, onClose, liste, onKaldir }) {
     setHata(null)
     try {
       await onKaldir(kisi)
+      setKaldirilanlar((m) => new Map(m).set(kisi.userId, kisi))
     } catch (err) {
       setHata(err)
     } finally {
@@ -876,14 +1082,23 @@ function EngellilerModali({ open, onClose, liste, onKaldir }) {
     }
   }
 
-  const kayitlar = liste.data ?? []
+  const sunucudakiler = new Map((liste.data ?? []).map((k) => [k.userId, k]))
+  for (const id of sunucudakiler.keys()) {
+    if (!sira.current.includes(id)) sira.current.push(id)
+  }
+  /* Sunucuda olmayan ve burada kaldırılmamış kayıt (başka ekrandan kaldırılmış) düşüyor:
+     o kişi için bu sayfada bir eylem yapılmadı, yer tutmak yanıltıcı olurdu. */
+  const kayitlar = sira.current
+    .map((id) => sunucudakiler.get(id) ?? kaldirilanlar.get(id))
+    .filter(Boolean)
 
   return (
     <Modal
       open={open}
       onClose={onClose}
       title="Engellediklerim"
-      footer={<Button onPress={onClose}>Kapat</Button>}
+      /* Footer yok: mavi "Kapat" başlıktaki ✕ ile birebir aynı işi yapıyordu ve birincil
+         rengi kapatmaya harcıyordu (uygulamada bunu yapan tek alt sayfaydı). */
     >
       <View className="gap-3 pb-2">
         <Text className="text-xs text-slate-500">
@@ -902,40 +1117,69 @@ function EngellilerModali({ open, onClose, liste, onKaldir }) {
           }}
         />
 
-        {liste.loading ? (
+        {liste.loading && !liste.data ? (
           <Loading label="Yükleniyor…" />
-        ) : kayitlar.length === 0 ? (
-          <Text className="text-sm text-slate-500">Kimseyi engellemedin.</Text>
+        ) : liste.error && !liste.data ? null : kayitlar.length === 0 ? (
+          /* Liste YÜKLENEMEDİYSE boş durum çizilmiyor: hata kutusunun yanında "kimse yok"
+             doğrulanmamış bir bilgi olurdu. */
+          <EmptyState
+            title="Engellediğin kimse yok"
+            description="Birini engellemek için arama kartındaki ya da profilindeki Engelle'yi kullan."
+          />
         ) : (
           <View>
-            {kayitlar.map((kisi, i) => (
-              <View
-                key={kisi.userId}
-                className={`flex-row items-center gap-2 py-2 ${i > 0 ? 'border-t border-slate-200' : ''}`}
-              >
-                <View className="min-w-0 flex-1">
-                  <Text numberOfLines={1} className="text-sm font-medium text-slate-800">
-                    {kisi.displayName}
-                  </Text>
-                  <Text className="text-xs text-slate-500">{formatDate(kisi.blockedAtUtc)}</Text>
-                  {/* Not YALNIZCA engelleyene görünüyor — karşı taraf ne engellendiğini ne de
-                      not yazıldığını görüyor. */}
-                  {kisi.note ? (
-                    <Text className="mt-0.5 text-xs italic text-slate-500">{kisi.note}</Text>
-                  ) : null}
-                </View>
-                {/* Bir satır çalışırken diğer satırların düğmeleri pasif (web kararı). */}
-                <Button
-                  variant="ghost"
-                  loading={calisan === kisi.userId}
-                  disabled={calisan !== null}
-                  accessibilityLabel={`${kisi.displayName} için engeli kaldır`}
-                  onPress={() => kaldir(kisi)}
+            {kayitlar.map((kisi, i) => {
+              const kaldirildi = kaldirilanlar.has(kisi.userId)
+              return (
+                <View
+                  key={kisi.userId}
+                  className={`${sutun ? 'items-start gap-2' : 'flex-row items-center gap-2'} py-2 ${i > 0 ? 'border-t border-slate-200' : ''}`}
                 >
-                  Kaldır
-                </Button>
-              </View>
-            ))}
+                  <View className={sutun ? 'self-stretch' : 'min-w-0 flex-1'}>
+                    {/* İki satıra kadar: sabit 150 px düğme ad sütununu 320 dp'de 122 px'e indiriyor ve
+                        onaysız "Engeli kaldır" listesinde kimliği taşıyan tek şey olan ad kesiliyordu. */}
+                    <Text
+                      numberOfLines={2}
+                      className={`text-sm font-medium ${kaldirildi ? 'text-slate-400' : 'text-slate-800'}`}
+                    >
+                      {kisi.displayName}
+                    </Text>
+                    <Text className="text-xs text-slate-500">
+                      {formatDate(kisi.blockedAtUtc)} tarihinde engellendi
+                    </Text>
+                    {/* Not YALNIZCA engelleyene görünüyor — karşı taraf ne engellendiğini ne de
+                        not yazıldığını görüyor. */}
+                    {kisi.note ? (
+                      <Text className="mt-0.5 text-xs italic text-slate-500">{kisi.note}</Text>
+                    ) : null}
+                  </View>
+                  {/* İkincil ve GERÇEKTEN SABİT GENİŞLİK (w, min-w değil): yükleme göstergesi
+                      metnin yanına 28 dp ekliyor; min-w ile düğme 124'ten 140'a genişliyor ve
+                      satırdaki not yeniden kırılıyordu. "Kaldırıldı" kutusu da aynı ölçüde. */}
+                  {kaldirildi ? (
+                    <View
+                      accessible
+                      accessibilityLabel={`${kisi.displayName} için engel kaldırıldı`}
+                      className="min-h-[44px] w-[150px] items-center justify-center"
+                    >
+                      <Text className="text-sm font-medium text-emerald-700">Kaldırıldı</Text>
+                    </View>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      className="w-[150px]"
+                      loading={calisan === kisi.userId}
+                      /* Bir satır çalışırken diğer satırların düğmeleri pasif (web kararı). */
+                      disabled={calisan !== null}
+                      accessibilityLabel={`${kisi.displayName} için engeli kaldır`}
+                      onPress={() => kaldir(kisi)}
+                    >
+                      Engeli kaldır
+                    </Button>
+                  )}
+                </View>
+              )
+            })}
           </View>
         )}
       </View>

@@ -50,7 +50,7 @@ import { Badge, Button, Card, EmptyState, ErrorBox, Loading } from './ui'
   başında (ArkadaslarBolumu.jsx).
 */
 
-export function ProfilGorunumu({ userId, kendiProfilim = false, onYuklendi }) {
+export function ProfilGorunumu({ userId, kendiProfilim = false, onYuklendi, onHata }) {
   const profile = useAsync(() => api.userProfile(userId), [userId])
   const [reviewPage, setReviewPage] = useState(1)
   const reviews = useAsync(() => api.userReviews(userId, reviewPage), [userId, reviewPage])
@@ -65,6 +65,14 @@ export function ProfilGorunumu({ userId, kendiProfilim = false, onYuklendi }) {
   useEffect(() => {
     if (profile.data && onYuklendi) onYuklendi(profile.data)
   }, [profile.data, onYuklendi])
+
+  /* Hata da bildiriliyor: çağıran profil gelene kadar eylem satırı için yer tutucu
+     çiziyor ve profil hiç gelmeyecekse onu kaldırabilmeli. Hata TEMİZLENİNCE de (null)
+     bildiriliyor: "Tekrar dene" yüklemeyi başlatınca yer tutucu geri gelmeli, yoksa profil
+     gelince kart yine zıplardı. Aynı KARARLI geri çağrı kuralı. */
+  useEffect(() => {
+    if (onHata) onHata(profile.error ?? null)
+  }, [profile.error, onHata])
 
   if (profile.loading) return <Loading />
   if (profile.error) return <ErrorBox error={profile.error} onRetry={profile.reload} />
@@ -160,7 +168,12 @@ function ProfilBasligi({ profile }) {
         rozetin varlığı adın okunmasından daha önemli değil.
       */}
       <View className="mt-4 flex-row flex-wrap items-center justify-center gap-x-3 gap-y-2">
-        <Text className="text-center text-3xl font-bold leading-tight tracking-tight text-slate-900">
+        {/* Başlık rolü: ekran okuyucu kullanıcısı başlıklar arasında gezinerek kişinin adına
+            atlayabilsin (eylem bloğu adın ÜSTÜNDE duruyor). */}
+        <Text
+          accessibilityRole="header"
+          className="text-center text-3xl font-bold leading-tight tracking-tight text-slate-900"
+        >
           {profile.displayName}
         </Text>
         {profile.isStaff && <YonetimRozeti />}
@@ -357,25 +370,44 @@ function Degerlendirmeler({ reviews, page, onPage }) {
 
 /**
  * Beş yıldızlık satır — kesirli değerde son yıldız KISMİ dolar (web'deki çift katman
- * tekniğinin RN hâli: altta gri beş yıldız, üstte genişliği % ile kırpılan amber kopya).
+ * tekniğinin RN hâli: altta gri beş yıldız, üstte kırpılan amber kopya).
  * Yuvarlama bilinçli olarak YOK: 4.5 ile 4.9 aynı görünmesin.
+ *
+ * ⚠️ AMBER KOPYA SABİT GENİŞLİKTE ÇİZİLİYOR, kırpan kutu ondan dar. Eskiden kopya, kırpan
+ * kutunun (%92 genişlik) İÇİNE yerleşiyordu: RN metni kabının genişliğine SIĞDIRIR, yani
+ * beş yıldız kırpılmak yerine daraltılan satıra sığdırılmaya çalışıldı ve
+ * `numberOfLines={1}` sona "…" koydu. 4.6 puan ~3,5 dolu yıldız + üç nokta gibi
+ * görünüyordu, 3 puanlık yorumda da aynı iz vardı. Web'de CSS `white-space: nowrap`
+ * bu sorunu hiç doğurmuyor; RN'de karşılığı, gri satırın ölçülen genişliğini kopyaya
+ * açıkça vermek. +2 px pay: yuvarlanan ölçü yüzünden son yıldız bir alt satıra
+ * düşmesin (taşan pay kırpan kutunun dışında kalır, görünmez).
  */
 function Yildizlar({ deger, kucuk = false }) {
-  const oran = Math.max(0, Math.min(100, (Number(deger) / 5) * 100))
+  const oran = Math.max(0, Math.min(1, Number(deger) / 5))
   const boyut = kucuk ? 'text-xs' : 'text-base'
+  const [genislik, setGenislik] = useState(0)
 
   return (
     <View accessible accessibilityLabel={`5 üzerinden ${Number(deger).toFixed(1)}`} className="self-start">
-      <Text className={`${boyut} leading-none text-slate-300`}>★★★★★</Text>
-      <View
-        className="absolute bottom-0 left-0 top-0 overflow-hidden"
-        style={{ width: `${oran}%` }}
-        pointerEvents="none"
+      <Text
+        onLayout={(e) => setGenislik(e.nativeEvent.layout.width)}
+        className={`${boyut} leading-none text-slate-300`}
       >
-        <Text numberOfLines={1} className={`${boyut} leading-none text-amber-400`}>
-          ★★★★★
-        </Text>
-      </View>
+        ★★★★★
+      </Text>
+      {/* Ölçü gelmeden amber katman çizilmez: tahmini bir genişlikle bir kare yanlış
+          dolgu göstermektense bir kare boyunca yalnızca gri satır görünsün. */}
+      {genislik > 0 && (
+        <View
+          className="absolute bottom-0 left-0 top-0 overflow-hidden"
+          style={{ width: genislik * oran }}
+          pointerEvents="none"
+        >
+          <Text className={`${boyut} leading-none text-amber-400`} style={{ width: genislik + 2 }}>
+            ★★★★★
+          </Text>
+        </View>
+      )}
     </View>
   )
 }
@@ -388,11 +420,18 @@ function MetrikCubugu({ label, value }) {
 
   return (
     <View className="flex-row items-center gap-3">
-      <Text className="w-20 shrink-0 text-xs text-slate-600">{label}</Text>
+      {/* Genişlikler SABİT kalıyor (çubuk başlangıçları hizalı olsun diye); büyük yazıda metin
+          sabit kutuya sığmayınca "Zaman/lama" diye bölünüyordu — artık küçülerek sığıyor. */}
+      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} className="w-20 shrink-0 text-xs text-slate-600">
+        {label}
+      </Text>
       <View className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200">
         <View className="h-full rounded-full bg-brand-500" style={{ width: `${oran}%` }} />
       </View>
       <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.6}
         className="w-8 shrink-0 text-right text-xs font-semibold text-slate-700"
         style={{ fontVariant: ['tabular-nums'] }}
       >

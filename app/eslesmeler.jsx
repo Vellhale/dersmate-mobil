@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { api } from '../src/lib/api'
 import { useAsync } from '../src/state/useAsync'
@@ -42,7 +42,29 @@ export default function Eslesmeler() {
   const router = useRouter()
   const { reloadConversations } = useInbox()
   const matches = useAsync(() => api.myMatches(), [])
-  const [tab, setTab] = useState('incoming')
+
+  /*
+    ODAKTA SESSİZ TAZELEME (CLAUDE.md → "Başka ekranda değişen veri ODAKTA tazelenir").
+    Bu ekrandan açılan bir profil ekranda başka bir Arkadaşlar ekranına götürebiliyor ya da
+    orada istek gönderilip engel konabiliyor; dönüldüğünde liste eski kalıyor ve zaten
+    yanıtlanmış isteğe "Kabul et" basmak sunucudan 409 alıyordu. Kurulumla aynı anda gelen
+    odak atlanıyor (ArkadaslarBolumu kalıbı): ilk çekimi useAsync zaten yaptı.
+  */
+  const tazele = useRef(matches.reload)
+  tazele.current = matches.reload
+  const kuruluyor = useRef(true)
+  useFocusEffect(
+    useCallback(() => {
+      if (!kuruluyor.current) tazele.current({ silent: true })
+    }, []),
+  )
+  useEffect(() => {
+    kuruluyor.current = false
+  }, [])
+  /* Başlangıç sekmesi adresten gelebilir (Profilim → "Arkadaşlarım" → ?sekme=active).
+     Bilinmeyen değer Gelen'e düşer: bildirimden gelen kullanıcının niyeti istekler. */
+  const { sekme } = useLocalSearchParams()
+  const [tab, setTab] = useState(() => (TABS.some((t) => t.key === sekme) ? sekme : 'incoming'))
   const [notice, setNotice] = useState(null)
 
   const lists = matches.data ?? { incoming: [], outgoing: [], active: [] }
@@ -59,7 +81,9 @@ export default function Eslesmeler() {
         >
           <Text className="text-xl text-slate-500">←</Text>
         </Pressable>
-        <View>
+        {/* min-w-0 flex-1: satırda geri düğmesi var ve düz View daralmadığı için alt başlık
+            ekranın sağından taşıp kırpılıyordu (yonetim.jsx'teki başlıkla aynı kalıp). */}
+        <View className="min-w-0 flex-1">
           <Text className="text-lg font-bold text-slate-900">Arkadaşlar</Text>
           <Text className="text-xs text-slate-500">
             İstek kabul edilince sohbet açılır; ders de oradan planlanır.
@@ -161,10 +185,17 @@ function SekmeBosDurumu({ tab, router }) {
     )
   }
 
+  /* Eylem ŞART: Profilim'deki "Arkadaşlarım" artık doğrudan bu sekmeyi açıyor ve yeni kullanıcı
+     buraya eylemsiz bir boş durumla iniyordu (Arkadaşlar bölümündeki "Arkadaş bul"un aynısı). */
   return (
     <EmptyState
       title="Henüz arkadaşın yok"
-      description="Bir istek kabul edildiğinde burada görünür ve sohbet açılır."
+      description="Adını bildiğin birini bulup arkadaş isteği gönderebilirsin; kabul edilince burada görünür ve sohbet açılır."
+      action={
+        <Button variant="secondary" onPress={() => router.push('/kesfet?sekme=arkadas')}>
+          Arkadaş bul
+        </Button>
+      }
     />
   )
 }
@@ -248,10 +279,24 @@ function MatchKarti({ match, tab, router, onChanged }) {
       <View className="mt-4 flex-row flex-wrap gap-2">
         {tab === 'incoming' && (
           <>
-            <Button variant="success" className="flex-1" loading={busy === 'accept'} onPress={() => respond(true)}>
+            {/* Etiketlerde ad: kart başına aynı "Kabul et / Reddet" ekran okuyucuda kimin isteği
+                olduğunu söylemiyordu. Görünen metinle başlıyor (WCAG 2.5.3). */}
+            <Button
+              variant="success"
+              className="flex-1"
+              loading={busy === 'accept'}
+              accessibilityLabel={`Kabul et, ${match.otherDisplayName}`}
+              onPress={() => respond(true)}
+            >
               Kabul et
             </Button>
-            <Button variant="secondary" className="flex-1" loading={busy === 'decline'} onPress={() => respond(false)}>
+            <Button
+              variant="secondary"
+              className="flex-1"
+              loading={busy === 'decline'}
+              accessibilityLabel={`Reddet, ${match.otherDisplayName}`}
+              onPress={() => respond(false)}
+            >
               Reddet
             </Button>
           </>
@@ -262,16 +307,30 @@ function MatchKarti({ match, tab, router, onChanged }) {
         {tab === 'active' && (
           <>
             {match.conversationId && (
-              <Button className="flex-1" onPress={() => router.push(`/sohbet/${match.conversationId}`)}>
-                Sohbet
+              /* "Mesaj gönder": profil ve Keşfet kartındaki aynı eylemle tek ad. Web "Sohbet" diyor;
+                 ayrışma mobilde ilişkiyi bilen yüzeylerle doğdu ve kullanıcı ikisini art arda
+                 görüyordu (bu karttan profile geçince). */
+              <Button
+                className="min-w-[45%] flex-1"
+                accessibilityLabel={`Mesaj gönder, ${match.otherDisplayName}`}
+                onPress={() => router.push(`/sohbet/${match.conversationId}`)}
+              >
+                Mesaj gönder
               </Button>
             )}
+            {/* min-w-[45%]: flex-1'in tabanı 0 olduğu için satır hiç sarmıyordu; Sonlandır 94 px'ini
+                alıyor, iki birincil eylem kalan alana sıkışıp varsayılan boyutta harf ortasından
+                bölünüyordu ("Sohb/et"). Artık Sonlandır gerekirse alt satıra iniyor. */}
             {match.requestedTopicName && (
-              <Button variant="secondary" className="flex-1" onPress={() => router.push('/dersler')}>
+              <Button variant="secondary" className="min-w-[45%] flex-1" onPress={() => router.push('/dersler')}>
                 Ders rezerve et
               </Button>
             )}
-            <Button variant="secondary" onPress={() => setConfirmClose(true)}>
+            <Button
+              variant="secondary"
+              accessibilityLabel={`Sonlandır, ${match.otherDisplayName}`}
+              onPress={() => setConfirmClose(true)}
+            >
               Sonlandır
             </Button>
           </>

@@ -46,7 +46,9 @@ export default function Mesajlar() {
           <EmptyState
             title="Henüz sohbetin yok"
             description="Sohbet, bir arkadaş isteği kabul edildiğinde otomatik açılır."
-            action={<Button onPress={() => router.push('/')}>Arkadaş bul</Button>}
+            // Arkadaş Ekle sekmesi: Profilim ve Arkadaşlar'daki "Arkadaş bul" ile aynı hedef (web de
+            // /kesfet'e gidiyor). Akış'a gitmek aynı etiketle öneri listesine indiriyordu.
+            action={<Button onPress={() => router.push('/kesfet?sekme=arkadas')}>Arkadaş bul</Button>}
           />
         </View>
       ) : (
