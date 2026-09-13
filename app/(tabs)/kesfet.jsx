@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AccessibilityInfo, FlatList, Platform, Pressable, Text, View } from 'react-native'
+import { AccessibilityInfo, FlatList, Pressable, Text, View } from 'react-native'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { sekmeAltDolgusu } from '../../src/lib/sekmeCubugu'
@@ -8,6 +8,7 @@ import { engelDegisti, engelSurumu } from '../../src/lib/engelSurumu'
 import { ILISKI } from '../../src/lib/iliski'
 import { useIliskiler } from '../../src/state/useIliskiler'
 import { formatDate } from '../../src/lib/format'
+import { seviyeEtiketi, seviyeHesapla } from '../../src/lib/seviye'
 import { useAsync } from '../../src/state/useAsync'
 import { useDebounced } from '../../src/hooks/useDebounced'
 import { Avatar } from '../../src/components/Avatar'
@@ -86,12 +87,17 @@ function useBirikenListe(aktif, yukleyici, bagimliliklar, anahtar) {
   const [ilkYukleme, setIlkYukleme] = useState(false)
   const [ekYukleme, setEkYukleme] = useState(false)
   const [error, setError] = useState(null)
+  /* Ekrandaki sonucun HANGİ SORGUYA ait olduğu. Sorgu değiştiği ilk render'da liste henüz
+     sıfırlanmamış ve eski sorgunun sonucunu taşıyor; bu anahtar olmadan o kare "bitti"
+     sanılıyordu (iOS duyurusu sonuç varken "Kimseyi bulamadık" dedi, ölçüldü). */
+  const [sonucAnahtari, setSonucAnahtari] = useState(null)
   const seq = useRef(0)
   const kilit = useRef(false)
   const basarisizHedef = useRef(null)
 
   async function sayfaGetir(hedefSayfa) {
     const benimSeq = ++seq.current
+    const sorguAnahtari = JSON.stringify(bagimliliklar)
     kilit.current = true
     if (hedefSayfa === 1) setIlkYukleme(true)
     else setEkYukleme(true)
@@ -110,6 +116,7 @@ function useBirikenListe(aktif, yukleyici, bagimliliklar, anahtar) {
       setTotalCount(data.totalCount)
       setHasNextPage(Boolean(data.hasNextPage ?? data.page < data.totalPages))
       setPage(hedefSayfa)
+      if (hedefSayfa === 1) setSonucAnahtari(sorguAnahtari)
       basarisizHedef.current = null
     } catch (err) {
       if (seq.current === benimSeq) {
@@ -137,6 +144,7 @@ function useBirikenListe(aktif, yukleyici, bagimliliklar, anahtar) {
       setTotalCount(0)
       setHasNextPage(false)
       setPage(0)
+      setSonucAnahtari(null)
 
       /*
         YÜKLEME BAYRAKLARI DA SIFIRLANMALI.
@@ -175,6 +183,7 @@ function useBirikenListe(aktif, yukleyici, bagimliliklar, anahtar) {
     setTotalCount(0)
     setHasNextPage(false)
     setPage(0)
+    setSonucAnahtari(null)
     basarisizHedef.current = null
     sayfaGetir(1)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -183,6 +192,7 @@ function useBirikenListe(aktif, yukleyici, bagimliliklar, anahtar) {
   return {
     items,
     totalCount,
+    sonucAnahtari,
     error,
     ilkYukleme,
     ekYukleme,
@@ -302,6 +312,12 @@ export default function Kesfet() {
     [isimSorgusu],
     (k) => k.userId,
   )
+  // Ekrandaki sonuç YAZILAN sorguya mı ait? (bkz. useBirikenListe → sonucAnahtari)
+  const sonucGuncel = arkadas.sonucAnahtari === JSON.stringify([isimSorgusu])
+  /* Arama gerçekten bitti mi: sayı, boş durum ve duyuru AYNI koşula bakıyor — ayrı koşullar
+     bir karede "1 kişi", bir karede "Kimseyi bulamadık" gösteriyordu. */
+  const aramaBitti =
+    arkadasKipi && !isimKisa && !isimBekliyor && sonucGuncel && !arkadas.ilkYukleme && !arkadas.error
 
   // Engellediklerim yalnızca bu sekmede yükleniyor (web kararı): her Keşfet açılışında bir
   // istek daha atmanın karşılığı yok, liste yalnızca burada görünüyor.
@@ -425,12 +441,8 @@ export default function Kesfet() {
             returnKeyType="search"
           />
           <View className="flex-row items-center justify-between gap-2">
-            {/* Canlı bölge (Android): odak arama kutusunda kalırken sonuç sayısı sessizce
-                değişiyordu. iOS karşılığı aşağıdaki duyuru efekti. */}
-            <Text accessibilityLiveRegion="polite" className="text-sm font-semibold text-slate-800">
-              {!isimKisa && !isimBekliyor && !liste.ilkYukleme && !liste.error && liste.items.length > 0
-                ? `${liste.totalCount} kişi`
-                : ''}
+            <Text className="text-sm font-semibold text-slate-800">
+              {aramaBitti && liste.items.length > 0 ? `${liste.totalCount} kişi` : ''}
             </Text>
             <Button variant="ghost" onPress={() => setEngelListesiAcik(true)}>
               Engellediklerim{engelSayisi > 0 ? ` (${engelSayisi})` : ''}
@@ -486,14 +498,15 @@ export default function Kesfet() {
      aranıyor, sonuç yok. Tek bir "bulunamadı", henüz aramamış kullanıcıya "aradık, yok"
      derdi — bu yüzden "adını yaz" dalı yükleniyor dalından ÖNCE. */
   /*
-    ARAMA SONUCU DUYURUSU (iOS; Android canlı bölgeyi kullanıyor). İsim yazan VoiceOver
-    kullanıcısı aramanın bitip bitmediğini ve kaç kişi bulunduğunu duymuyordu. Sorgu başına
-    BİR kez: aynı sonuç yeniden çizildiğinde tekrar okunmasın.
+    ARAMA SONUCU DUYURUSU — iki platformda da açık duyuru, sorgu başına BİR kez. İsim yazan
+    ekran okuyucu kullanıcısı aramanın bitip bitmediğini duymuyordu. İlk sürümde Android için
+    görünen sayıya canlı bölge konmuştu: sıfır sonuçta metin boş kaldığı için "Kimseyi
+    bulamadık" hiç okunmuyordu. Koşul `aramaBitti` (sonucGuncel dahil): eski sorgunun sonucu
+    taşınan ara karede duyuru yapılıp sorgu "duyuruldu" diye kilitleniyordu.
   */
   const duyurulanSorgu = useRef(null)
-  const aramaBitti = arkadasKipi && !isimKisa && !isimBekliyor && !liste.ilkYukleme && !liste.error
   useEffect(() => {
-    if (Platform.OS !== 'ios' || !aramaBitti || duyurulanSorgu.current === isimSorgusu) return
+    if (!aramaBitti || duyurulanSorgu.current === isimSorgusu) return
     duyurulanSorgu.current = isimSorgusu
     AccessibilityInfo.announceForAccessibility(
       liste.totalCount > 0 ? `${liste.totalCount} kişi bulundu` : 'Kimseyi bulamadık',
@@ -507,7 +520,7 @@ export default function Kesfet() {
       title="Aradığın kişinin adını yaz"
       description={`En az ${ARKADAS_MIN_HARF} harf yazınca sonuçlar burada çıkar.`}
     />
-  ) : arkadasKipi && isimBekliyor ? (
+  ) : arkadasKipi && (isimBekliyor || (!sonucGuncel && !liste.error)) ? (
     <Loading label="Aranıyor…" />
   ) : liste.ilkYukleme ? (
     <Loading label="Aranıyor…" />
@@ -556,7 +569,7 @@ export default function Kesfet() {
       <EkranBasligi baslik="Keşfet" />
 
       <FlatList
-        data={arkadasKipi && (isimKisa || isimBekliyor) ? [] : liste.items}
+        data={arkadasKipi && (isimKisa || isimBekliyor || !sonucGuncel) ? [] : liste.items}
         keyExtractor={(item) => (yksKipi ? item.offerId : item.userId)}
         renderItem={({ item }) =>
           yksKipi ? (
@@ -583,7 +596,7 @@ export default function Kesfet() {
         ListEmptyComponent={bosDurum}
         /* Liste gizliyken (yazılan sorguya yetişilmedi) bağlanmıyor: boş veride
            VirtualizedList onEndReached'i tetikliyor ve ESKİ sorgunun sonraki sayfası isteniyordu. */
-        onEndReached={arkadasKipi && (isimKisa || isimBekliyor) ? undefined : liste.dahaGetir}
+        onEndReached={arkadasKipi && (isimKisa || isimBekliyor || !sonucGuncel) ? undefined : liste.dahaGetir}
         onEndReachedThreshold={0.4}
         ListFooterComponent={
           liste.ekYukleme ? (
@@ -780,24 +793,49 @@ function UniversiteKarti({
 }) {
   const router = useRouter()
 
+  /*
+    BAĞLANTI ETİKETİ GÖRÜNEN BİLGİDEN KURULUYOR. RN'de accessibilityLabel çocuk metinlerin
+    YERİNE okunuyor; eskiden yalnızca "X profilini aç" deniyordu ve aynı adı taşıyan iki kişiyi
+    ayırt eden üniversite ya da katılma tarihi (aşağıdaki yorum) ekran okuyucuya hiç gitmiyordu.
+    Avatar ve rozetler kendi `accessible` bayraklarıyla Android'de ayrı durak oluyordu: gizli.
+  */
+  const kimlikEtiketi = [
+    kisi.displayName,
+    seviyeEtiketi(seviyeHesapla({ level: kisi.level })),
+    kisi.isStaff ? 'yönetim hesabı' : null,
+    iliski?.durum === ILISKI.arkadas ? 'arkadaşın' : null,
+    kisi.university ?? (kisi.createdAtUtc ? `${formatDate(kisi.createdAtUtc)} tarihinde katıldı` : null),
+    kisi.ratingCount > 0
+      ? `${Number(kisi.averageRating).toFixed(1)} puan, ${kisi.ratingCount} değerlendirme`
+      : 'henüz değerlendirilmemiş',
+  ]
+    .filter(Boolean)
+    .join(', ')
+  // Birincil düğmeler de kişiyi söylüyor (Engelle'deki kural); etiket görünen metinle başlıyor.
+  const adli = (metin) => `${metin}, ${kisi.displayName}`
+
   return (
     <Card>
       <Pressable
         accessibilityRole="link"
-        accessibilityLabel={`${kisi.displayName} profilini aç`}
+        accessibilityLabel={`${kimlikEtiketi}. Profilini aç`}
         onPress={() => router.push(`/profil/${kisi.userId}`)}
         className="flex-row items-start gap-4"
       >
-        <Avatar userId={kisi.userId} name={kisi.displayName} size="lg" className="border-2 border-white" />
+        <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+          <Avatar userId={kisi.userId} name={kisi.displayName} size="lg" className="border-2 border-white" />
+        </View>
 
         <View className="min-w-0 flex-1">
           <View className="flex-row flex-wrap items-center gap-x-2 gap-y-1">
             <Text className="shrink text-base font-semibold text-brand-700" numberOfLines={2}>
               {kisi.displayName}
             </Text>
-            {kisi.isStaff && <YonetimRozeti kucuk />}
-            <SeviyeRozeti kaynak={{ level: kisi.level }} boyut="sm" ton="acik" />
-            {iliski?.durum === ILISKI.arkadas && <Badge tone="success">Arkadaşın</Badge>}
+            <View className="flex-row flex-wrap items-center gap-x-2 gap-y-1" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+              {kisi.isStaff && <YonetimRozeti kucuk />}
+              <SeviyeRozeti kaynak={{ level: kisi.level }} boyut="sm" ton="acik" />
+              {iliski?.durum === ILISKI.arkadas && <Badge tone="success">Arkadaşın</Badge>}
+            </View>
           </View>
 
           {/* ÜNİVERSİTESİ YOKSA KATILMA TARİHİ. Üniversite sekmesinde bu dal hiç çalışmaz
@@ -815,12 +853,13 @@ function UniversiteKarti({
           ) : null}
 
           {kisi.ratingCount > 0 ? (
-            <View className="mt-1.5 flex-row items-center gap-1.5">
+            /* flex-wrap + shrink: büyük yazıda "(N değerlendirme)" kart kenarını ve ekranı aşıyordu. */
+            <View className="mt-1.5 flex-row flex-wrap items-center gap-x-1.5">
               <YildizIkonu renk={amber[500]} boy={14} />
               <Text className="text-xs font-semibold text-slate-700">
                 {Number(kisi.averageRating).toFixed(1)}
               </Text>
-              <Text className="text-xs text-slate-600">({kisi.ratingCount} değerlendirme)</Text>
+              <Text className="shrink text-xs text-slate-600">({kisi.ratingCount} değerlendirme)</Text>
             </View>
           ) : (
             /* Üniversite kartında puan tek sinyal — yokluğu da bilgi (web kararı). */
@@ -851,7 +890,10 @@ function UniversiteKarti({
           listesi hata verirse eski davranışa düşülüyor (istek düğmesi): aynı yöndeki
           yinelemeyi sunucu zaten reddediyor ve bütün listeyi bir yan isteğe kilitlemek
           orantısız olurdu. */}
-      <View className="mt-4 flex-row gap-2">
+      {/* flex-wrap + birincil min %55: büyük yazıda Engelle genişleyip birincil düğmeyi daraltıyor,
+          birincil etiket harf ortasından bölünüyordu. O ölçekte Engelle alt satıra iniyor;
+          varsayılan boyutta satır tek sıra kalıyor (135 + 8 + 80 ≤ 246, 320 dp). */}
+      <View className="mt-4 flex-row flex-wrap gap-2">
         {iliski?.durum === ILISKI.arkadas ? (
           /* Kartta İKİNCİL, profilde birincil — bilinçli: keşif listesinin işi yeni biriyle
              tanıştırmak, zaten arkadaş olunan kişi listede öne çıkmamalı. Profilde ise o kişiye
@@ -859,24 +901,30 @@ function UniversiteKarti({
           iliski.conversationId ? (
             <Button
               variant="secondary"
-              className="flex-1"
+              className="min-w-[55%] flex-1"
+              accessibilityLabel={adli('Mesaj gönder')}
               onPress={() => router.push(`/sohbet/${iliski.conversationId}`)}
             >
               Mesaj gönder
             </Button>
           ) : (
-            <View className="flex-1" />
+            <View className="min-w-[55%] flex-1" />
           )
         ) : iliski?.durum === ILISKI.gelen ? (
-          <Button className="flex-1" onPress={() => router.push('/eslesmeler')}>
+          <Button className="min-w-[55%] flex-1" accessibilityLabel={adli('İsteğini yanıtla')} onPress={() => router.push('/eslesmeler')}>
             İsteğini yanıtla
           </Button>
         ) : iliski?.durum === ILISKI.giden ? (
-          <Button variant="secondary" className="flex-1" disabled>
+          <Button variant="secondary" className="min-w-[55%] flex-1" accessibilityLabel={adli('İstek gönderildi')} disabled>
             İstek gönderildi
           </Button>
         ) : (
-          <Button className="flex-1" disabled={iliskiYukleniyor} onPress={() => onSohbet(kisi)}>
+          <Button
+            className="min-w-[55%] flex-1"
+            accessibilityLabel={adli(istekMetni)}
+            disabled={iliskiYukleniyor}
+            onPress={() => onSohbet(kisi)}
+          >
             {istekMetni}
           </Button>
         )}
@@ -1081,8 +1129,10 @@ function EngellilerModali({ open, onClose, liste, onKaldir }) {
                   className={`flex-row items-center gap-2 py-2 ${i > 0 ? 'border-t border-slate-200' : ''}`}
                 >
                   <View className="min-w-0 flex-1">
+                    {/* İki satıra kadar: sabit 150 px düğme ad sütununu 320 dp'de 122 px'e indiriyor ve
+                        onaysız "Engeli kaldır" listesinde kimliği taşıyan tek şey olan ad kesiliyordu. */}
                     <Text
-                      numberOfLines={1}
+                      numberOfLines={2}
                       className={`text-sm font-medium ${kaldirildi ? 'text-slate-400' : 'text-slate-800'}`}
                     >
                       {kisi.displayName}

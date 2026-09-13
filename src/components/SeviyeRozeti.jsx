@@ -50,13 +50,17 @@ export function SeviyeRozeti({ kaynak, boyut = 'md', ton = 'koyu', etiketli = tr
   const seviye = seviyeHesapla(kaynak)
   const t = TONLAR[ton] ?? TONLAR.koyu
   const b = BOYUTLAR[boyut] ?? BOYUTLAR.md
+  /* İlerleme cümlesi YALNIZCA veri varsa. Kart ve satırlar rozete sadece `{ level }` veriyor;
+     seviyeIlerlemeMetni (web'le birebir) eksik alanı "0 puan · en üst seviye" diye
+     yorumluyordu ve ekran okuyucu 6. seviyedeki birine "en üst seviye, 0 puan" diyordu. */
+  const ilerlemeVar = kaynak != null && ('nextLevelAt' in kaynak || 'totalEarnedCredits' in kaynak)
 
   return (
     <View
       // accessible ŞART: View varsayılanda erişilebilirlik düğümü DEĞİLDİR — bayraksız
       // accessibilityLabel hiç okunmaz (bu üç bileşende de aynı hata vardı).
       accessible
-      accessibilityLabel={`${seviyeEtiketi(seviye)} (${EN_YUKSEK_SEVIYE} üzerinden) — ${seviyeIlerlemeMetni(kaynak)}`}
+      accessibilityLabel={`${seviyeEtiketi(seviye)} (${EN_YUKSEK_SEVIYE} üzerinden)${ilerlemeVar ? ` — ${seviyeIlerlemeMetni(kaynak)}` : ''}`}
       className={`flex-row items-center self-start rounded-full ${t.kabuk} ${b.kabuk}`}
     >
       <View className={`items-center justify-center rounded-full ${t.madalyon} ${b.madalyon}`}>

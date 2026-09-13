@@ -296,7 +296,17 @@ function BaskaKisiIslemleri({ kisi, onNotice }) {
         </>
       ) : (
         <>
-          <Text numberOfLines={1} className={`text-sm font-medium ${durum.ton}`}>
+          {/* Görünen cümle adsız (dar ekranda fiil kesiliyordu); ekran okuyucu ise bu bloğa
+              profil kartından ÖNCE geliyor ve kimin olduğunu duymuyordu — ad etikette.
+              adjustsFontSizeToFit: büyük yazı ölçeğinde kesilmek yerine küçülür, satır tek
+              kalır ve iskeletle yükseklik eşleşmesi bozulmaz. */}
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+            accessibilityLabel={`${kisi.displayName}: ${durum.metin}`}
+            className={`text-sm font-medium ${durum.ton}`}
+          >
             {durum.metin}
           </Text>
 
@@ -316,13 +326,16 @@ function BaskaKisiIslemleri({ kisi, onNotice }) {
               </Button>
             </View>
           ) : (
-            <View className="flex-row gap-2">
+            /* flex-wrap + birincil min %55: büyük yazıda birincil düğme Engelle'den daralıp
+               etiketi bölünüyordu (Keşfet kartıyla aynı kural). */
+            <View className="flex-row flex-wrap gap-2">
               {iliski?.durum === ILISKI.arkadas ? (
                 /* Kabul edilen her istekte sunucu sohbeti açıyor (RespondMatchHandler); kimlik
                    yine de yoksa düğme pasif — var olmayan sohbete götüren düğme olmasın. */
                 <Button
-                  className="flex-1"
+                  className="min-w-[55%] flex-1"
                   disabled={!iliski.conversationId}
+                  accessibilityLabel={`Mesaj gönder, ${kisi.displayName}`}
                   onPress={() => router.push(`/sohbet/${iliski.conversationId}`)}
                 >
                   Mesaj gönder
@@ -330,20 +343,30 @@ function BaskaKisiIslemleri({ kisi, onNotice }) {
               ) : iliski?.durum === ILISKI.gelen ? (
                 /* Kabul/ret Arkadaşlar ekranında: o mantık (sohbet açılışı, gelen kutusu
                    tazelemesi) ikinci kez yazılmadı. Etiket Keşfet kartıyla aynı. */
-                <Button className="flex-1" onPress={arkadaslaraGit}>
+                <Button
+                  className="min-w-[55%] flex-1"
+                  accessibilityLabel={`İsteğini yanıtla, ${kisi.displayName}`}
+                  onPress={arkadaslaraGit}
+                >
                   İsteğini yanıtla
                 </Button>
               ) : iliski?.durum === ILISKI.giden ? (
-                <Button variant="secondary" className="flex-1" disabled>
+                <Button
+                  variant="secondary"
+                  className="min-w-[55%] flex-1"
+                  accessibilityLabel={`İstek gönderildi, ${kisi.displayName}`}
+                  disabled
+                >
                   İstek gönderildi
                 </Button>
               ) : (
-                /* Erişilebilir ad GÖRÜNEN ETİKETİ içeriyor (WCAG 2.5.3): Sesle Denetim
-                   kullanan "Arkadaş ekle'ye dokun" dediğinde düğme bulunabilmeli. */
+                /* Erişilebilir ad GÖRÜNEN ETİKETLE BAŞLIYOR (WCAG 2.5.3): Sesle Denetim kullanan
+                   "Arkadaş ekle'ye dokun" dediğinde düğme bulunabilmeli. Ad ayrı: "X kişisini
+                   arkadaş ekle" bozuk Türkçeydi. */
                 <Button
-                  className="flex-1"
+                  className="min-w-[55%] flex-1"
                   loading={busy}
-                  accessibilityLabel={`${kisi.displayName} kişisini arkadaş ekle`}
+                  accessibilityLabel={`Arkadaş ekle, ${kisi.displayName}`}
                   onPress={istekGonder}
                 >
                   Arkadaş ekle

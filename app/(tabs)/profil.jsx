@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Pressable, ScrollView, Text, View } from 'react-native'
+import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { sekmeAltDolgusu } from '../../src/lib/sekmeCubugu'
@@ -27,6 +27,12 @@ import { VeriTercihleriBaglantisi } from '../../src/components/IzinSayfasi'
 export default function Profil() {
   const guvenli = useSafeAreaInsets()
   const router = useRouter()
+  /* Büyük yazı ölçeğinde iki düğmeli satırlar alt alta (bkz. kısayol satırları). Sütunda
+     flex-1 verilmez: tabanı 0 olan düğme yüksekliği min-h'ye çökerdi. */
+  const { fontScale } = useWindowDimensions()
+  const buyukYazi = fontScale >= 1.3
+  const satirSinifi = buyukYazi ? 'gap-2' : 'flex-row gap-2'
+  const dugmeSinifi = buyukYazi ? '' : 'flex-1'
   const { session, logout } = useAuth()
 
   const [dialog, setDialog] = useState(null)
@@ -111,11 +117,13 @@ export default function Profil() {
         )}
         <ErrorBox error={avatarError} />
 
-        <View className="flex-row gap-2">
-          <Button variant="secondary" className="flex-1" loading={avatarBusy} onPress={fotografDegistir}>
+        {/* Büyük yazı ölçeğinde (>= 1.3) iki düğmeli satırlar ALT ALTA: 320 dp'de 140 px'lik
+            düğmeye tek sözcüklü uzun etiket sığmayıp harf ortasından bölünüyordu. */}
+        <View className={satirSinifi}>
+          <Button variant="secondary" className={dugmeSinifi} loading={avatarBusy} onPress={fotografDegistir}>
             Fotoğrafı değiştir
           </Button>
-          <Button className="flex-1" onPress={() => setDialog('edit')}>
+          <Button className={dugmeSinifi} onPress={() => setDialog('edit')}>
             Profili düzenle
           </Button>
         </View>
@@ -125,13 +133,13 @@ export default function Profil() {
         {/* ui.jsx Button: hemen üstteki "Fotoğrafı değiştir" ile aynı yüzey. Eskiden elle
             yazılmış Pressable'lardı (köşe 12, kenar slate-200) ve üstteki satırla (köşe 8,
             kenar slate-300) alt alta farklı görünüyordu. */}
-        <View className="flex-row gap-2">
-          <Button variant="secondary" className="flex-1" onPress={() => router.push('/dersler')}>
+        <View className={satirSinifi}>
+          <Button variant="secondary" className={dugmeSinifi} onPress={() => router.push('/dersler')}>
             Derslerim
           </Button>
           {/* "Arkadaşlarım" ARKADAŞ listesini açmalı; parametresiz rota Gelen isteklerle
               açılıyordu. Akış başlığındaki ikon parametresiz kalıyor: orada niyet istekler. */}
-          <Button variant="secondary" className="flex-1" onPress={() => router.push('/eslesmeler?sekme=active')}>
+          <Button variant="secondary" className={dugmeSinifi} onPress={() => router.push('/eslesmeler?sekme=active')}>
             Arkadaşlarım
           </Button>
         </View>
@@ -321,7 +329,8 @@ function HesabiSilModali({ open, onClose, onDeleted }) {
 
 function AltBaglanti({ onPress, children }) {
   return (
-    <Pressable accessibilityRole="link" onPress={onPress} className="min-h-[44px] justify-center">
+    // min-w: kısa etiketli bağlantı ('Gizlilik') 44 px genişliğin altında kalıyordu.
+    <Pressable accessibilityRole="link" onPress={onPress} className="min-h-[44px] min-w-[44px] items-center justify-center">
       <Text className="text-sm text-slate-500">{children}</Text>
     </Pressable>
   )

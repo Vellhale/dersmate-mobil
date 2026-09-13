@@ -1,5 +1,6 @@
-import { cloneElement, isValidElement } from 'react'
+import { cloneElement, isValidElement, useEffect } from 'react'
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   KeyboardAvoidingView,
   Modal as RNModal,
@@ -221,6 +222,24 @@ const NOTICE_TONLARI = {
 
 /** Kısa süreli bilgi/başarı bildirimi (sayfa üstünde) — web Notice'in portu. */
 export function Notice({ tone = 'success', children, onDismiss }) {
+  /*
+    BİLDİRİM DUYURULUYOR. "Engellendi", "istek gönderildi", "engel kaldırıldı" gibi sonuçlar
+    ekranda beliriyor ama ekran okuyucu kullanıcısı hiçbir şey duymuyordu; odak sökülen
+    düğmeyle birlikte kaybolduğu için işlemin olup olmadığını listeyi yeniden tarayarak
+    anlıyordu. Canlı bölge DEĞİL, açık duyuru: bildirim çoğu zaman bir alt sayfanın
+    ARKASINDA çiziliyor ve Android'de etkin olmayan pencerenin canlı bölgesi okunmuyor.
+    Metin başına bir kez (bağımlılık metnin kendisi). Kanca erken dönüşten ÖNCE.
+
+    YALNIZCA KAPATILABİLİR bildirim duyuruluyor (onDismiss): projede geçici sonuç
+    bildirimleri kapatılabilir, sayfaya gömülü sabit bilgi kutuları (ör. engelleme onayındaki
+    şikayet uyarısı) değil. Hepsi duyurulsaydı alt sayfa açılır açılmaz ekran okuyucu başlığı
+    okumadan uyarı kutusunu okuyordu (ölçüldü).
+  */
+  const duyuru = onDismiss && typeof children === 'string' ? children : null
+  useEffect(() => {
+    if (duyuru) AccessibilityInfo.announceForAccessibility(duyuru)
+  }, [duyuru])
+
   if (!children) return null
   const t = NOTICE_TONLARI[tone] ?? NOTICE_TONLARI.success
   return (

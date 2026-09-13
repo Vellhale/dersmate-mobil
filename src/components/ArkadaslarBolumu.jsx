@@ -164,7 +164,11 @@ export function ArkadaslarBolumu({ userId, kendiProfilim = false, ad }) {
                 i > 0 ? 'border-t border-slate-100' : ''
               }`}
             >
-              <Avatar userId={k.userId} name={k.displayName} size="sm" />
+              {/* Satırın etiketi adı ve seviyeyi zaten söylüyor; avatar ve rozet kendi `accessible`
+                  bayraklarıyla Android'de ayrı durak olup ikinci kez okunuyordu. */}
+              <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+                <Avatar userId={k.userId} name={k.displayName} size="sm" />
+              </View>
               <Text numberOfLines={1} className="min-w-0 flex-1 text-sm font-medium text-brand-700">
                 {k.displayName}
               </Text>
@@ -174,7 +178,7 @@ export function ArkadaslarBolumu({ userId, kendiProfilim = false, ad }) {
                   satırın ~%28'ini alıp adı kırpıyordu ("Ayşe Nur Karao…"). Seviye bilgisi
                   kaybolmuyor: satırın erişilebilirlik etiketi "6. Seviye" diyor
                   (topluluk.jsx'teki dar satırla aynı kullanım). */}
-              <View className="shrink-0">
+              <View className="shrink-0" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
                 <SeviyeRozeti kaynak={{ level: k.level }} boyut="sm" ton="acik" etiketli={false} />
               </View>
             </Pressable>

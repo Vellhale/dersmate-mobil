@@ -23,8 +23,10 @@ import { useInbox } from '../../src/state/InboxContext'
   SEKME DÜZENİ (Instagram konvansiyonu):
     Akış · Keşfet · ➕ Oluştur · Mesajlar · Profil
 
-  Etiket YOK (ikon-only): Instagram dilinin imzası. Erişilebilirlik kaybolmuyor —
-  her sekmenin title'ı ekran okuyucuya gidiyor. Aktif sekme, web'deki ray gibi
+  Etiket YOK (ikon-only): Instagram dilinin imzası. Erişilebilirlik adı her sekmede AÇIKÇA
+  veriliyor (tabBarAccessibilityLabel): React Navigation title'dan adı yalnızca iOS'ta
+  kuruyor, Android'de beş sekme de adsızdı — TalkBack yalnızca "sekme" okuyordu, Mesajlar'da
+  bağlamsız rozet rakamı. Aktif sekme, web'deki ray gibi
   KALIN çizgi + marka rengiyle ayrışır; pasif sekme slate-400 ince çizgi.
 
   ORTA SEKME DOLGULU DAİRE: "ilan oluştur" gezinme değil EYLEM — görsel dili de
@@ -262,11 +264,15 @@ export default function TabsLayout() {
         sceneStyle: { backgroundColor: zemin },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Akış', tabBarIcon: ikon(EvIkonu) }} />
+      <Tabs.Screen
+        name="index"
+        options={{ title: 'Akış', tabBarAccessibilityLabel: 'Akış', tabBarIcon: ikon(EvIkonu) }}
+      />
       <Tabs.Screen
         name="kesfet"
         options={{
           title: 'Keşfet',
+          tabBarAccessibilityLabel: 'Keşfet',
           tabBarIcon: ikon(AramaIkonu),
           tabBarButton: turluDugme('kesfet'),
         }}
@@ -275,6 +281,7 @@ export default function TabsLayout() {
         name="olustur"
         options={{
           title: 'Ders İlanı Oluştur',
+          tabBarAccessibilityLabel: 'Ders ilanı oluştur',
           tabBarIcon: ikon(ArtiDaireIkonu),
           tabBarButton: turluDugme('portfoy'),
         }}
@@ -283,6 +290,8 @@ export default function TabsLayout() {
         name="mesajlar"
         options={{
           title: 'Mesajlar',
+          // Okunmamış sayısı adın içinde: rozetteki çıplak rakam tek başına okunmasın.
+          tabBarAccessibilityLabel: unreadTotal > 0 ? `Mesajlar, ${unreadTotal} okunmamış` : 'Mesajlar',
           tabBarIcon: ikon(MesajIkonu),
           // Okunmamış toplamı: web'deki üst bar rozetinin karşılığı. 0 ise rozet hiç
           // çizilmez — boş kırmızı nokta "bir şey var" yalanı söylerdi.
@@ -296,6 +305,7 @@ export default function TabsLayout() {
         name="profil"
         options={{
           title: 'Profil',
+          tabBarAccessibilityLabel: 'Profil',
           tabBarIcon: ikon(KisiIkonu),
           tabBarButton: turluDugme('rutbe'),
         }}

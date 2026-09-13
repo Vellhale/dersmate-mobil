@@ -168,7 +168,12 @@ function ProfilBasligi({ profile }) {
         rozetin varlığı adın okunmasından daha önemli değil.
       */}
       <View className="mt-4 flex-row flex-wrap items-center justify-center gap-x-3 gap-y-2">
-        <Text className="text-center text-3xl font-bold leading-tight tracking-tight text-slate-900">
+        {/* Başlık rolü: ekran okuyucu kullanıcısı başlıklar arasında gezinerek kişinin adına
+            atlayabilsin (eylem bloğu adın ÜSTÜNDE duruyor). */}
+        <Text
+          accessibilityRole="header"
+          className="text-center text-3xl font-bold leading-tight tracking-tight text-slate-900"
+        >
           {profile.displayName}
         </Text>
         {profile.isStaff && <YonetimRozeti />}
