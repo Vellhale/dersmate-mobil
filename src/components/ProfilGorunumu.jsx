@@ -149,7 +149,7 @@ export function ProfilGorunumu({ userId, kendiProfilim = false, onYuklendi, onHa
 */
 function ProfilBasligi({ profile }) {
   return (
-    <Card className="items-center p-7">
+    <Card dolgu="p-7" className="items-center">
       <Avatar
         userId={profile.userId}
         name={profile.displayName}
@@ -278,7 +278,7 @@ function Degerlendirmeler({ reviews, page, onPage }) {
   }
 
   return (
-    <Card className="overflow-hidden p-0">
+    <Card dolgu="p-0" className="overflow-hidden">
       {/* ÖZET — hafif renkli başlık şeridi: "bu bölüm bir başlık" der. */}
       <View className="gap-4 border-b border-slate-200 bg-slate-50 p-4">
         <View className="flex-row items-center gap-3">

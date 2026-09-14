@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { FlatList, Pressable, RefreshControl, View } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { sekmeAltDolgusu } from '../../src/lib/sekmeCubugu'
@@ -14,7 +14,7 @@ import { KepIkonu, KisilerIkonu, ToplulukIkonu } from '../../src/components/Ikon
 import { useTurCipasi } from '../../src/lib/tur'
 import { IlanKarti } from '../../src/components/IlanKarti'
 import { EslesmeIstegiModali } from '../../src/components/EslesmeIstegiModali'
-import { EmptyState, ErrorBox, Loading, Notice, SayacRozeti } from '../../src/components/ui'
+import { Button, EmptyState, ErrorBox, Loading, Notice, SayacRozeti } from '../../src/components/ui'
 
 /*
   AKIŞ (ANA SAYFA) — Instagram düzeninin ana sayfası: kişiselleştirilmiş öneri
@@ -26,7 +26,7 @@ import { EmptyState, ErrorBox, Loading, Notice, SayacRozeti } from '../../src/co
 
   Veri kararları web'den:
   • api.suggestions(20) — öneriler "Almak istediğim konular" portföyünden türer;
-    portföyde Seek yoksa kullanıcıya bunu söyleyen bilgi kutusu çıkar.
+    portföyde Seek yoksa kullanıcıya bunu söyleyen kutu ve Oluştur'a götüren düğme çıkar.
   • Portföyün Offer girdileri arkadaş isteği modalındaki takas teklifi listesini besler.
 
   İSTEK SONUCU DOKUNULAN KARTTA (web'den sapma): web istek gönderilince önerileri sessizce
@@ -49,6 +49,18 @@ import { EmptyState, ErrorBox, Loading, Notice, SayacRozeti } from '../../src/co
   rozet. Sayılar mevcut uçlardan: myMatches (useIliskiler) ve mySessions(1, 1) — aktif dersler
   sayfadan bağımsız TAM dönüyor, geçmişten yalnızca tek kayıt istenir. Ekran kurulu kaldığı
   için ikisi de odakta ve ön plana dönüşte sessiz tazeleniyor (useOnePlanaGelince).
+
+  SOĞUK BAŞLANGIÇ TEK DOKUNUŞ (mobil sapma): portföyü boş kullanıcı iki eylemsiz kutu
+  görüyordu ("➕ sekmesinden ekle" tarifi ve altında "Şimdilik öneri yok"); ilk öneriye 8
+  dokunuş ve tahmin vardı. Şimdi tek kutu ve tek düğme: Oluştur'u "Almak istediğim konu"
+  seçicisi açık getirir (?ekle=Seek). Boş liste kutusu o durumda çizilmez; ikisi aynı
+  şeyi söylüyordu ve yalnızca birinde düğme vardı.
+
+  Dönüşte tazeleme: konu Oluştur'da ekleniyor ve Akış kurulu kalıyor. Portföy odakta
+  sessiz çekiliyor; Seek sayısı 0'dan yukarı çıktıysa öneriler de yeniden isteniyor.
+  Her odakta öneri çekilmiyor: yeniden sıralanan kartlar kaydırılmış akışı oynatırdı (üstteki
+  "istek sonucu" gerekçesi). Kartı olan kullanıcının sonradan eklediği konu çekerek
+  yenilemeyle gelir; boş akışta ise bekletecek bir kaydırma yok.
 */
 export default function Akis() {
   const guvenli = useSafeAreaInsets()
@@ -59,7 +71,10 @@ export default function Akis() {
   const portfolio = useAsync(() => api.myPortfolio(), [])
   const iliskiler = useIliskiler()
   const dersler = useAsync(() => api.mySessions(1, 1), [])
-  useOnePlanaGelince(() => dersler.reload({ silent: true }))
+  useOnePlanaGelince(() => {
+    dersler.reload({ silent: true })
+    portfolio.reload({ silent: true })
+  })
   // Derslerim'deki "Senden aksiyon bekleyenler" grubuyla aynı tanım (lib/dersDurumu.js).
   const dersAksiyon = (dersler.data?.active ?? []).filter((s) => eylemBekliyor(s)).length
 
@@ -84,6 +99,26 @@ export default function Akis() {
 
   const myOffers = portfolio.data?.filter((entry) => entry.direction === 'Offer') ?? []
   const mySeekCount = portfolio.data?.filter((entry) => entry.direction === 'Seek').length ?? 0
+
+  /*
+    İLK KONU EKLENİNCE ÖNERİLER. Sayı portföy gelmeden null: "bilinmiyor", 0 değil — yoksa
+    ilk yanıt 0→N geçişi sayılıp öneriler kurulumda ikinci kez çekilirdi.
+
+    Tazeleme liste BOŞKEN sessiz değil: Seek'i olmayan kullanıcıya sunucu boş liste döner
+    (GetMatchSuggestions yalnızca Seek'lenen konuları tarıyor). Sessiz tazelemede useAsync
+    elde veri ([]) olduğu için yükleme bayrağını kaldırmaz; istek sürerken, konu daha yeni
+    eklenmişken ekranda "Şimdilik öneri yok" yazardı. Boş listede korunacak kaydırma yok;
+    kart varsa (portföy ile öneri farklı anlarda çekildiyse) tazeleme sessiz kalır.
+  */
+  const seekSayisi = portfolio.data ? mySeekCount : null
+  const oncekiSeek = useRef(seekSayisi)
+  useEffect(() => {
+    if (oncekiSeek.current === 0 && seekSayisi > 0) {
+      suggestions.reload({ silent: (suggestions.data?.length ?? 0) > 0 })
+    }
+    oncekiSeek.current = seekSayisi
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seekSayisi])
 
   function yenile() {
     setYenileniyor(true)
@@ -176,22 +211,38 @@ export default function Akis() {
             <ErrorBox error={suggestions.error} onRetry={() => suggestions.reload()} />
 
             {/* Hata hâlinde bilgi kutusu ÇIKMAZ: portföy çekilemediyse mySeekCount=0
-                veri değil bilinmezliktir — "konu ekle" demek yanlış yönlendirirdi. */}
+                veri değil bilinmezliktir — "konu ekle" demek yanlış yönlendirirdi.
+                Kutu Notice değil: Notice metin taşıyor, burada kutunun işi düğme. Tonu
+                Notice'in info tonuyla aynı. */}
             {!portfolio.loading && !portfolio.error && mySeekCount === 0 && (
-              <Notice tone="info">
-                Öneriler, "Almak istediğim konular" listenden üretilir. ➕ sekmesinden
-                portföyüne en az bir konu ekleyerek başla.
-              </Notice>
+              <View className="gap-3 rounded-2xl border border-brand-200 bg-brand-50 p-4">
+                <Text className="text-sm text-brand-800">
+                  Öneriler, öğrenmek istediğin konulardan üretilir. Henüz bir konu eklemedin.
+                </Text>
+                <Button onPress={() => router.push('/olustur?ekle=Seek')}>
+                  Öğrenmek istediğim konuyu ekle
+                </Button>
+              </View>
             )}
           </View>
         }
+        /* Portföy ilk kez gelmeden boş liste kutusu SEÇİLMİYOR: hangisinin doğru olduğunu
+           (soğuk başlangıç kutusu mu, "öneri yok" mu) portföy söylüyor. Beklenmeseydi
+           portföyü boş kullanıcı açılışta önce "Şimdilik öneri yok" görür, kutu sonra
+           yerine gelirdi. portfolio.loading yalnızca ilk çekimde yükseliyor (sessiz
+           tazelemeler bayrağa dokunmuyor). */
         ListEmptyComponent={
-          suggestions.loading ? (
+          suggestions.loading || portfolio.loading ? (
             <Loading />
-          ) : suggestions.error ? null : (
+          ) : suggestions.error || (!portfolio.error && mySeekCount === 0) ? null : (
             <EmptyState
               title="Şimdilik öneri yok"
               description="Almak istediğin konuları genişlet ya da Keşfet sekmesinden katalogda ara."
+              action={
+                <Button variant="secondary" onPress={() => router.push('/kesfet')}>
+                  Keşfet'te ara
+                </Button>
+              }
             />
           )
         }

@@ -82,10 +82,18 @@ export function Button({
   )
 }
 
-export function Card({ className = '', children }) {
+/*
+  DOLGU AÇIK PROP, className'le EZİLMEZ. NativeWind sınıfları birleştirmiyor: `p-5 p-0`
+  yan yana gelince hangisinin kazanacağını yazılış sırası değil üretilen stil sırası
+  belirliyor ve genelde büyük değer kazanıyor. `className="p-0"` bu yüzden hiç işlemiyordu:
+  Oluştur'daki bölüm şeritleri kartın kenarına oturmak yerine 20px beyaz çerçeveli bir iç
+  kutu gibi duruyordu. Dolgusu farklı kart `dolgu="p-0"` / `dolgu="p-7"` verir; className
+  yerleşim ve kırpma içindir (items-center, overflow-hidden).
+*/
+export function Card({ className = '', dolgu = 'p-5', children }) {
   return (
     <View
-      className={`rounded-2xl border border-slate-100 bg-white p-5 ${className}`}
+      className={`rounded-2xl border border-slate-100 bg-white ${dolgu} ${className}`}
       // Gölge NativeWind sınıfıyla değil style ile: RN'de gölge platforma göre ayrışır
       // (iOS shadow*, Android elevation) ve web'deki shadow-sm'in dengi bu ikili.
       style={{

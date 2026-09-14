@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { sekmeAltDolgusu } from '../../src/lib/sekmeCubugu'
 import { api } from '../../src/lib/api'
@@ -25,13 +26,30 @@ import { Badge, Button, Card, ErrorBox, Field, Girdi, Loading, Modal, Notice } f
   MOBİL FARK — seviye kaydırıcı DEĞİL beş buton: RN'de yerleşik range yok ve beş
   değerlik bir seçim için kaydırıcı zaten fazlaydı (web'deki süre butonlarıyla aynı
   gerekçe: seçenek az ve yan yana karşılaştırma bedava).
+
+  DIŞARIDAN EKLEME (?ekle=Seek | Offer): Akış'ın soğuk başlangıç kutusu kullanıcıyı "➕
+  sekmesine git, bölümü bul, düğmeye bas" diye tarif etmek yerine seçiciyi açık getirir.
+  Oluştur bir SEKME ekranı ve kurulu kalıyor; başlangıç değeri bir kez okunsaydı ikinci
+  dokunuşta seçici açılmazdı. Parametre bu yüzden her değişimde uygulanıp BOŞALTILIYOR
+  (tanınmayan değer de): aynı değerle yeniden gelindiğinde efekt yine koşsun, kapatılan
+  seçici de ekran aynı adresle yeniden kurulunca kendiliğinden açılmasın. Kalıp Keşfet'in
+  ?sekme= ve Derslerim'in ?rezerve= okumasıyla aynı; boş dize çünkü web'de
+  setParams({ ekle: undefined }) adresi değiştirmiyordu (Keşfet'te ölçülmüş).
 */
 export default function Olustur() {
   const guvenli = useSafeAreaInsets()
+  const router = useRouter()
   const entries = useAsync(() => api.myPortfolio(), [])
   const konular = useAsync(() => api.topics(), [])
   const [modalDirection, setModalDirection] = useState(null)
   const [notice, setNotice] = useState(null)
+
+  const { ekle } = useLocalSearchParams()
+  useEffect(() => {
+    if (!ekle) return
+    if (ekle === 'Seek' || ekle === 'Offer') setModalDirection(ekle)
+    router.setParams({ ekle: '' })
+  }, [ekle, router])
 
   const offers = entries.data?.filter((e) => e.direction === 'Offer') ?? []
   const seeks = entries.data?.filter((e) => e.direction === 'Seek') ?? []
@@ -62,12 +80,18 @@ export default function Olustur() {
           <Loading />
         ) : (
           <>
+            {/* BİRİNCİL DÜĞME BOŞ LİSTEDE, ekranda en fazla bir tane. Merkez sekmenin ekranında
+                dolgulu düğme yoktu; iki "+ Konu ekle" de ikincildi ve boş portföyde nereden
+                başlanacağını hiçbir şey söylemiyordu. Önce "Almak istediğim": öneriler Seek'ten
+                türüyor, Akış'ı dolduran o. Seek varken Offer boşsa sıra Offer'a geçer. Bölüm
+                sırası bilerek değişmedi; nereden başlanacağını sıra değil düğme söylüyor. */}
             <PortfoyBolumu
               title="Verebileceğim konular"
               tone="success"
               aciklama="Onaylanan her ders sana puan kazandırır."
               emptyText="Henüz anlatabileceğin bir konu eklemedin. En iyi olduğun konuyla başla."
               entries={offers}
+              birincil={seeks.length > 0 && offers.length === 0}
               onAdd={() => setModalDirection('Offer')}
               onRemoved={() => entries.reload({ silent: true })}
             />
@@ -77,6 +101,7 @@ export default function Olustur() {
               aciklama="Ücretsizdir; ders önerileri için sinyaldir."
               emptyText="İhtiyacın olan konuları ekle; sana anlatabilecek öğrenciler önerilsin."
               entries={seeks}
+              birincil={seeks.length === 0}
               onAdd={() => setModalDirection('Seek')}
               onRemoved={() => entries.reload({ silent: true })}
             />
@@ -103,7 +128,7 @@ export default function Olustur() {
   )
 }
 
-function PortfoyBolumu({ title, aciklama, tone, entries, emptyText, onAdd, onRemoved }) {
+function PortfoyBolumu({ title, aciklama, tone, entries, emptyText, birincil, onAdd, onRemoved }) {
   const [removingId, setRemovingId] = useState(null)
   const [removeError, setRemoveError] = useState(null)
 
@@ -122,9 +147,11 @@ function PortfoyBolumu({ title, aciklama, tone, entries, emptyText, onAdd, onRem
   }
 
   return (
-    <Card className="p-0">
+    <Card dolgu="p-0">
       {/* Başlık şeridi hafif marka zemini taşır: bölümün "kapağı" olduğu bir bakışta
-          anlaşılsın. Sayı rozeti başlığın yanında — kaç konu olduğu kaydırmadan görünür. */}
+          anlaşılsın. Sayı rozeti başlığın yanında — kaç konu olduğu kaydırmadan görünür.
+          Şerit kendi üst köşelerini yuvarlıyor; kartta overflow-hidden YOK, iOS'ta gölgeyi
+          keserdi. */}
       <View className="flex-row flex-wrap items-center justify-between gap-3 rounded-t-2xl bg-brand-50 px-4 py-3">
         <View className="min-w-0 shrink">
           <View className="flex-row items-center gap-2">
@@ -133,7 +160,7 @@ function PortfoyBolumu({ title, aciklama, tone, entries, emptyText, onAdd, onRem
           </View>
           <Text className="mt-0.5 text-xs text-slate-600">{aciklama}</Text>
         </View>
-        <Button variant="secondary" onPress={onAdd}>
+        <Button variant={birincil ? 'primary' : 'secondary'} onPress={onAdd}>
           + Konu ekle
         </Button>
       </View>
