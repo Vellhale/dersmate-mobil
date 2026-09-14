@@ -33,6 +33,7 @@ import {
   Modal,
   Notice,
   Spinner,
+  UstEtiket,
 } from '../src/components/ui'
 
 /*
@@ -539,13 +540,13 @@ function AltBaslik({ children, sayi, tone = 'slate' }) {
   const amber = tone === 'amber'
   return (
     <View className="flex-row items-center gap-2.5 pt-1">
-      <Text
-        className={`shrink-0 text-xs font-semibold uppercase tracking-wider ${
+      <UstEtiket
+        className={`shrink-0 text-xs font-semibold tracking-wider ${
           amber ? 'text-amber-700' : 'text-slate-600'
         }`}
       >
         {children}
-      </Text>
+      </UstEtiket>
       {sayi !== undefined && <Badge tone={amber ? 'warning' : 'neutral'}>{String(sayi)}</Badge>}
       <View className="h-px flex-1 bg-slate-200" />
     </View>
@@ -568,9 +569,9 @@ function TarihBlogu({ utcString, stil }) {
 
   return (
     <View className="w-16 shrink-0 self-start overflow-hidden rounded-xl border border-slate-200 bg-white">
-      <Text className={`py-1 text-center text-xs font-semibold uppercase tracking-wide ${stil.takvim} ${stil.takvimYazi}`}>
+      <UstEtiket className={`py-1 text-center text-xs font-semibold tracking-wide ${stil.takvim} ${stil.takvimYazi}`}>
         {gecerli ? AY_KISALTMASI.format(tarih) : '—'}
-      </Text>
+      </UstEtiket>
       <Text className="pt-2 text-center text-2xl font-bold leading-none text-slate-900" style={{ fontVariant: ['tabular-nums'] }}>
         {gecerli ? GUN_SAYISI.format(tarih) : '—'}
       </Text>
@@ -979,7 +980,7 @@ function BookModal({ matches, baslangicMatchId, yukleniyor, hata, onYenidenDene,
           {/* ÖZET ŞERİDİ — kararın tamamı tek bakışta. Sayı açıkça "eğitmenin kazanacağı
               puan" diye etiketli: etiketsiz sayı ücret gibi okunur (web kararı). */}
           <View className="rounded-xl border border-brand-100 bg-brand-50 px-4 py-3">
-            <Text className="text-xs font-semibold uppercase tracking-wide text-brand-700">Özet</Text>
+            <UstEtiket className="text-xs font-semibold tracking-wide text-brand-700">Özet</UstEtiket>
             <View className="mt-2 gap-1.5">
               <OzetSatiri ad="Konu" deger={selected?.topicName ?? 'Arkadaş seçilmedi'} soluk={!selected} />
               <OzetSatiri ad="Anlatan" deger={selected?.match.otherDisplayName ?? '—'} soluk={!selected} />

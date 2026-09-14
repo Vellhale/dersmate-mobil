@@ -21,6 +21,7 @@ import {
   Modal,
   Notice,
   Spinner,
+  UstEtiket,
 } from '../src/components/ui'
 
 /*
@@ -1034,9 +1035,9 @@ function FiltreSeridi({
       </Text>
 
       <View className="mt-4 border-t border-slate-100 pt-4">
-        <Text className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+        <UstEtiket className="mb-2 text-xs font-medium tracking-wide text-slate-500">
           Tarih
-        </Text>
+        </UstEtiket>
         <View className="flex-row flex-wrap gap-2">
           {/* Görünen metin kısa ("Hafta"), okunan ad tam ("Bu hafta"): dört pil tek
               satıra sığsın ama ekran okuyucu kısaltmayı çözmek zorunda kalmasın. */}
@@ -1047,9 +1048,9 @@ function FiltreSeridi({
           ))}
         </View>
 
-        <Text className="mb-2 mt-4 text-xs font-medium uppercase tracking-wide text-slate-500">
+        <UstEtiket className="mb-2 mt-4 text-xs font-medium tracking-wide text-slate-500">
           Etiket
-        </Text>
+        </UstEtiket>
         <View className="flex-row flex-wrap gap-2">
           {ETIKETLER.map(({ key, label }) => (
             <Pil key={key} aktif={etiket === key} onPress={() => onEtiket(key)}>

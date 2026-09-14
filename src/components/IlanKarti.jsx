@@ -4,7 +4,7 @@ import { Avatar } from './Avatar'
 import { SeviyeRozeti } from './SeviyeRozeti'
 import { YonetimRozeti } from './YonetimRozeti'
 import { KepIkonu, KitapIkonu, TakasIkonu, YildizIkonu } from './Ikonlar'
-import { Button, Card } from './ui'
+import { Button, Card, UstEtiket } from './ui'
 import { amber, brand, emerald, slate } from '../lib/theme'
 
 /*
@@ -79,7 +79,7 @@ function TopicList({ title, tone, ikon: Ikon, topics }) {
     <View className="mt-3">
       <View className="flex-row items-center gap-1.5">
         <Ikon renk={slate[600]} boy={14} />
-        <Text className="text-xs font-medium uppercase tracking-wide text-slate-600">{title}</Text>
+        <UstEtiket className="text-xs font-medium tracking-wide text-slate-600">{title}</UstEtiket>
       </View>
       <View className="mt-1.5 flex-row flex-wrap gap-1.5">
         {/* Ders adı OPAKLIKLA soldurulmuyor: opacity-70, 12px metni pastel zeminde AA

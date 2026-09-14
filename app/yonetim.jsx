@@ -21,6 +21,7 @@ import {
   Notice,
   SectionTitle,
   Spinner,
+  UstEtiket,
 } from '../src/components/ui'
 
 /*
@@ -1560,17 +1561,17 @@ function IncelemeSayfasi({ disputeId, onClose, onKarara }) {
           {/* İKİ TARAFIN BEYANI. Eğitmen yanıtı yoksa bu da hakem için bir veridir. */}
           <View className="gap-2">
             <View className="rounded-xl border border-rose-200 bg-rose-50 p-3">
-              <Text className="text-xs font-medium uppercase tracking-wide text-rose-700">
+              <UstEtiket className="text-xs font-medium tracking-wide text-rose-700">
                 Öğrencinin iddiası · {formatDateTime(d.createdAtUtc)}
-              </Text>
+              </UstEtiket>
               <Text className="mt-1 text-sm leading-relaxed text-slate-700">{d.description}</Text>
             </View>
 
             <View className="rounded-xl border border-slate-200 bg-white p-3">
-              <Text className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              <UstEtiket className="text-xs font-medium tracking-wide text-slate-500">
                 Eğitmenin savunması
                 {d.tutorStatementAtUtc ? ` · ${formatDateTime(d.tutorStatementAtUtc)}` : ''}
-              </Text>
+              </UstEtiket>
               {d.tutorStatement ? (
                 <Text className="mt-1 text-sm leading-relaxed text-slate-700">
                   {d.tutorStatement}
@@ -1635,7 +1636,7 @@ function TarafKarti({ baslik, taraf, onBan, pasif }) {
     <View className="rounded-xl border border-slate-200 p-3">
       <View className="flex-row items-start justify-between gap-2">
         <View className="min-w-0 flex-1">
-          <Text className="text-xs uppercase tracking-wide text-slate-600">{baslik}</Text>
+          <UstEtiket className="text-xs tracking-wide text-slate-600">{baslik}</UstEtiket>
           <Text numberOfLines={1} className="font-medium text-slate-800">
             {taraf.displayName}
           </Text>

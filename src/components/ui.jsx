@@ -1,4 +1,4 @@
-import { cloneElement, isValidElement, useEffect } from 'react'
+import { Children, cloneElement, isValidElement, useEffect } from 'react'
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -13,6 +13,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { beyaz, brand, slate } from '../lib/theme'
+import { buyukHarf } from '../lib/metin'
 
 /*
   YÜZEY DİLİ — web'deki components/ui.jsx'in RN portu. Kararlar aynen taşındı:
@@ -106,6 +107,32 @@ export function SectionTitle({ children, action }) {
       <Text className="text-lg font-semibold text-slate-800">{children}</Text>
       {action}
     </View>
+  )
+}
+
+/*
+  ÜST ETİKET — küçük, büyük harfli bölüm etiketi ("SANA ANLATABİLİR", "GEÇMİŞ DERSLER").
+  Tailwind'in büyük harf sınıfının (textTransform) yerine geçer: o sınıf "i"yi platforma
+  göre "I" yapıyordu (gerekçe lib/metin.js'te). Stil tamamen çağıranın className'inden
+  gelir; bileşen yalnızca metni dönüştürür.
+
+  Erişim adı ÖZGÜN metin: büyük harfli dizeyi ekran okuyucu harf harf kodlama ya da
+  kısaltma gibi okuyabilir, "Sana anlatabilir" doğal cümle olarak okunur. Ad yalnızca
+  çocukların hepsi düz metin/sayıyken veriliyor; araya bir JSX öğesi girerse ad tahmin
+  edilmez (o öğe de büyütülmez) ve Text kendi içeriğini okutur.
+
+  Yeni üst etiket bu bileşenle yazılmalı. Büyük harf sınıfı uygulamada yalnızca
+  Derslerim'deki doğrulama kodu girdisinde kaldı ve orada doğru: kod alfabesinde "I" yok
+  (CodeGenerator.cs) ve sunucu ToUpperInvariant ile karşılaştırıyor (SessionRules.cs).
+  Sınıf o girdinin dışında yeniden görünürse "SANA ANLATABILIR" hatası geri gelmiş olur.
+*/
+export function UstEtiket({ className = '', children, ...props }) {
+  const parcalar = Children.toArray(children)
+  const duz = parcalar.every((c) => typeof c === 'string' || typeof c === 'number')
+  return (
+    <Text accessibilityLabel={duz ? parcalar.join('') : undefined} className={className} {...props}>
+      {Children.map(children, (c) => (typeof c === 'string' ? buyukHarf(c) : c))}
+    </Text>
   )
 }
 

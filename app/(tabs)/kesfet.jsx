@@ -18,7 +18,7 @@ import { EslesmeIstegiModali } from '../../src/components/EslesmeIstegiModali'
 import { EngellemeModali } from '../../src/components/EngellemeModali'
 import { EkranBasligi } from '../../src/components/EkranBasligi'
 import { KepIkonu, SaatIkonu, YildizIkonu } from '../../src/components/Ikonlar'
-import { Badge, Button, Card, EmptyState, ErrorBox, Field, Girdi, Loading, Modal, Notice, Spinner } from '../../src/components/ui'
+import { Badge, Button, Card, EmptyState, ErrorBox, Field, Girdi, Loading, Modal, Notice, Spinner, UstEtiket } from '../../src/components/ui'
 import { amber, brand, slate } from '../../src/lib/theme'
 
 /*
@@ -1274,9 +1274,9 @@ function Pill({ active, onPress, children }) {
 function FiltreBolumu({ baslik, children }) {
   return (
     <View>
-      <Text className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+      <UstEtiket className="mb-2 text-xs font-medium tracking-wide text-slate-500">
         {baslik}
-      </Text>
+      </UstEtiket>
       <View className="flex-row flex-wrap gap-2">{children}</View>
     </View>
   )
