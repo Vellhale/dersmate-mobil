@@ -22,6 +22,17 @@ import { Button, Modal } from './ui'
   Web'deki "reddet ve devam et" davranışı korundu: reddin bedeli yok, uygulama aynı
   şekilde çalışır (bkz. IZIN_KATEGORILERI'ndeki zorunlu kategori açıklaması).
 */
+
+/**
+ * İzin sayfası kapandıktan sonra ardından açılacak katmanın beklediği süre (ms).
+ *
+ * ui.jsx'teki alt sayfa `animationType="slide"` ile kapanıyor; beklemeden açılan katman
+ * (ürün turu, Oluştur'un ?ekle= seçicisi) sayfa hâlâ aşağı süzülürken üstüne biner ve iki
+ * katman bir an için yine üst üste görünür. iOS'ta kapanan RN Modal'la aynı karede açılan
+ * ikinci Modal hiç görünmeyebilir. Tek yerde, çünkü sayı animasyona bağlı.
+ */
+export const IZIN_KAPANMA_SURESI = 350
+
 export function IzinSayfasi() {
   const { mutlakaSor, ayarlarAcik, ayarlariKapat, kaydet, izin } = useIzin()
   const router = useRouter()

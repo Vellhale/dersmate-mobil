@@ -57,10 +57,10 @@ import { Button, EmptyState, ErrorBox, Loading, Notice, SayacRozeti } from '../.
   şeyi söylüyordu ve yalnızca birinde düğme vardı.
 
   Dönüşte tazeleme: konu Oluştur'da ekleniyor ve Akış kurulu kalıyor. Portföy odakta
-  sessiz çekiliyor; Seek sayısı 0'dan yukarı çıktıysa öneriler de yeniden isteniyor.
-  Her odakta öneri çekilmiyor: yeniden sıralanan kartlar kaydırılmış akışı oynatırdı (üstteki
-  "istek sonucu" gerekçesi). Kartı olan kullanıcının sonradan eklediği konu çekerek
-  yenilemeyle gelir; boş akışta ise bekletecek bir kaydırma yok.
+  sessiz çekiliyor; Seek sayısı 0 sınırını geçtiyse (iki yönde de) öneriler de yeniden
+  isteniyor. Her odakta öneri çekilmiyor: yeniden sıralanan kartlar kaydırılmış akışı
+  oynatırdı (üstteki "istek sonucu" gerekçesi). Kartı olan kullanıcının sonradan eklediği
+  konu çekerek yenilemeyle gelir; boş akışta ise bekletecek bir kaydırma yok.
 */
 export default function Akis() {
   const guvenli = useSafeAreaInsets()
@@ -101,22 +101,49 @@ export default function Akis() {
   const mySeekCount = portfolio.data?.filter((entry) => entry.direction === 'Seek').length ?? 0
 
   /*
-    İLK KONU EKLENİNCE ÖNERİLER. Sayı portföy gelmeden null: "bilinmiyor", 0 değil — yoksa
-    ilk yanıt 0→N geçişi sayılıp öneriler kurulumda ikinci kez çekilirdi.
+    SOĞUK BAŞLANGIÇ KUTUSU VE KARTLAR BİRLİKTE ÇİZİLMEZ. Hata hâlinde kutu ÇIKMAZ: portföy
+    çekilemediyse mySeekCount=0 veri değil bilinmezliktir, "konu ekle" demek yanlış
+    yönlendirirdi.
 
-    Tazeleme liste BOŞKEN sessiz değil: Seek'i olmayan kullanıcıya sunucu boş liste döner
-    (GetMatchSuggestions yalnızca Seek'lenen konuları tarıyor). Sessiz tazelemede useAsync
-    elde veri ([]) olduğu için yükleme bayrağını kaldırmaz; istek sürerken, konu daha yeni
-    eklenmişken ekranda "Şimdilik öneri yok" yazardı. Boş listede korunacak kaydırma yok;
-    kart varsa (portföy ile öneri farklı anlarda çekildiyse) tazeleme sessiz kalır.
+    Kutu varken liste boş veriliyor, öneri yanıtı beklenmeden. Seek'lerin hepsi kaldırılıp
+    Akış'a dönülünce portföy odakta tazeleniyor ama öneriler eski kalıyordu. Kutu ("Henüz
+    bir konu eklemedin") silinen konulardan türemiş kartların ÜSTÜNDE duruyordu (önizlemede
+    ölçüldü: kutu ve 3 kart). Sunucu Seek yokken zaten boş liste döndürüyor
+    (GetMatchSuggestions yalnızca Seek'lenen konuları tarıyor); liste yanıttan önce boşalınca
+    iki yüzey ağ süresi boyunca da çelişmiyor.
+  */
+  const sogukBaslangic = !portfolio.loading && !portfolio.error && mySeekCount === 0
+  const oneriler = sogukBaslangic ? [] : (suggestions.data ?? [])
+
+  /*
+    SEEK SAYISI 0 SINIRINI GEÇİNCE ÖNERİLER. Sayı portföy gelmeden null: "bilinmiyor", 0
+    değil. Yoksa ilk yanıt 0→N geçişi sayılır ve öneriler kurulumda ikinci kez çekilirdi.
+
+    0→N (ilk konu eklendi): tazeleme sessiz DEĞİL. Sessiz tazelemede useAsync elde veri ([])
+    olduğu için yükleme bayrağını kaldırmaz; istek sürerken, konu daha yeni eklenmişken
+    ekranda "Şimdilik öneri yok" yazardı. Sayı 0 iken kart çizilmediği için korunacak
+    kaydırma da yok.
+
+    N→0 (son konu kaldırıldı): liste yukarıda zaten boş çiziliyor; tazeleme verinin kendisini
+    boşaltıyor. Yapılmasaydı eski kartlar veride kalır ve sonraki 0→N geçişinde yeni yanıt
+    gelene kadar silinen konuların kartları geri görünürdü. Bu tazeleme SESSİZ: yükleme
+    bayrağı kalksaydı liste boş çizildiği için kutunun altında yanıt gelene kadar "Yükleniyor"
+    dönerdi.
+
+    N→M (0 olmayan iki sayı) bilerek tazelenmiyor: kartlar zaten var ve yeniden sıralama
+    kaydırılmış akışı oynatır (dosya başındaki gerekçe). O fark çekerek yenilemeyle gelir.
   */
   const seekSayisi = portfolio.data ? mySeekCount : null
   const oncekiSeek = useRef(seekSayisi)
   useEffect(() => {
-    if (oncekiSeek.current === 0 && seekSayisi > 0) {
-      suggestions.reload({ silent: (suggestions.data?.length ?? 0) > 0 })
-    }
+    const onceki = oncekiSeek.current
     oncekiSeek.current = seekSayisi
+    if (onceki === null || seekSayisi === null) return
+    if (onceki === 0 && seekSayisi > 0) {
+      suggestions.reload()
+    } else if (onceki > 0 && seekSayisi === 0) {
+      suggestions.reload({ silent: true })
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seekSayisi])
 
@@ -128,7 +155,7 @@ export default function Akis() {
     iliskiler.yenile()
   }
 
-  const bosDegil = (suggestions.data?.length ?? 0) > 0
+  const bosDegil = oneriler.length > 0
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
@@ -180,7 +207,7 @@ export default function Akis() {
       />
 
       <FlatList
-        data={suggestions.data ?? []}
+        data={oneriler}
         keyExtractor={(kisi) => kisi.userId}
         renderItem={({ item }) => (
           <IlanKarti
@@ -210,11 +237,9 @@ export default function Akis() {
 
             <ErrorBox error={suggestions.error} onRetry={() => suggestions.reload()} />
 
-            {/* Hata hâlinde bilgi kutusu ÇIKMAZ: portföy çekilemediyse mySeekCount=0
-                veri değil bilinmezliktir — "konu ekle" demek yanlış yönlendirirdi.
-                Kutu Notice değil: Notice metin taşıyor, burada kutunun işi düğme. Tonu
-                Notice'in info tonuyla aynı. */}
-            {!portfolio.loading && !portfolio.error && mySeekCount === 0 && (
+            {/* Koşul ve hata hâli sogukBaslangic'te. Kutu Notice değil: Notice metin
+                taşıyor, burada kutunun işi düğme. Tonu Notice'in info tonuyla aynı. */}
+            {sogukBaslangic && (
               <View className="gap-3 rounded-2xl border border-brand-200 bg-brand-50 p-4">
                 <Text className="text-sm text-brand-800">
                   Öneriler, öğrenmek istediğin konulardan üretilir. Henüz bir konu eklemedin.
@@ -234,7 +259,7 @@ export default function Akis() {
         ListEmptyComponent={
           suggestions.loading || portfolio.loading ? (
             <Loading />
-          ) : suggestions.error || (!portfolio.error && mySeekCount === 0) ? null : (
+          ) : suggestions.error || sogukBaslangic ? null : (
             <EmptyState
               title="Şimdilik öneri yok"
               description="Almak istediğin konuları genişlet ya da Keşfet sekmesinden katalogda ara."

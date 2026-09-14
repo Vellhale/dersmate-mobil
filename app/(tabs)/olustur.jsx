@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useLocalSearchParams, useNavigation } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { sekmeAltDolgusu } from '../../src/lib/sekmeCubugu'
 import { api } from '../../src/lib/api'
 import { useAsync } from '../../src/state/useAsync'
 import { EkranBasligi } from '../../src/components/EkranBasligi'
 import { KonuSecici } from '../../src/components/KonuSecici'
+import { IZIN_KAPANMA_SURESI } from '../../src/components/IzinSayfasi'
+import { useIzin } from '../../src/state/IzinContext'
 import { Badge, Button, Card, ErrorBox, Field, Girdi, Loading, Modal, Notice } from '../../src/components/ui'
 
 /*
@@ -32,24 +34,55 @@ import { Badge, Button, Card, ErrorBox, Field, Girdi, Loading, Modal, Notice } f
   Oluştur bir SEKME ekranı ve kurulu kalıyor; başlangıç değeri bir kez okunsaydı ikinci
   dokunuşta seçici açılmazdı. Parametre bu yüzden her değişimde uygulanıp BOŞALTILIYOR
   (tanınmayan değer de): aynı değerle yeniden gelindiğinde efekt yine koşsun, kapatılan
-  seçici de ekran aynı adresle yeniden kurulunca kendiliğinden açılmasın. Kalıp Keşfet'in
-  ?sekme= ve Derslerim'in ?rezerve= okumasıyla aynı; boş dize çünkü web'de
-  setParams({ ekle: undefined }) adresi değiştirmiyordu (Keşfet'te ölçülmüş).
+  seçici de ekran aynı adresle yeniden kurulunca kendiliğinden açılmasın. Boş dize çünkü
+  web'de setParams({ ekle: undefined }) adresi değiştirmiyordu (Keşfet'te ölçülmüş).
+
+  BOŞALTMA EKRANIN KENDİ navigation'IYLA VE BİR TIK SONRA. İki yanlış yol önizlemede ölçüldü:
+  • router.setParams ODAKTAKİ gezgine gider. Ağaç tek seferde kurulunca (adresten açılış;
+    native'de oturum okununca Stack, Tabs ve ekran aynı commit'te geliyor) yaprağın efekti,
+    Tabs'ın odak dinleyicisini kaydeden efektten ÖNCE koşuyor. Parametre kök rotaya yazılıyor,
+    Oluştur'da 'Seek' kalıyor; o oturumda Akış düğmesi aynı değeri gönderdiği için seçici
+    bir daha açılmıyordu (2/2 dokunuş).
+  • navigation.setParams gecikmesiz çağrılınca da kayboluyor: gezgin, kurulumda hesapladığı
+    durumu kendi efektinde (yaprağınkinden sonra) yazıp üstüne basıyor.
+  setTimeout aynı commit'in bütün efektleri bittikten sonra koşuyor.
+  Keşfet'in ?sekme= ve Derslerim'in ?rezerve= okumaları hâlâ router.setParams'la; aynı kusuru
+  taşıyorlar.
+
+  İZİN SORUSU CEVAPLANMADAN SEÇİCİ AÇILMAZ. Adresten ya da derin bağlantıyla ilk açılışta
+  izin sayfası da ekrandaydı ve seçici onun düğmelerini örtüyordu. Parametre bu yüzden
+  izin cevabı okunana ve soru kapanana kadar TÜKETİLMİYOR (adreste bekliyor). Sayfa bu
+  kurulumda gerçekten göründüyse kapanma animasyonu da bekleniyor (bkz. IZIN_KAPANMA_SURESI).
 */
 export default function Olustur() {
   const guvenli = useSafeAreaInsets()
-  const router = useRouter()
+  const navigation = useNavigation()
   const entries = useAsync(() => api.myPortfolio(), [])
   const konular = useAsync(() => api.topics(), [])
   const [modalDirection, setModalDirection] = useState(null)
   const [notice, setNotice] = useState(null)
 
+  const { hazir: izinOkundu, mutlakaSor } = useIzin()
+  const izinBekliyor = !izinOkundu || mutlakaSor
+  const izinGorundu = useRef(false)
+  useEffect(() => {
+    if (mutlakaSor) izinGorundu.current = true
+  }, [mutlakaSor])
+
   const { ekle } = useLocalSearchParams()
   useEffect(() => {
-    if (!ekle) return
-    if (ekle === 'Seek' || ekle === 'Offer') setModalDirection(ekle)
-    router.setParams({ ekle: '' })
-  }, [ekle, router])
+    if (!ekle || izinBekliyor) return
+    const zamanlayici = setTimeout(
+      () => {
+        // Bekleme bir kez: sonraki ?ekle= dokunuşları gecikmesiz açılsın.
+        izinGorundu.current = false
+        if (ekle === 'Seek' || ekle === 'Offer') setModalDirection(ekle)
+        navigation.setParams({ ekle: '' })
+      },
+      izinGorundu.current ? IZIN_KAPANMA_SURESI : 0,
+    )
+    return () => clearTimeout(zamanlayici)
+  }, [ekle, izinBekliyor, navigation])
 
   const offers = entries.data?.filter((e) => e.direction === 'Offer') ?? []
   const seeks = entries.data?.filter((e) => e.direction === 'Seek') ?? []

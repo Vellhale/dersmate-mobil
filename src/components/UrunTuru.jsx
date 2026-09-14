@@ -18,6 +18,8 @@ import {
   turuYenidenBaslat,
 } from '../lib/tur'
 import { useIzin } from '../state/IzinContext'
+// Tur, izin sayfası kapanırken üstüne binmesin (süre animasyona bağlı, orada tanımlı).
+import { IZIN_KAPANMA_SURESI } from './IzinSayfasi'
 
 /**
  * İnteraktif ürün rehberi — web'deki ProductTour.jsx'in mobil UYARLAMASI.
@@ -75,14 +77,6 @@ const ACILIS_EKRANLARI = ['/', '/kesfet']
 
 /** Çıpanın etrafında bırakılan nefes payı (web'deki padding=8 ile aynı). */
 const BOSLUK = 8
-
-/**
- * İzin sayfası kapandıktan sonra turun beklediği süre (ms).
- *
- * ui.jsx'teki alt sayfa `animationType="slide"` ile kapanıyor; beklemeseydik tur, sayfa
- * hâlâ aşağı süzülürken üstüne biner ve iki katman bir an için yine üst üste görünürdü.
- */
-const IZIN_KAPANMA_SURESI = 350
 
 export function UrunTuru() {
   const { mutlakaSor } = useIzin()
