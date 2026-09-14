@@ -29,7 +29,7 @@ const SCORE_FIELDS = [
   { key: 'punctualityScore', label: 'Zamanlama', hint: 'Ders vaktinde başladı mı?' },
 ]
 
-export function ReviewModal({ session, open, onClose, onSubmitted }) {
+export function ReviewModal({ session, open, onay, onClose, onSubmitted }) {
   const [scores, setScores] = useState({ score: 0, teachingScore: 0, punctualityScore: 0 })
   const [tags, setTags] = useState([])
   const [comment, setComment] = useState('')
@@ -91,6 +91,26 @@ export function ReviewModal({ session, open, onClose, onSubmitted }) {
       }
     >
       <View className="gap-5 pb-2">
+        {/*
+          ONAY CÜMLESİ SAYFANIN BAŞINDA: arkadaki bildirim bu sayfanın altında kalıyor ve
+          öğrenci onayın sonucunu (kime kaç puan yazıldı) hiç görmüyordu. Ek duyuru YOK:
+          arkadaki Notice aynı metni zaten duyuruyor, ikinci kez okutmak tekrar olurdu.
+          ✓ dairesi süs; metin kendi başına yetiyor, ekran okuyucudan gizli.
+          "+N" ya da kutlama animasyonu YOK: puan öğrenciye yazılmıyor.
+        */}
+        {onay ? (
+          <View className="flex-row items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+            <View
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              className="h-8 w-8 items-center justify-center rounded-full bg-emerald-700"
+            >
+              <Text className="font-bold text-white">✓</Text>
+            </View>
+            <Text className="flex-1 text-sm font-medium text-emerald-800">{onay}</Text>
+          </View>
+        ) : null}
+
         <View className="rounded-xl bg-brand-50 p-4">
           <Text className="text-sm text-slate-600">Değerlendirdiğin ders</Text>
           <Text className="mt-0.5 font-semibold text-slate-900">

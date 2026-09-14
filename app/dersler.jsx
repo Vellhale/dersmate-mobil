@@ -475,10 +475,17 @@ export default function Dersler() {
           session={dialog.session}
           onClose={() => setDialog(null)}
           onApproved={(credits, session) => {
-            refresh(`Ders onaylandı. Eğitmene ${credits} puan yazıldı.`)
+            /* Puan anlatana yazılıyor; cümle alıcıyı adıyla söylüyor ("+N" ya da "kazandın"
+               dili yok). Gönüllü derste sunucu 0 basar: "0 puan yazıldı" bir kayıp gibi
+               okunacağı için sayı hiç yazılmaz. */
+            const onay =
+              credits > 0
+                ? `Ders onaylandı. ${session.otherDisplayName} kişisine ${credits} puan yazıldı.`
+                : 'Ders onaylandı.'
+            refresh(onay)
             // Değerlendirme onayın hemen ardından: yorum ancak tamamlanmış dersin
             // çıktısı olabilir ve bu an tam olarak o an.
-            setDialog({ type: 'review', session })
+            setDialog({ type: 'review', session, onay })
           }}
           onReport={() => setDialog({ type: 'report', session: dialog.session })}
           onDispute={() => setDialog({ type: 'dispute', session: dialog.session })}
@@ -502,11 +509,20 @@ export default function Dersler() {
         <ReviewModal
           open
           session={dialog.session}
+          /* ONAY ANI KORUNUYOR. Onay cümlesi Notice'e yazılıyordu ama bildirim %85 yükseklikteki
+             bu sayfanın ARKASINDA kalıyordu; Gönder'den sonra "Değerlendirmen kaydedildi" onu
+             eziyordu. Onay veren öğrenci döngünün kapandığını hiçbir anda görmüyordu. Cümle
+             artık sayfanın başında ve gönderimde silinmiyor, değerlendirme teşekkürü ARDINA
+             ekleniyor. "Şimdi değil" (onClose) Notice'e dokunmuyor, onay cümlesi yerinde kalıyor.
+             veriDegisti: false — değerlendirme ders listesini değiştirmiyor; onay zaten listeyi
+             tazeledi, yeniden çekmek biriken geçmiş sayfalarını 5'e sıfırlardı. */
+          onay={dialog.onay}
           onClose={() => setDialog(null)}
-          onSubmitted={() => {
-            setDialog(null)
-            refresh('Değerlendirmen kaydedildi. Teşekkürler!')
-          }}
+          onSubmitted={() =>
+            refresh(`${dialog.onay ?? ''} Değerlendirmen kaydedildi, teşekkürler!`.trim(), {
+              veriDegisti: false,
+            })
+          }
         />
       )}
 
