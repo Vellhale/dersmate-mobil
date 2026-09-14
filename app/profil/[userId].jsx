@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Pressable, ScrollView, Text, View } from 'react-native'
+import { ScrollView, Text, View } from 'react-native'
 import { Stack, useFocusEffect, useLocalSearchParams, useNavigation, useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { api } from '../../src/lib/api'
@@ -9,7 +9,7 @@ import { useAsync } from '../../src/state/useAsync'
 import { useIliskiler } from '../../src/state/useIliskiler'
 import { EngellemeModali } from '../../src/components/EngellemeModali'
 import { ProfilGorunumu } from '../../src/components/ProfilGorunumu'
-import { Button, ErrorBox, IskeletBlok, Notice } from '../../src/components/ui'
+import { Button, ErrorBox, GeriDugmesi, IskeletBlok, Notice } from '../../src/components/ui'
 import { useAuth } from '../../src/state/AuthContext'
 
 /*
@@ -50,15 +50,8 @@ export default function BaskasininProfili() {
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      <View className="flex-row items-center gap-2 border-b border-slate-200 bg-white px-2 py-2">
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Geri"
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-          className="h-11 w-11 items-center justify-center rounded-lg"
-        >
-          <Text className="text-xl text-slate-500">←</Text>
-        </Pressable>
+      <View className="flex-row items-center gap-3 border-b border-slate-200 bg-white px-4 py-2">
+        <GeriDugmesi onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
         <Text className="text-lg font-bold text-slate-900">Profil</Text>
       </View>
 

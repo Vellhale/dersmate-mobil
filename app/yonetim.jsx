@@ -12,9 +12,11 @@ import { DISPUTE_REASON_LABELS, REPORT_REASON_LABELS, formatDateTime } from '../
 import {
   Badge,
   Button,
+  Card,
   EmptyState,
   ErrorBox,
   Field,
+  GeriDugmesi,
   Girdi,
   Loading,
   Modal,
@@ -89,15 +91,8 @@ export default function Yonetim() {
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
-      <View className="flex-row items-center gap-2 border-b border-slate-200 bg-white px-2 py-2">
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Geri"
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-          className="h-11 w-11 items-center justify-center rounded-lg"
-        >
-          <Text className="text-xl text-slate-500">←</Text>
-        </Pressable>
+      <View className="flex-row items-center gap-3 border-b border-slate-200 bg-white px-4 py-2">
+        <GeriDugmesi onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
         <View className="min-w-0 flex-1">
           <Text className="text-lg font-bold text-slate-900">Yönetim</Text>
           <Text className="text-xs text-slate-500">
@@ -186,14 +181,14 @@ export default function Yonetim() {
 */
 function KuyrukKarti({ children, aksiyonlar }) {
   return (
-    <View className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
+    <Card dolgu="p-0" className="overflow-hidden">
       <View className="gap-2 p-5">{children}</View>
       {aksiyonlar && (
         <View className="flex-row flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-5 py-3.5">
           {aksiyonlar}
         </View>
       )}
-    </View>
+    </Card>
   )
 }
 

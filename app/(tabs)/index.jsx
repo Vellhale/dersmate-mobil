@@ -173,14 +173,15 @@ export default function Akis() {
               accessibilityRole="button"
               accessibilityLabel="Topluluk"
               onPress={() => router.push('/topluluk')}
-              className="h-11 w-11 items-center justify-center rounded-lg"
+              className="h-[44px] w-[44px] items-center justify-center rounded-lg active:bg-slate-100"
             >
               <ToplulukIkonu renk={slate[700]} boy={24} />
             </Pressable>
             {/* Tur çıpaları: bu iki ikon turun "eslesmeler" ve "dersler" adımlarının
                 ışık tuttuğu öğeler (bkz. src/lib/tur.js TUR_ADIMLARI).
                 Sayaç rozetleri düğmenin İÇİNDE absolute: 44×44 dokunma alanı ve çıpa ölçüsü
-                değişmiyor. Sayı rozetten değil erişim adından okunuyor (bkz. SayacRozeti). */}
+                değişmiyor. Sayı rozetten değil erişim adından okunuyor (bkz. SayacRozeti).
+                Boy px ile: h-11 rem'dir ve cihazda 38.5dp çizilirdi (bkz. ui.jsx GeriDugmesi). */}
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={
@@ -189,7 +190,7 @@ export default function Akis() {
                   : 'Arkadaşlar'
               }
               onPress={() => router.push('/eslesmeler')}
-              className="h-11 w-11 items-center justify-center rounded-lg active:bg-slate-100"
+              className="h-[44px] w-[44px] items-center justify-center rounded-lg active:bg-slate-100"
               {...eslesmelerCipasi}
             >
               <KisilerIkonu renk={slate[700]} boy={24} />
@@ -199,7 +200,7 @@ export default function Akis() {
               accessibilityRole="button"
               accessibilityLabel={dersAksiyon > 0 ? `Derslerim, ${dersAksiyon} ders işlem bekliyor` : 'Derslerim'}
               onPress={() => router.push('/dersler')}
-              className="h-11 w-11 items-center justify-center rounded-lg active:bg-slate-100"
+              className="h-[44px] w-[44px] items-center justify-center rounded-lg active:bg-slate-100"
               {...derslerCipasi}
             >
               <KepIkonu renk={slate[700]} boy={24} />

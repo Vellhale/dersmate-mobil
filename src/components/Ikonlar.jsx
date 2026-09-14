@@ -49,6 +49,16 @@ export function EvIkonu(props) {
   )
 }
 
+/** Geri — ok değil OK UCU (Lucide `chevron-left`). Yığın ekranlarının başlığındaki GeriDugmesi
+    çiziyor; eski "←" metin glifi yazı tipine göre ince ve kayık çiziliyordu. */
+export function GeriIkonu(props) {
+  return (
+    <Cizgi {...props}>
+      <Path d="m15 18-6-6 6-6" />
+    </Cizgi>
+  )
+}
+
 /* Keşfet — pusula değil BÜYÜTEÇ (web'deki 2026-08-24 kararı): sayfanın yaptığı iş
    aramak; büyüteç, ekrandaki arama kutusuyla aynı şeyi söylüyor. */
 export function AramaIkonu(props) {

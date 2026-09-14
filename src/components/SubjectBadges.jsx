@@ -4,6 +4,7 @@ import Svg, { Circle, Path } from 'react-native-svg'
 import { api } from '../lib/api'
 import { amber, slate } from '../lib/theme'
 import { useAsync } from '../state/useAsync'
+import { Card } from './ui'
 
 /*
   BRANŞ ROZETLERİ — web'deki components/SubjectBadges.jsx'in portu (iş kuralı 2).
@@ -77,7 +78,7 @@ export function SubjectBadges({ userId, kendiProfilim = false }) {
   }
 
   return (
-    <View className="rounded-2xl border border-slate-100 bg-white p-5">
+    <Card>
       <View className="mb-4 flex-row items-center justify-between gap-3">
         <Text className="text-sm font-semibold text-slate-800">Branş rozetleri</Text>
         {rozetsiz.length > 0 && (
@@ -132,7 +133,7 @@ export function SubjectBadges({ userId, kendiProfilim = false }) {
           })}
         </View>
       )}
-    </View>
+    </Card>
   )
 }
 

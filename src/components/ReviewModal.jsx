@@ -204,7 +204,7 @@ function YildizSatiri({ label, hint, value, onChange }) {
             accessibilityState={{ checked: value === star }}
             accessibilityLabel={`${star} yıldız`}
             onPress={() => onChange(star)}
-            className="h-11 w-11 items-center justify-center rounded-lg active:bg-slate-50"
+            className="h-[44px] w-[44px] items-center justify-center rounded-lg active:bg-slate-50"
           >
             <YildizIkonu
               boy={28}

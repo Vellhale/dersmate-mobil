@@ -150,7 +150,7 @@ export default function Profil() {
           <Pressable
             accessibilityRole="button"
             onPress={() => router.push('/yonetim')}
-            className="min-h-[44px] items-center justify-center rounded-xl border border-brand-200 bg-brand-50"
+            className="min-h-[44px] items-center justify-center rounded-lg border border-brand-200 bg-brand-50"
           >
             <Text className="text-sm font-medium text-brand-700">Yönetim paneli</Text>
           </Pressable>

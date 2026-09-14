@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { beyaz, brand, slate } from '../lib/theme'
 import { buyukHarf } from '../lib/metin'
+import { GeriIkonu } from './Ikonlar'
 
 /*
   YÜZEY DİLİ — web'deki components/ui.jsx'in RN portu. Kararlar aynen taşındı:
@@ -21,7 +22,8 @@ import { buyukHarf } from '../lib/metin'
     zemin  bg-slate-50 (sayfa)
     kart   beyaz + border-slate-100 + hafif gölge — derinlik kartın kendisinden değil,
            zeminden AYRILMASINDAN gelir (web'deki 2026-08-24 kararı)
-    köşe   rounded-2xl (16px): "kutu" değil "kart"
+    köşe   rounded-2xl (20px; mobil ölçek web'den bir basamak yumuşak, bkz. tailwind.config.js):
+           "kutu" değil "kart"
     buton  zemini brand-600 (beyaz metinle 4.90:1); brand-500 kimlik rengidir, zemin değil
 
   DOKUNMA HEDEFİ: her basılabilir öğe en az 44px yüksekliğinde. Web'de bu kural lg
@@ -91,20 +93,55 @@ export function Button({
 */
 export function Card({ className = '', dolgu = 'p-5', children }) {
   return (
-    <View
-      className={`rounded-2xl border border-slate-100 bg-white ${dolgu} ${className}`}
-      // Gölge NativeWind sınıfıyla değil style ile: RN'de gölge platforma göre ayrışır
-      // (iOS shadow*, Android elevation) ve web'deki shadow-sm'in dengi bu ikili.
-      style={{
-        shadowColor: slate[900],
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        shadowOffset: { width: 0, height: 1 },
-        elevation: 1,
-      }}
-    >
+    <View className={`rounded-2xl border border-slate-100 bg-white ${dolgu} ${className}`} style={KART_GOLGESI}>
       {children}
     </View>
+  )
+}
+
+/*
+  KART GÖLGESİ — TEK TANIM. Card bunu kullanıyor; Card olamayan kart yüzeyleri (basılabilir
+  defter başlığı, perdelenmiş gönderi) de style olarak bunu verir. Elle yazılan kart gölgesiz
+  kalıyordu ve yayvan gölgeyle gölgeli/gölgesiz kartlar aynı ekranda yan yana belirginleşti.
+
+  Gölge sınıfla değil style ile ve boxShadow olarak: YAYVAN VE HAFİF (genel yumuşatma,
+  2026-09-14; renk slate-900). Eski ikili (shadowRadius 2 + Android elevation 1) kartın altına
+  sert bir çizgi çekiyordu; elevation'ın yayılımı da ayarlanamıyor. overflow-hidden gölgeyi
+  kırpmıyor (iOS ayrı kap görünümü kullanıyor, Android yalnızca çocukları kırpıyor).
+
+  ⚠️ ANDROID 9 (API 28) ALTINDA boxShadow ÇİZİLMİYOR: RN dış gölgeyi yalnızca
+  MIN_OUTSET_BOX_SHADOW_SDK_VERSION = 28 ve üstünde ekliyor (OutsetBoxShadowDrawable.kt), minSdk
+  ise 24. Orada eski elevation 1'e düşülüyor; yoksa kart zeminden yalnızca slate-100 kenarla
+  (~1.05:1) ayrılır, pratikte görünmezdi. İkisi BİRLİKTE verilmez: API 28+'da çift gölge çizilir.
+*/
+export const KART_GOLGESI =
+  Platform.OS === 'android' && Platform.Version < 28
+    ? { elevation: 1, shadowColor: slate[900] }
+    : { boxShadow: '0px 4px 16px rgba(15, 23, 42, 0.06)' }
+
+/**
+ * Yığın ekranı başlığındaki geri düğmesi — yumuşak gri daire içinde ok ucu.
+ *
+ * NEDEN BİLEŞEN: yedi başlıkta aynı Pressable elle kopyalanmıştı ve "←" metin glifi yazı
+ * tipine göre ince, soluk (slate-500) ve dikeyde kayık çiziliyordu. Daire 44px: dokunma
+ * hedefi görünen şeklin kendisi (hitSlop web önizlemesinde uygulanmıyor). Boy px ile
+ * yazılı: h-11 rem'dir ve cihazda 38.5dp çizilir (NativeWind rem = 14), yani kuralın altında
+ * kalırdı; web önizlemesi 44 gösterdiği için fark ancak cihazda görünür. Basılı zemin
+ * slate-200, yani basış gözle görülüyor.
+ *
+ * `onPress` çağıranda kalır: dönüş hedefi ekrana göre değişiyor (sohbet /mesajlar'a,
+ * diğerleri köke düşüyor). Erişim adı varsayılan "Geri"; nereye döndüğü önemliyse verilir.
+ */
+export function GeriDugmesi({ onPress, accessibilityLabel = 'Geri' }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      onPress={onPress}
+      className="h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full bg-slate-100 active:bg-slate-200"
+    >
+      <GeriIkonu renk={slate[800]} boy={22} kalinlik={2.25} />
+    </Pressable>
   )
 }
 

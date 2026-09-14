@@ -16,7 +16,9 @@ import {
   EmptyState,
   ErrorBox,
   Field,
+  GeriDugmesi,
   Girdi,
+  KART_GOLGESI,
   Loading,
   Modal,
   Notice,
@@ -390,7 +392,9 @@ function YazarSatiri({ yazar, damga, kucuk = false }) {
     akıyor ve solda dikey bir ray okuma genişliğini boşuna daraltırdı.
 */
 function OyRayi({ arti, eksi, oy = 0, onOy, kucuk = false, yatay = false }) {
-  const olcu = kucuk ? 'h-9 w-9' : 'h-11 w-11'
+  // px ile: h-9 / h-11 rem'dir ve cihazda 31.5 / 38.5dp çizilir (NativeWind rem = 14), yani
+  // hitSlop'lu yorum rayı da gönderi rayı da 44'ün altında kalıyordu.
+  const olcu = kucuk ? 'h-[36px] w-[36px]' : 'h-[44px] w-[44px]'
   const hedefBuyutme = kucuk ? { top: 4, bottom: 4, left: 6, right: 6 } : undefined
   const sayiRengi = oy === 1 ? 'text-brand-700' : oy === -1 ? 'text-slate-800' : 'text-slate-600'
 
@@ -836,15 +840,8 @@ export default function Topluluk() {
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
-      <View className="flex-row items-center gap-2 border-b border-slate-200 bg-white px-2 py-2">
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Geri"
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-          className="h-11 w-11 items-center justify-center rounded-lg"
-        >
-          <Text className="text-xl text-slate-500">←</Text>
-        </Pressable>
+      <View className="flex-row items-center gap-3 border-b border-slate-200 bg-white px-4 py-2">
+        <GeriDugmesi onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
         <Text className="flex-1 text-lg font-bold text-slate-900">Topluluk</Text>
       </View>
 
@@ -952,7 +949,7 @@ function GonderiKutusu({ session, onAc }) {
           accessibilityRole="button"
           accessibilityLabel="Yeni gönderi yaz"
           onPress={onAc}
-          className="min-h-[44px] flex-1 justify-center rounded-xl border border-slate-200 bg-white px-4 active:bg-slate-50"
+          className="min-h-[44px] flex-1 justify-center rounded-lg border border-slate-200 bg-white px-4 active:bg-slate-50"
         >
           <Text numberOfLines={1} className="text-sm text-slate-500">
             Bir soru sor ya da neler olduğunu anlat…
@@ -1075,10 +1072,11 @@ function FiltreSeridi({
 /* ─── GÖNDERİ KARTI ────────────────────────────────────────────────────────── */
 
 /*
-  Kart yüzeyi ui.jsx'teki Card ile AYNI dil (rounded-2xl + border-slate-100 + beyaz) ama
-  Card bileşeni değil: perde şeridinin kartın üst kenarına yapışması için iç dolgunun
-  bölünmesi gerekiyor, Card ise tek parça p-5 veriyor (dersler.jsx'teki ders kartı da
-  aynı sebeple ham View).
+  Kart yüzeyi ui.jsx'teki Card, dolgusuz: perde şeridinin kartın üst kenarına yapışması için
+  iç dolgu bölünüyor (`dolgu="p-0"`, dolgu içerideki satırlarda). Eskiden ham View'di ve
+  Card'ın gölgesini almıyordu; yayvan gölgeyle filtre kartı gölgeli, altındaki gönderiler
+  düz duruyordu. Perdelenmiş gönderi amber zeminli ama akışta aynı yuvayı tutuyor, gölgesi
+  de aynı tanımdan (KART_GOLGESI).
 */
 function GonderiKarti({ gonderi, benimUserId, onOy, onAc, gizliAcik, onGizliAc, onSikayet }) {
   const etiketAnahtari = ETIKET_ANAHTARI[gonderi.tag] ?? gonderi.tag
@@ -1100,7 +1098,7 @@ function GonderiKarti({ gonderi, benimUserId, onOy, onAc, gizliAcik, onGizliAc, 
   */
   if (gonderi.underReview && !gizliAcik) {
     return (
-      <View className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+      <View className="rounded-2xl border border-amber-200 bg-amber-50 p-4" style={KART_GOLGESI}>
         <View className="flex-row items-start gap-3">
           <View className="mt-0.5">
             <UyariIkonu renk={amber[800]} boy={20} />
@@ -1130,7 +1128,7 @@ function GonderiKarti({ gonderi, benimUserId, onOy, onAc, gizliAcik, onGizliAc, 
   }
 
   return (
-    <View className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
+    <Card dolgu="p-0" className="overflow-hidden">
       {/* Perde açıldıysa uyarı kartın ÜSTÜNDE kalıyor: kullanıcı "yine de göster"e
           bastığı anı unutabilir, içeriğin durumu unutulmamalı. */}
       {gonderi.underReview && (
@@ -1195,7 +1193,7 @@ function GonderiKarti({ gonderi, benimUserId, onOy, onAc, gizliAcik, onGizliAc, 
           </Pressable>
         </View>
       </View>
-    </View>
+    </Card>
   )
 }
 
@@ -1685,7 +1683,8 @@ function KurallarKarti() {
           <View key={kural} className="flex-row gap-2.5">
             {/* Numara madde işaretinden daha iyi: kurallar bir moderasyon kararında
                 referans veriliyor ("3. kural"), numarasız bir liste bunu yapamaz. */}
-            <View className="mt-0.5 h-5 w-5 shrink-0 items-center justify-center rounded-md bg-slate-100">
+            {/* rounded (6): h-5 cihazda 17.5dp; md (8) bu kutuda daireye dönüyordu. */}
+            <View className="mt-0.5 h-5 w-5 shrink-0 items-center justify-center rounded bg-slate-100">
               <Text className="text-[11px] font-bold text-slate-600">{i + 1}</Text>
             </View>
             <Text className="flex-1 text-xs leading-relaxed text-slate-600">{kural}</Text>

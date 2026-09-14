@@ -25,10 +25,13 @@ import {
 import {
   Badge,
   Button,
+  Card,
   EmptyState,
   ErrorBox,
   Field,
+  GeriDugmesi,
   Girdi,
+  KART_GOLGESI,
   Loading,
   Modal,
   Notice,
@@ -399,15 +402,8 @@ export default function Dersler() {
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
-      <View className="flex-row items-center gap-2 border-b border-slate-200 bg-white px-2 py-2">
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Geri"
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-          className="h-11 w-11 items-center justify-center rounded-lg"
-        >
-          <Text className="text-xl text-slate-500">←</Text>
-        </Pressable>
+      <View className="flex-row items-center gap-3 border-b border-slate-200 bg-white px-4 py-2">
+        <GeriDugmesi onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
         <Text className="flex-1 text-lg font-bold text-slate-900">Derslerim</Text>
         {/* İkincil: başlıkta her an duran dolgulu düğme, listedeki acil onayla ("Kanıtı incele
             ve onayla") göz için yarışıyordu. Rezervasyon artık çoğunlukla arkadaş kartından,
@@ -647,7 +643,7 @@ function SessionKarti({ session, onAction, past = false, kilitli = false }) {
   const stil = DURUM_STILI[session.status] ?? VARSAYILAN_DURUM_STILI
 
   return (
-    <View className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
+    <Card dolgu="p-0" className="overflow-hidden">
       {/* Durum şeridi: kenarlık değil, içeriden çekilmiş yuvarlak uçlu çubuk. Bilgi
           taşımıyor, hızlandırıyor — aynı durum metinli rozette de yazılı. */}
       <View className={`absolute bottom-4 left-0 top-4 w-1 rounded-r-full ${stil.serit}`} />
@@ -759,7 +755,7 @@ function SessionKarti({ session, onAction, past = false, kilitli = false }) {
           </Button>
         )}
       </View>
-    </View>
+    </Card>
   )
 }
 
@@ -1653,6 +1649,8 @@ function PuanGecmisi() {
         accessibilityState={{ expanded: open }}
         onPress={toggle}
         className="min-h-[44px] flex-row items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white px-5 py-4"
+        // Basılabilir olduğu için Card değil; kart yüzeyinin gölgesi yine tek tanımdan.
+        style={KART_GOLGESI}
       >
         <View className="min-w-0 shrink">
           <Text className="text-sm font-semibold text-slate-900">Puan geçmişi</Text>
@@ -1670,15 +1668,15 @@ function PuanGecmisi() {
           {loading && rows.length === 0 ? (
             <Loading />
           ) : rows.length === 0 && !error ? (
-            <View className="rounded-2xl border border-slate-100 bg-white p-5">
+            <Card>
               <Text className="text-sm text-slate-600">
                 Henüz puan hareketin yok. Bir ders anlatıp onaylandığında ilk kaydın burada
                 belirir.
               </Text>
-            </View>
+            </Card>
           ) : (
             /* TEK kart, ince ayraçlar: defter tek bir belgedir, kart koleksiyonu değil. */
-            <View className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
+            <Card dolgu="p-0" className="overflow-hidden">
               {rows.map((row, i) => (
                 <HareketSatiri key={`${row.createdAtUtc}-${i}`} row={row} ilk={i === 0} />
               ))}
@@ -1690,7 +1688,7 @@ function PuanGecmisi() {
                   </Button>
                 </View>
               )}
-            </View>
+            </Card>
           )}
         </View>
       )}

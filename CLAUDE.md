@@ -202,6 +202,11 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
   (`src/lib/iliski.js` → `ogrenciKonusu`): Arkadaşlar kartındaki "Ders rezerve et" yalnızca öğrenci
   tarafta, konulu eşleşmede çıkar; anlatan tarafta bilgi satırı var. Web'de `Matches.jsx` düğme koşulu
   ve `Sessions.jsx` ön seçimsiz — aynı çıkmaz orada duruyor.
+- **Köşe yarıçapı ve kart gölgesi** (2026-09-14): mobil `tailwind.config.js` yarıçapı px ve bir
+  basamak yumuşak (lg 12 · xl 16 · 2xl 20), web Tailwind varsayılanında (lg 8 · xl 12 · 2xl 16)
+  ve kartta `shadow-sm`. Sınıf adları aynı: port ederken `rounded-*` değiştirilmez, değer farkı
+  config'ten gelir (tek istisna küçük kareler, bkz. "Dokunma ve yüzey dili"). Paletteki "iki
+  dosya birden güncellenir" kuralı bu ayar için GEÇERLİ DEĞİL.
 
 - `localStorage` → oturum + HWID **SecureStore**'da, tercihler AsyncStorage'da
   (`src/lib/storage.js`). Oturum açılışta BİR KEZ okunur, sonrası bellekte —
@@ -334,9 +339,32 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
 
 - Basılabilir her öğe **min 44px**; girdi puntosu **16px** (`text-base`). Web'de bu
   kurallar `lg` kırılımına bağlıydı; mobilde koşulsuz.
+
+  ⚠️ 44 px ile yazılır: `h-[44px]` / `min-h-[44px]`. Boşluk ve boy sınıfları rem ve NativeWind
+  cihazda rem'i **14** sayıyor (`inlineRem`): `h-11` telefonda 38.5dp, `h-9` 31.5, `p-1` 3.5.
+  Web önizlemesi rem 16 ile 44 gösterdiği için bu fark ancak cihazda görünür.
 - Yüzey dili `src/components/ui.jsx`'te tek yerde: kart = beyaz + `border-slate-100` +
   hafif gölge + `rounded-2xl`; sayfa zemini `bg-slate-50`. Sayfalar kendi yüzey dilini
-  icat etmez.
+  icat etmez: kart yüzeyi elle kurulmaz, bölünmüş dolgulu kart `<Card dolgu="p-0"
+  className="overflow-hidden">` ile yazılır. Card olamayan kart (basılabilir yüzey) gölgeyi
+  `KART_GOLGESI`'nden alır.
+- **Köşe yarıçapı px ve Tailwind'den BİR BASAMAK yumuşak** (kullanıcı kararı, 2026-09-14;
+  `tailwind.config.js` → `borderRadius`): sm 4 · DEFAULT 6 · md 8 · lg 12 (düğme, girdi,
+  uyarı) · xl 16 (iç kutu) · 2xl 20 (kart, alt sayfa) · 3xl 28 (AuthKabuk paneli) · full
+  değişmedi. px, çünkü rem cihazda 14'le çarpılıyordu (rounded-lg telefonda 7, önizlemede 8).
+  İç içe öğede iç yarıçap ≈ dış − dolgu (segment rayı lg + p-1 → sekme md). Boy hâlâ rem
+  olduğu için küçük karelerde yarıçap bir basamak düşürülür: 28dp ve altındaki kutuda lg ve
+  üstü daireye döner (`Avatar` tablosu web'den bir basamak aşağıda).
+- **Kart gölgesi `boxShadow: 0px 4px 16px rgba(15,23,42,0.06)`** — yayvan ve hafif, tek tanım
+  `KART_GOLGESI` (ui.jsx). Android 9 (API 28) altında RN dış `boxShadow` çizmiyor (minSdk 24),
+  orada eski `elevation: 1`'e düşülüyor; ikisi birlikte verilmez (API 28+'da çift gölge).
+  `overflow-hidden` gölgeyi kırpmıyor.
+- **Yığın ekranı başlığı**: geri düğmesi `GeriDugmesi` (ui.jsx; slate-100 daire içinde
+  `GeriIkonu` chevron-left). Elle Pressable ve "←" metin glifi YAZILMAZ. Şerit `flex-row
+  items-center gap-3 border-b border-slate-200 bg-white px-4 py-2`: px-4, sekme başlığı
+  (`EkranBasligi`) ve içeriğin `p-4` kenarıyla aynı hizada. Sohbet başlığı gap-2 (şeritte
+  dört-beş öğe var). Dönüş hedefi `onPress` ile verilir; nereye döndüğü önemliyse
+  `accessibilityLabel` ("Sohbet listesine dön").
 - Renk DEĞERİ gereken yerler (tab bar, SVG, StatusBar) `src/lib/theme.js`'ten okur —
   hex'i elle yazma, palet tek kaynaktan gelsin.
 - **Renk rolleri (A düzeni)** — renk anlam taşır, süs değildir:

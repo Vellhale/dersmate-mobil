@@ -43,10 +43,16 @@ function basHarfler(name = '') {
 /*
   Küçük boyutlar YUVARLATILMIŞ KARE, xl TAM DAİRE — web kararı aynen: liste satırında
   kare avatar hizalanması kolay bir blok; profil başlığında daire daha çok yüz gösterir.
+
+  YARIÇAP SINIFI WEB'DEN BİR BASAMAK AŞAĞIDA (sm md, md lg; web sm lg, md xl). Mobil köşe
+  ölçeği px ve bir basamak yumuşak (tailwind.config.js) ama kutu boyu hâlâ rem: cihazda
+  sm 28dp. Web sınıfıyla sm 12/28 (düz kenar 4dp) daireden ayırt edilmiyordu ve md mesaj
+  satırının (rounded-lg) içinde satırdan daha yuvarlak duruyordu. Bu tabloyla üç boyut da
+  cihazda ~%29 (eskiden %25/%25/%20): biraz yumuşak, şekil tek.
 */
 const BOYUTLAR = {
-  sm: { kutu: 'h-8 w-8 rounded-lg', yazi: 'text-xs', px: 32 },
-  md: { kutu: 'h-12 w-12 rounded-xl', yazi: 'text-sm', px: 48 },
+  sm: { kutu: 'h-8 w-8 rounded-md', yazi: 'text-xs', px: 32 },
+  md: { kutu: 'h-12 w-12 rounded-lg', yazi: 'text-sm', px: 48 },
   lg: { kutu: 'h-20 w-20 rounded-2xl', yazi: 'text-2xl', px: 80 },
   xl: { kutu: 'h-28 w-28 rounded-full', yazi: 'text-4xl', px: 112 },
 }

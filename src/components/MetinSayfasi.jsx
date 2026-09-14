@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { ILETISIM_EPOSTA } from '../lib/yasalMetinler'
 import { Logo } from './Logo'
-import { Notice } from './ui'
+import { GeriDugmesi, Notice } from './ui'
 
 /*
   UZUN METİN SAYFALARININ ORTAK KABUĞU — web'deki pages/MetinSayfasi.jsx'in portu.
@@ -91,15 +91,8 @@ export function MetinUstSeridi() {
   const router = useRouter()
 
   return (
-    <View className="flex-row items-center gap-2 border-b border-slate-200 bg-white px-2 py-2">
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Geri"
-        onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-        className="h-11 w-11 items-center justify-center rounded-lg active:bg-slate-100"
-      >
-        <Text className="text-xl text-slate-500">←</Text>
-      </Pressable>
+    <View className="flex-row items-center gap-3 border-b border-slate-200 bg-white px-4 py-2">
+      <GeriDugmesi onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
       <Logo boyut="sm" />
     </View>
   )

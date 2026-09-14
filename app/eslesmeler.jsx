@@ -7,7 +7,7 @@ import { useAsync } from '../src/state/useAsync'
 import { useInbox } from '../src/state/InboxContext'
 import { formatDateTime } from '../src/lib/format'
 import { Avatar } from '../src/components/Avatar'
-import { Badge, Button, EmptyState, ErrorBox, Loading, Notice, SayacRozeti } from '../src/components/ui'
+import { Badge, Button, Card, EmptyState, ErrorBox, GeriDugmesi, Loading, Notice, SayacRozeti } from '../src/components/ui'
 import { ogrenciKonusu } from '../src/lib/iliski'
 
 /*
@@ -78,26 +78,19 @@ export default function Eslesmeler() {
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
-      <View className="flex-row items-center gap-2 border-b border-slate-200 bg-white px-2 py-2">
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Geri"
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-          className="h-11 w-11 items-center justify-center rounded-lg"
-        >
-          <Text className="text-xl text-slate-500">←</Text>
-        </Pressable>
-        {/* min-w-0 flex-1: satırda geri düğmesi var ve düz View daralmadığı için alt başlık
-            ekranın sağından taşıp kırpılıyordu (yonetim.jsx'teki başlıkla aynı kalıp). */}
-        <View className="min-w-0 flex-1">
-          <Text className="text-lg font-bold text-slate-900">Arkadaşlar</Text>
-          <Text className="text-xs text-slate-500">
-            İstek kabul edilince sohbet açılır; ders de oradan planlanır.
-          </Text>
-        </View>
+      <View className="flex-row items-center gap-3 border-b border-slate-200 bg-white px-4 py-2">
+        <GeriDugmesi onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
+        <Text className="min-w-0 flex-1 text-lg font-bold text-slate-900">Arkadaşlar</Text>
       </View>
 
-      <View className="m-4 mb-0 flex-row rounded-lg bg-slate-100 p-1">
+      {/* Açıklama cümlesi başlık şeridinde değil içeriğin başında (Derslerim ve Topluluk'la aynı
+          yer). Şeritte 390 dp'de iki satıra kırılıyordu: şerit öteki yığın başlıklarından 16px
+          uzuyor ve geri düğmesi ekranlar arasında geçerken 8px zıplıyordu (ölçüldü). */}
+      <Text className="mx-4 mt-4 text-sm text-slate-600">
+        İstek kabul edilince sohbet açılır; ders de oradan planlanır.
+      </Text>
+
+      <View className="mx-4 mt-3 flex-row rounded-lg bg-slate-100 p-1">
         {TABS.map((item) => {
           const sayi = lists[item.key]?.length ?? 0
           return (
@@ -259,7 +252,7 @@ function MatchKarti({ match, tab, router, onChanged }) {
   }
 
   return (
-    <View className="rounded-2xl border border-slate-100 bg-white p-5">
+    <Card>
       <Pressable
         accessibilityRole="link"
         accessibilityLabel={`${match.otherDisplayName} profilini aç`}
@@ -403,6 +396,6 @@ function MatchKarti({ match, tab, router, onChanged }) {
           <ErrorBox error={error} />
         </View>
       )}
-    </View>
+    </Card>
   )
 }
