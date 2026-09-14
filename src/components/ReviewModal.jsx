@@ -37,8 +37,10 @@ export function ReviewModal({ session, open, onClose, onSubmitted }) {
   const [busy, setBusy] = useState(false)
 
   // Üç puanın da verilmesi beklenir: eksik puanı 5 sayıp göndermek, kullanıcının
-  // söylemediği bir şeyi ona söyletmek olurdu.
-  const ready = SCORE_FIELDS.every((f) => scores[f.key] >= 1)
+  // söylemediği bir şeyi ona söyletmek olurdu. Eksikler AD ADINA tutuluyor: pasif
+  // "Gönder" basınca hiçbir yanıt vermiyordu; footer artık hangi satırların kaldığını söylüyor.
+  const eksik = SCORE_FIELDS.filter((f) => scores[f.key] < 1)
+  const ready = eksik.length === 0
 
   function toggleTag(value) {
     setTags((current) =>
@@ -67,6 +69,13 @@ export function ReviewModal({ session, open, onClose, onSubmitted }) {
       title="Dersi değerlendir"
       footer={
         <>
+          {/* `w-full`: footer flex-row flex-wrap, metin düğmelerin üstünde kendi satırına
+              iner. Her puanda liste kısaldığı için `aria-live` kalanı yeniden okutuyor. */}
+          {eksik.length > 0 && (
+            <Text aria-live="polite" className="w-full text-right text-xs text-slate-600">
+              Göndermek için puanla: {eksik.map((f) => f.label).join(', ')}
+            </Text>
+          )}
           <Button variant="secondary" onPress={onClose}>
             Şimdi değil
           </Button>

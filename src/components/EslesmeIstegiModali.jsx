@@ -121,6 +121,18 @@ export function EslesmeIstegiModali({ person, myOffers, konuDurumu, onClose, onS
       title="Arkadaş isteği"
       footer={
         <>
+          {/*
+            PASİF DÜĞME NEDENİNİ SÖYLER: "İsteği gönder" konu seçilmeden basılamıyor ve
+            basınca hiçbir yanıt vermiyordu; kullanıcı neyin eksik olduğunu tahmin etmek
+            zorundaydı. `w-full` metni footer'ın (flex-row flex-wrap) kendi satırına indirir.
+            `aria-live`: Android ve web'de değişen metin okunur; accessibilityLiveRegion
+            RN Web'de kullanım dışı uyarısı veriyor, native çözümleyici ikisini de tanıyor.
+          */}
+          {!requestedTopicId && (
+            <Text aria-live="polite" className="w-full text-right text-xs text-slate-600">
+              Göndermek için almak istediğin konuyu seç.
+            </Text>
+          )}
           <Button variant="secondary" onPress={onClose}>
             Vazgeç
           </Button>
@@ -170,12 +182,19 @@ export function EslesmeIstegiModali({ person, myOffers, konuDurumu, onClose, onS
               </SecimSatiri>
             ))}
 
-            <Text className="text-xs text-slate-500">
+            <Text className="text-xs text-slate-600">
               {tradeableOffers.length > 0
                 ? 'Takas teklifi isteğin kabul edilme ihtimalini artırır.'
                 : 'Karşı tarafın aradığı konulardan birini verebiliyorsan burada görünür. Boş bırakman da sorun değil — ders almak ücretsiz.'}
             </Text>
           </View>
+
+          {/* İsteğin SONUCU gönderimden ÖNCE anlatılır: kullanıcı kabulden sonra ne
+              olacağını bilmiyordu. Üçü de sunucu davranışı — RespondMatch kabulde sohbeti
+              açıyor, BookSession yalnızca kabul edilmiş eşleşmenin konularına ders alıyor. */}
+          <Text className="text-xs text-slate-600">
+            Kabul edilince arkadaş olursunuz, sohbet açılır ve bu konuda ders rezerve edebilirsin.
+          </Text>
 
           <ErrorBox error={error} />
         </View>
