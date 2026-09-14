@@ -7,6 +7,7 @@ import DateTimePicker from '@react-native-community/datetimepicker'
 import { api } from '../src/lib/api'
 import { useYetkiliGorsel } from '../src/components/YetkiliGorsel'
 import { amber, rose, slate } from '../src/lib/theme'
+import { eylemBekliyor } from '../src/lib/dersDurumu'
 import { useAsync } from '../src/state/useAsync'
 import { useWallet } from '../src/state/WalletContext'
 import { Avatar } from '../src/components/Avatar'
@@ -35,7 +36,8 @@ import {
 
 /*
   DERSLERİM — web'deki pages/Sessions.jsx'in portu. Web'in iki sabit sütunu mobilde
-  TEK AKIŞA iner: aksiyon bekleyenler → planlanmış → saati geçmiş açıklar → geçmiş.
+  TEK AKIŞA iner: aksiyon bekleyenler → itirazda → planlanmış → saati geçmiş açıklar →
+  geçmiş. ("İtirazda" mobilde ayrı başlık; web itirazları aksiyon grubunda tutuyor.)
 
   İKİ BİLİNÇLİ MOBİL FARKI:
   • Geçmiş SAYFA DEĞİŞTİRMEZ, BİRİKİR (iş kuralı 4): 5'erli sayfalar FlatList
@@ -123,13 +125,21 @@ export default function Dersler() {
     const active = sessions.data?.active ?? []
     const simdi = Date.now()
 
-    const aksiyonBekliyor = (s) => s.canComplete || s.canApprove || s.status === 'Disputed'
+    /*
+      Aksiyon tanımı Akış başlığındaki Derslerim sayacıyla ORTAK (lib/dersDurumu.js): rozet
+      "2" deyip burada tek kart görünmesin. İtirazdaki dersler eskiden bu grubun içindeydi,
+      ama onlarda kullanıcının basabileceği bir düğme yok, karar yönetimde. Ayrı başlığa
+      alındılar. Aksi hâlde "Senden aksiyon bekleyenler" yapılamayacak bir iş vaat ediyordu.
+    */
+    const aksiyonBekliyor = (s) => eylemBekliyor(s, simdi)
+    const itirazda = (s) => s.status === 'Disputed'
     const saatiGecti = (s) => new Date(s.scheduledEndUtc).getTime() <= simdi
 
     return {
       action: active.filter(aksiyonBekliyor),
-      upcoming: active.filter((s) => !aksiyonBekliyor(s) && !saatiGecti(s)),
-      gecmisAcik: active.filter((s) => !aksiyonBekliyor(s) && saatiGecti(s)),
+      itirazda: active.filter(itirazda),
+      upcoming: active.filter((s) => !aksiyonBekliyor(s) && !saatiGecti(s) && s.status !== 'Disputed'),
+      gecmisAcik: active.filter((s) => !aksiyonBekliyor(s) && saatiGecti(s) && s.status !== 'Disputed'),
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessions.data, tick])
@@ -199,7 +209,12 @@ export default function Dersler() {
   const hicDersYok =
     !sessions.error &&
     sessions.data != null &&
-    groups.action.length + groups.upcoming.length + groups.gecmisAcik.length + gecmisItems.length === 0
+    groups.action.length +
+      groups.itirazda.length +
+      groups.upcoming.length +
+      groups.gecmisAcik.length +
+      gecmisItems.length ===
+      0
 
   const baslikBolumu = (
     <View className="gap-3 pb-1">
@@ -239,6 +254,17 @@ export default function Dersler() {
                 Senden aksiyon bekleyenler
               </AltBaslik>
               {groups.action.map((s) => (
+                <SessionKarti key={s.sessionId} session={s} onAction={setDialog} />
+              ))}
+            </>
+          )}
+
+          {/* Aksiyonun hemen altında: kullanıcı itiraz ettiği dersi arıyor ve Planlanmış'ın
+              altında kaybolmamalı. Başlık bekleyenin kim olduğunu söylüyor. */}
+          {groups.itirazda.length > 0 && (
+            <>
+              <AltBaslik sayi={groups.itirazda.length}>İtirazda, karar yönetimde</AltBaslik>
+              {groups.itirazda.map((s) => (
                 <SessionKarti key={s.sessionId} session={s} onAction={setDialog} />
               ))}
             </>

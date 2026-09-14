@@ -123,6 +123,38 @@ export function Badge({ tone = 'neutral', className = '', children }) {
   )
 }
 
+/**
+ * Sayaç rozeti — "senden bekleyen iş var" işareti (gelen istek, işlem bekleyen ders).
+ * Badge'den ayrı: Badge durum ANLATIR ve her zaman görünür, bu yalnızca sayı taşır ve
+ * sayı 0 iken HİÇ çizilmez ("0" yazan kırmızı nokta kullanıcıyı boş bir ekrana çağırır).
+ * Tek renk (rose-600 + beyaz), Mesajlar sekmesindeki okunmamış rozetiyle aynı dil.
+ *
+ * EKRAN OKUYUCUDAN GİZLİ: sayı değiştiğinde kendi başına duyurulmuyor. Sayıyı ebeveyn
+ * düğmenin erişim adı taşımalı ("Derslerim, 2 ders işlem bekliyor"); rozet ayrıca
+ * okunsaydı düğme adından kopuk bir "2" durağı olurdu.
+ *
+ * 9'dan sonrası "9+": 44px'lik ikon düğmesinin köşesine iki haneden fazlası sığmıyor ve
+ * onuncu işten sonra kesin sayı karar değiştirmiyor. Konumu çağıran className ile verir
+ * (ikon düğmesinde `absolute`): dokunma alanının İÇİNDE kalmalı, tur çıpası ölçüsü değişmesin.
+ */
+export function SayacRozeti({ sayi, className = '' }) {
+  if (!(sayi > 0)) return null
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      className={`h-[18px] min-w-[18px] items-center justify-center rounded-full bg-rose-600 px-1 ${className}`}
+    >
+      <Text
+        className="text-[11px] font-semibold leading-[14px] text-white"
+        style={{ fontVariant: ['tabular-nums'] }}
+      >
+        {sayi > 9 ? '9+' : sayi}
+      </Text>
+    </View>
+  )
+}
+
 export function Spinner({ boy = 'small', renk = brand[600] }) {
   return <ActivityIndicator size={boy} color={renk} />
 }

@@ -267,7 +267,22 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
     her yeni yer başarıdan sonra `engelDegisti()` çağırmalı. Sayaç api.js'e konamaz:
     önizleme api nesnesini `onizlemeApi` ile eziyor.
   - İlk odak `useFocusEffect`'te de çalışır (ekran odaktayken kurulursa); ilk çekimi
-    zaten yapan ekranda o çağrı atlanmalı.
+    zaten yapan ekranda o çağrı atlanmalı. ⚠️ Kurulum efektinde indirilen `kuruluyor`
+    bayrağı bunu YAPAMIYOR: expo-router'ın `useFocusEffect`'i ilk çağrıyı bir render
+    geciktiriyor (`useOptionalNavigation`) ve bayrağı inmiş buluyor. Yeni ekranlar
+    `src/state/useOnePlanaGelince.js`'i kullanmalı (kurulum anındaki `isFocused()`'a
+    bakıyor). `eslesmeler.jsx` ve `ArkadaslarBolumu` hâlâ eski kalıpta; önizlemede
+    açılışta `myMatches` / `userFriends` ikişer kez çağrılıyor (2026-09-14 ölçümü).
+- **Akış başlığında bekleyen iş sayaçları mobilde var, web'de yok.** Web `Layout.jsx`
+  yalnızca okunmamış mesaj rozeti taşıyor. Mobilde Arkadaşlar ikonu gelen istek sayısını
+  (`myMatches`), Derslerim ikonu kullanıcının kapatabileceği ders sayısını
+  (`mySessions(1, 1)`) gösteriyor; push olmadığı için 14 günde düşen isteği ve 48 saatte
+  otomatik onaylanan dersi kullanıcıya haber veren tek şey bunlar. "İşlem bekliyor"
+  tanımı TEK yerde (`src/lib/dersDurumu.js` → `eylemBekliyor`) ve Derslerim'in aksiyon
+  grubu da onu kullanıyor. Aynı turda Derslerim'de itirazdaki (`Disputed`) dersler aksiyon
+  grubundan "İtirazda, karar yönetimde" başlığına çıktı; web onları hâlâ aksiyonda
+  gösteriyor. Sayaçlar odakta VE ön plana dönüşte tazeleniyor
+  (`src/state/useOnePlanaGelince.js`): odak olayı uygulama arka plandan dönünce gelmiyor.
 - Avatar önbellek sayacı **diskte** (`KEYS.avatarSurumleri`). Fresco'nun disk önbelleği
   uygulama yeniden başlatmalarını aşıyor; sayaç bellekte kalırsa açılışta temel URI'ye
   dönülür ve eski görsel ağa hiç çıkmadan sunulur.

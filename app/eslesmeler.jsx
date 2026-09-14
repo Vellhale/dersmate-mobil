@@ -7,7 +7,7 @@ import { useAsync } from '../src/state/useAsync'
 import { useInbox } from '../src/state/InboxContext'
 import { formatDateTime } from '../src/lib/format'
 import { Avatar } from '../src/components/Avatar'
-import { Badge, Button, EmptyState, ErrorBox, Loading, Notice } from '../src/components/ui'
+import { Badge, Button, EmptyState, ErrorBox, Loading, Notice, SayacRozeti } from '../src/components/ui'
 
 /*
   ARKADAŞLAR — web'deki pages/Matches.jsx'in portu. Tab çubuğunun üstünde yığın ekranı
@@ -98,6 +98,9 @@ export default function Eslesmeler() {
             <Pressable
               key={item.key}
               accessibilityRole="tab"
+              // Sayı adın içinde: Gelen'deki rozet ekran okuyucudan gizli (SayacRozeti), yani
+              // ad vermeseydik o sekme sayısız okunurdu. Üç sekme aynı biçimde adlanıyor.
+              accessibilityLabel={sayi > 0 ? `${item.label}, ${sayi}` : item.label}
               accessibilityState={{ selected: tab === item.key }}
               onPress={() => setTab(item.key)}
               className={`min-h-[44px] flex-1 flex-row items-center justify-center gap-1 rounded-md ${
@@ -111,7 +114,18 @@ export default function Eslesmeler() {
               >
                 {item.label}
               </Text>
-              {sayi > 0 && <Text className="text-xs text-slate-400">({sayi})</Text>}
+              {/* Gelen, Akış başlığındaki sayaçla aynı rozeti taşıyor: kullanıcıyı buraya o
+                  rozet çağırdı ve iş burada. Giden ile Arkadaş iş değil bilgi, nötr parantez
+                  kalıyor. Rengi slate-600: slate-400 beyaz zeminde bile 2.56:1'di (WCAG 1.4.3). */}
+              {item.key === 'incoming' ? (
+                <SayacRozeti sayi={sayi} />
+              ) : (
+                sayi > 0 && (
+                  <Text className="text-xs text-slate-600" style={{ fontVariant: ['tabular-nums'] }}>
+                    ({sayi})
+                  </Text>
+                )
+              )}
             </Pressable>
           )
         })}

@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useFocusEffect } from 'expo-router'
 import { api } from '../lib/api'
 import { ILISKI, iliskiHaritasi, kimlikAnahtari } from '../lib/iliski'
 import { useAsync } from './useAsync'
+import { useOnePlanaGelince } from './useOnePlanaGelince'
 
 /**
  * Oturum sahibinin arkadaşlık ilişkileri (bkz. lib/iliski.js).
  *
- * ODAKTA SESSİZ TAZELENİYOR: ilişki çoğu zaman BAŞKA ekranda değişiyor (Arkadaşlar'da
- * kabul, karşı tarafın kabulü). Kurulu kalan Keşfet ve profil ekranı tazelenmezse kabul
- * edilmiş isteğin kartında "İstek gönderildi" kalırdı (CLAUDE.md → "Başka ekranda değişen
- * veri ODAKTA tazelenir"). Liste sıfırlanmıyor, yalnızca bu küçük yanıt yeniden çekiliyor.
- * Kurulumla aynı anda gelen odak atlanıyor — ilk çekimi useAsync zaten yaptı
- * (ArkadaslarBolumu'ndaki kalıp).
+ * ODAKTA VE ÖN PLANA DÖNÜŞTE SESSİZ TAZELENİYOR: ilişki çoğu zaman BAŞKA ekranda ya da
+ * cihaz dışında değişiyor (Arkadaşlar'da kabul, karşı tarafın kabulü). Kurulu kalan Keşfet
+ * ve profil ekranı tazelenmezse kabul edilmiş isteğin kartında "İstek gönderildi" kalırdı
+ * (CLAUDE.md → "Başka ekranda değişen veri ODAKTA tazelenir"). Liste sıfırlanmıyor,
+ * yalnızca bu küçük yanıt yeniden çekiliyor. Kurulumla aynı anda gelen odak atlanıyor
+ * (bkz. useOnePlanaGelince). Akış başlığının gelen istek sayacı da bu yanıttan okunuyor.
  *
  * İYİMSER İŞARET: istek gönderilince kart ağ yanıtı beklemeden "İstek gönderildi"ye
  * dönüyor. İşaret sunucudan YENİ bir yanıt geldiğinde siliniyor — sunucu otorite. Kalıcı
@@ -26,15 +26,7 @@ export function useIliskiler(aktif = true) {
 
   const tazele = useRef(veri.reload)
   tazele.current = veri.reload
-  const kuruluyor = useRef(true)
-  useFocusEffect(
-    useCallback(() => {
-      if (!kuruluyor.current) tazele.current({ silent: true })
-    }, []),
-  )
-  useEffect(() => {
-    kuruluyor.current = false
-  }, [])
+  useOnePlanaGelince(() => tazele.current({ silent: true }))
 
   // Sunucudan yeni yanıt = iyimser işaretler artık gereksiz (ya da yanlış).
   useEffect(() => {
@@ -62,6 +54,9 @@ export function useIliskiler(aktif = true) {
     hata: veri.data ? null : veri.error,
     iliski,
     istekGonderildi,
+    /** Yanıtlanmayı bekleyen gelen istekler. Yanıt yokken 0: sayaç "bilinmiyor"u rozet
+        olarak çizmesin. */
+    gelenIstekSayisi: veri.data?.incoming?.length ?? 0,
     yenile: useCallback(() => tazele.current(), []),
   }
 }

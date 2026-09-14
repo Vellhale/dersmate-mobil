@@ -5,13 +5,16 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { sekmeAltDolgusu } from '../../src/lib/sekmeCubugu'
 import { api } from '../../src/lib/api'
 import { useAsync } from '../../src/state/useAsync'
+import { useIliskiler } from '../../src/state/useIliskiler'
+import { useOnePlanaGelince } from '../../src/state/useOnePlanaGelince'
+import { eylemBekliyor } from '../../src/lib/dersDurumu'
 import { brand, slate } from '../../src/lib/theme'
 import { EkranBasligi } from '../../src/components/EkranBasligi'
 import { KepIkonu, KisilerIkonu, ToplulukIkonu } from '../../src/components/Ikonlar'
 import { useTurCipasi } from '../../src/lib/tur'
 import { IlanKarti } from '../../src/components/IlanKarti'
 import { EslesmeIstegiModali } from '../../src/components/EslesmeIstegiModali'
-import { EmptyState, ErrorBox, Loading, Notice } from '../../src/components/ui'
+import { EmptyState, ErrorBox, Loading, Notice, SayacRozeti } from '../../src/components/ui'
 
 /*
   AKIŞ (ANA SAYFA) — Instagram düzeninin ana sayfası: kişiselleştirilmiş öneri
@@ -31,6 +34,14 @@ import { EmptyState, ErrorBox, Loading, Notice } from '../../src/components/ui'
   ÇEKEREK YENİLEME: akış deseninin beklenen jesti. useAsync'in loading bayrağı sessiz
   tazelemede yükselmediği için RefreshControl kendi yerel bayrağını taşır ve veri
   (ya da hata) geldiğinde söner.
+
+  BEKLEYEN İŞ SAYAÇLARI (mobil sapma, web'de yok): gelen istek ve kullanıcının kapatabileceği
+  dersler Akış'tan görünmüyordu. İkisinin de sessiz bir süresi var: istek 14 günde kendini
+  kapatıyor, onaylanmayan ders 48 saatte otomatik onaylanıp itiraz hakkını götürüyor. Push
+  bildirimi yok, yani kullanıcıyı Arkadaşlar'a ya da Derslerim'e çağıracak tek şey bu iki
+  rozet. Sayılar mevcut uçlardan: myMatches (useIliskiler) ve mySessions(1, 1) — aktif dersler
+  sayfadan bağımsız TAM dönüyor, geçmişten yalnızca tek kayıt istenir. Ekran kurulu kaldığı
+  için ikisi de odakta ve ön plana dönüşte sessiz tazeleniyor (useOnePlanaGelince).
 */
 export default function Akis() {
   const guvenli = useSafeAreaInsets()
@@ -39,6 +50,11 @@ export default function Akis() {
   const derslerCipasi = useTurCipasi('dersler')
   const suggestions = useAsync(() => api.suggestions(20), [])
   const portfolio = useAsync(() => api.myPortfolio(), [])
+  const iliskiler = useIliskiler()
+  const dersler = useAsync(() => api.mySessions(1, 1), [])
+  useOnePlanaGelince(() => dersler.reload({ silent: true }))
+  // Derslerim'deki "Senden aksiyon bekleyenler" grubuyla aynı tanım (lib/dersDurumu.js).
+  const dersAksiyon = (dersler.data?.active ?? []).filter((s) => eylemBekliyor(s)).length
 
   const [hedef, setHedef] = useState(null)
   const [notice, setNotice] = useState(null)
@@ -66,6 +82,8 @@ export default function Akis() {
     setYenileniyor(true)
     suggestions.reload({ silent: true })
     portfolio.reload({ silent: true })
+    dersler.reload({ silent: true })
+    iliskiler.yenile()
   }
 
   const bosDegil = (suggestions.data?.length ?? 0) > 0
@@ -88,24 +106,32 @@ export default function Akis() {
               <ToplulukIkonu renk={slate[700]} boy={24} />
             </Pressable>
             {/* Tur çıpaları: bu iki ikon turun "eslesmeler" ve "dersler" adımlarının
-                ışık tuttuğu öğeler (bkz. src/lib/tur.js TUR_ADIMLARI). */}
+                ışık tuttuğu öğeler (bkz. src/lib/tur.js TUR_ADIMLARI).
+                Sayaç rozetleri düğmenin İÇİNDE absolute: 44×44 dokunma alanı ve çıpa ölçüsü
+                değişmiyor. Sayı rozetten değil erişim adından okunuyor (bkz. SayacRozeti). */}
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Arkadaşlar"
+              accessibilityLabel={
+                iliskiler.gelenIstekSayisi > 0
+                  ? `Arkadaşlar, ${iliskiler.gelenIstekSayisi} gelen istek`
+                  : 'Arkadaşlar'
+              }
               onPress={() => router.push('/eslesmeler')}
-              className="h-11 w-11 items-center justify-center rounded-lg"
+              className="h-11 w-11 items-center justify-center rounded-lg active:bg-slate-100"
               {...eslesmelerCipasi}
             >
               <KisilerIkonu renk={slate[700]} boy={24} />
+              <SayacRozeti sayi={iliskiler.gelenIstekSayisi} className="absolute right-0.5 top-1" />
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Derslerim"
+              accessibilityLabel={dersAksiyon > 0 ? `Derslerim, ${dersAksiyon} ders işlem bekliyor` : 'Derslerim'}
               onPress={() => router.push('/dersler')}
-              className="h-11 w-11 items-center justify-center rounded-lg"
+              className="h-11 w-11 items-center justify-center rounded-lg active:bg-slate-100"
               {...derslerCipasi}
             >
               <KepIkonu renk={slate[700]} boy={24} />
+              <SayacRozeti sayi={dersAksiyon} className="absolute right-0.5 top-1" />
             </Pressable>
           </View>
         }
