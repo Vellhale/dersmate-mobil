@@ -129,13 +129,52 @@ export default function Dersler() {
   */
   const gecmisNesil = useRef(0)
 
+  /*
+    TAZELEME KİLİDİ — işlemden sonra liste sunucudan dönene kadar kart düğmeleri pasif.
+
+    Tazeleme sessiz olduğu için kartlar ekranda kalıyor, ama gösterdikleri durum bir önceki
+    listeye ait: az önce iptal edilen dersin "İptal"i ya da onaylanan dersin "Kanıtı incele
+    ve onayla"sı yanıt gelene kadar hâlâ basılabilir duruyordu. İkinci basış sunucudan hata
+    döner ve kullanıcı, işlemi ASLINDA başarılıyken kırmızı kutu görürdü.
+  */
+  const [tazeleniyor, setTazeleniyor] = useState(false)
+  const listeRef = useRef(null)
+
+  /*
+    YUKARI KAYDIRMA İSTEĞİ — refresh() içinde doğrudan değil, commit'ten SONRA koşan efektte.
+
+    refresh() modal hâlâ ekrandayken çağrılıyor. Kaydırma orada başlatılınca web önizlemesinde
+    şikayetten sonra liste yerinde kaldı (ölçüldü: scrollTop 4226'da sabit, bildirim görünmüyor).
+    RN Web'in Modal odak tuzağı modal sökülürken onu açan düğmeye focus() veriyor
+    (ModalFocusTrap temizleyicisi). Şikayette bu çağrı kaydırma henüz ilerlemeden geldi ve
+    kaydırmayı durdurdu. İptalde kaydırma o anda 580'e inmişti ve sürdü, yani sonuç zamanlamaya
+    kalıyordu. Sökülen bileşenin efekt temizleyicileri yeni efektlerden önce koşuyor: buradaki
+    kaydırma her zaman odak iadesinden sonra başlıyor. Native'de odak iadesi yok, sıra orada
+    da zararsız.
+  */
+  const [yukariKaydir, setYukariKaydir] = useState(0)
+  useEffect(() => {
+    if (yukariKaydir) listeRef.current?.scrollToOffset({ offset: 0, animated: true })
+  }, [yukariKaydir])
+
   useEffect(() => {
     gecmisNesil.current += 1
     gecmisKilit.current = false
     setEkGecmis([])
     setGecmisSayfa(1)
     setGecmisHata(null)
+    setTazeleniyor(false)
+    /* Uçuştaki "daha getir" yanıtı yukarıdaki nesil kuralıyla ATILIYOR ve kendi finally'si
+       eski nesle ait olduğu için bayrağı indirmiyor. Burada indirilmezse liste dibindeki
+       spinner, isteği çoktan çöpe atılmış bir sayfa için süresiz dönerdi. */
+    setGecmisYukleniyor(false)
   }, [sessions.data])
+
+  // Tazeleme hatayla biterse data değişmez ve yukarıdaki efekt koşmaz: kilit burada açılır,
+  // yoksa düğmeler ErrorBox'ın yanında kalıcı olarak pasif kalırdı.
+  useEffect(() => {
+    if (sessions.error) setTazeleniyor(false)
+  }, [sessions.error])
 
   const [tick, setTick] = useState(0)
   useEffect(() => {
@@ -210,12 +249,33 @@ export default function Dersler() {
     }
   }
 
-  function refresh(message) {
+  /*
+    İŞLEM SONRASI TAZELEME — SESSİZ.
+
+    Eskiden sessions.reload() spinner'lı yüklemeydi: loading true olunca liste boşalıyor,
+    kartların yerine "Yükleniyor…" geliyor ve yarım saniye sonra kartlar geri dönüyordu.
+    Kaydırma konumu da o arada 0'a düşüyordu. Boşalan liste onEndReached'i tetikliyor,
+    tetiklenen sayfa yeni nesil yüzünden atılıyor ve liste dibindeki spinner saniyelerce
+    dönüyordu. Artık elde veri varken liste yerinde kalıyor; değişen kartlar yanıtla güncelleniyor.
+
+    YUKARI KAYDIRMA BİLİNÇLİ: sonuç cümlesi (Notice) listenin başında. Kullanıcı derin
+    kaydırmışken işlem yapınca cümle görünmüyordu, sayfa sessizce "bir şey olmadı" gibi
+    duruyordu. Kalıcı çözüm ekranın altında duran bir bildirim (Toast); gelene kadar
+    konum tepeye dönüyor.
+
+    veriDegisti: false — işlem ders listesini değiştirmiyor (şikayet dersin akışına
+    dokunmaz). Listeyi yeniden çekmek yalnızca birikmiş geçmiş sayfalarını 5'e sıfırlardı.
+  */
+  function refresh(message, { veriDegisti = true } = {}) {
     setDialog(null)
     setBookOpen(false)
     setOnSecim(null)
     if (message) setNotice(message)
-    sessions.reload()
+    setYukariKaydir((n) => n + 1)
+    if (veriDegisti) {
+      setTazeleniyor(true)
+      sessions.reload({ silent: true })
+    }
     matches.reload({ silent: true })
     // Onay puan basar; seviye rozeti aynı cüzdan ucundan besleniyor.
     refreshWallet()
@@ -253,7 +313,10 @@ export default function Dersler() {
 
       <ErrorBox error={sessions.error} onRetry={sessions.reload} />
 
-      {sessions.loading ? (
+      {/* Spinner YALNIZCA elde hiç veri yokken. "Yeniden dene" düz reload çağırıyor ve
+          loading'i veri varken de kaldırıyor; koşul yalnızca loading olsaydı eldeki liste
+          yine "Yükleniyor…"a dönüp kaydırma konumunu silerdi. */}
+      {sessions.loading && sessions.data == null ? (
         <Loading />
       ) : hicDersYok ? (
         <EmptyState
@@ -277,7 +340,7 @@ export default function Dersler() {
                 Senden aksiyon bekleyenler
               </AltBaslik>
               {groups.action.map((s) => (
-                <SessionKarti key={s.sessionId} session={s} onAction={setDialog} />
+                <SessionKarti key={s.sessionId} session={s} onAction={setDialog} kilitli={tazeleniyor} />
               ))}
             </>
           )}
@@ -288,7 +351,7 @@ export default function Dersler() {
             <>
               <AltBaslik sayi={groups.itirazda.length}>İtirazda, karar yönetimde</AltBaslik>
               {groups.itirazda.map((s) => (
-                <SessionKarti key={s.sessionId} session={s} onAction={setDialog} />
+                <SessionKarti key={s.sessionId} session={s} onAction={setDialog} kilitli={tazeleniyor} />
               ))}
             </>
           )}
@@ -297,7 +360,7 @@ export default function Dersler() {
             <>
               <AltBaslik sayi={groups.upcoming.length}>Planlanmış</AltBaslik>
               {groups.upcoming.map((s) => (
-                <SessionKarti key={s.sessionId} session={s} onAction={setDialog} />
+                <SessionKarti key={s.sessionId} session={s} onAction={setDialog} kilitli={tazeleniyor} />
               ))}
             </>
           )}
@@ -308,7 +371,7 @@ export default function Dersler() {
                 Saati geçti, hâlâ açık
               </AltBaslik>
               {groups.gecmisAcik.map((s) => (
-                <SessionKarti key={s.sessionId} session={s} onAction={setDialog} />
+                <SessionKarti key={s.sessionId} session={s} onAction={setDialog} kilitli={tazeleniyor} />
               ))}
             </>
           )}
@@ -341,11 +404,19 @@ export default function Dersler() {
 
       {/* Geçmiş, FlatList'in KENDİSİ (iş kuralı 4): 5'erli sayfalar onEndReached ile
           birikir. Aktif bölümler başlıkta yaşar — sunucu aktifleri zaten sınırlı ve
-          TAM döndürür (aksiyon bekleyen ders sayfanın altında kalmamalı). */}
+          TAM döndürür (aksiyon bekleyen ders sayfanın altında kalmamalı).
+          Liste boşaltma koşulu loading DEĞİL data: yükleme sırasında data=[] vermek,
+          içerik kısaldığı için onEndReached'i tetikliyordu ve o sayfa isteği tazeleme
+          dönünce çöpe gidiyordu. extraData: hücreler data değişmeden yeniden çizilmez,
+          kilit yalnızca bir state. */}
       <FlatList
-        data={sessions.loading ? [] : gecmisItems}
+        ref={listeRef}
+        data={sessions.data == null ? [] : gecmisItems}
+        extraData={tazeleniyor}
         keyExtractor={(s) => s.sessionId}
-        renderItem={({ item }) => <SessionKarti session={item} onAction={setDialog} past />}
+        renderItem={({ item }) => (
+          <SessionKarti session={item} onAction={setDialog} kilitli={tazeleniyor} past />
+        )}
         contentContainerClassName="gap-3 p-4"
         ListHeaderComponent={baslikBolumu}
         onEndReached={dahaGetir}
@@ -358,7 +429,9 @@ export default function Dersler() {
               </View>
             )}
             <ErrorBox error={gecmisHata} onRetry={dahaGetir} />
-            {!sessions.loading && !hicDersYok && <PuanGecmisi />}
+            {/* data'ya bağlı, loading'e değil: tazelemede sökülse açık defter kapanır ve
+                yüklenmiş sayfaları kaybolurdu. */}
+            {sessions.data != null && !hicDersYok && <PuanGecmisi />}
           </View>
         }
       />
@@ -441,7 +514,11 @@ export default function Dersler() {
           key={dialog.session.sessionId}
           session={dialog.session}
           onClose={() => setDialog(null)}
-          onDone={() => refresh('Şikayetin yönetime iletildi. Karşı tarafa bildirilmez.')}
+          /* Şikayet dersin akışını değiştirmiyor (ReportModal metni de bunu söylüyor): liste
+             yeniden çekilmez, kullanıcının biriktirdiği geçmiş sayfaları yerinde kalır. */
+          onDone={() =>
+            refresh('Şikayetin yönetime iletildi. Karşı tarafa bildirilmez.', { veriDegisti: false })
+          }
         />
       )}
 
@@ -519,8 +596,12 @@ function UyariSatiri({ children }) {
   DERS KARTI — üç bölgeli sabit iskelet (web kararı): NE ZAMAN (takvim yaprağı) →
   NE/KİMLE (başlık, kişi, meta) → NE YAPMALIYIM (alt aksiyon şeridi). Sıra her kartta
   aynı; düğmeler kartın alt kenarına yapışık.
+
+  kilitli: işlem sonrası tazeleme sürüyor, kartın durumu bayat olabilir (bkz. Dersler →
+  TAZELEME KİLİDİ). Düğmeler görünür kalıyor, yalnızca basılamıyor: kaybolup geri gelmeleri
+  kartın yüksekliğini oynatır ve kaydırmayı sıçratırdı.
 */
-function SessionKarti({ session, onAction, past = false }) {
+function SessionKarti({ session, onAction, past = false, kilitli = false }) {
   const router = useRouter()
   const startsIn = remainingText(session.scheduledStartUtc)
   const endsIn = remainingText(session.scheduledEndUtc)
@@ -623,26 +704,26 @@ function SessionKarti({ session, onAction, past = false }) {
           uzasın düğmeler alt kenarda, göz hep aynı noktayı arar. */}
       <View className="flex-row flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-5 py-3.5">
         {session.iAmTutor && session.status === 'Booked' && (
-          <Button disabled={!completeReady} onPress={() => onAction({ type: 'complete', session })}>
+          <Button disabled={kilitli || !completeReady} onPress={() => onAction({ type: 'complete', session })}>
             Dersi tamamladım
           </Button>
         )}
 
         {session.canApprove && (
-          <Button variant="success" onPress={() => onAction({ type: 'approve', session })}>
+          <Button variant="success" disabled={kilitli} onPress={() => onAction({ type: 'approve', session })}>
             Kanıtı incele ve onayla
           </Button>
         )}
 
         {/* Şikayet HER derste açık; savunma düğmesi YOK — şikayet tek yönlüdür. */}
         {!session.canApprove && (
-          <Button variant="secondary" onPress={() => onAction({ type: 'report', session })}>
+          <Button variant="secondary" disabled={kilitli} onPress={() => onAction({ type: 'report', session })}>
             Şikayet et
           </Button>
         )}
 
         {session.canCancel && (
-          <Button variant="secondary" onPress={() => onAction({ type: 'cancel', session })}>
+          <Button variant="secondary" disabled={kilitli} onPress={() => onAction({ type: 'cancel', session })}>
             İptal
           </Button>
         )}
