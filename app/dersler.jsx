@@ -104,7 +104,11 @@ export default function Dersler() {
     if (!rezerve) return
     setOnSecim(String(rezerve))
     setBookOpen(true)
-    router.setParams({ rezerve: '' })
+    /* Bir sonraki tura ERTELENİYOR: ekranın ilk commit'inde çağrılan setParams gezinme durumu
+       henüz kurulmadığı için soğuk açılışta (derin bağlantı, web'de adres) etkisiz kalıyordu;
+       sayfa yenilenince rezervasyon yeniden açılıyordu (ölçüldü). */
+    const zamanlayici = setTimeout(() => router.setParams({ rezerve: '' }), 0)
+    return () => clearTimeout(zamanlayici)
   }, [rezerve, router])
 
   /*

@@ -132,6 +132,11 @@ export function EslesmeIstegiModali({ person, myOffers, konuDurumu, kisiIliskisi
     }
   }
 
+  /* Seçim hâlâ gönderilebilir mi: seçili konu sonradan pasifleşmiş olabilir (bkz. SecimSatiri
+     çağrısı). Düğme ve ipucu aynı koşula bakıyor. */
+  const secimGecerli =
+    Boolean(requestedTopicId) && !(gosterilen && konuDurumu?.(gosterilen.userId, requestedTopicId))
+
   return (
     <Modal
       open={Boolean(person)}
@@ -155,7 +160,7 @@ export function EslesmeIstegiModali({ person, myOffers, konuDurumu, kisiIliskisi
               ve live region bu kararda sayılmıyor (ViewShadowNode.cpp → formsView). Düzleşen
               View'un canlı bölgesi native görünümle birlikte kaybolurdu.
           */}
-          {!requestedTopicId && (
+          {!secimGecerli && (
             <View aria-live="polite" collapsable={false} className="w-full">
               <Text className="text-right text-xs text-slate-600">
                 Göndermek için almak istediğin konuyu seç.
@@ -165,7 +170,7 @@ export function EslesmeIstegiModali({ person, myOffers, konuDurumu, kisiIliskisi
           <Button variant="secondary" onPress={onClose}>
             Vazgeç
           </Button>
-          <Button onPress={submit} loading={busy} disabled={!requestedTopicId}>
+          <Button onPress={submit} loading={busy} disabled={!secimGecerli}>
             İsteği gönder
           </Button>
         </>
@@ -182,7 +187,10 @@ export function EslesmeIstegiModali({ person, myOffers, konuDurumu, kisiIliskisi
               return (
                 <SecimSatiri
                   key={topic.topicId}
-                  secili={requestedTopicId === topic.topicId}
+                  /* Pasif satır seçili ÇİZİLMEZ: sayfa açıldıktan sonra gelen ilişki bilgisi önceden
+                     seçilmiş konuyu pasifleştirebiliyor (önerilerden önce dönmeyen myMatches). Nokta
+                     dolu kalıp erişim durumu "seçili değil" diyordu ve gönderim 409 alıyordu. */
+                  secili={!d && requestedTopicId === topic.topicId}
                   pasif={Boolean(d)}
                   ek={d?.durum === 'aktif' ? 'Arkadaşlığınızda' : d ? 'İstek bekliyor' : null}
                   onPress={() => setRequestedTopicId(topic.topicId)}

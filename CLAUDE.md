@@ -188,6 +188,17 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
 
 ## Web'den bilinçli sapmalar
 
+- **`success` düğme tonu emerald-700** (`ui.jsx`, beyazla 5.48:1). Web `ui.jsx` hâlâ emerald-600
+  (3.77:1, AA altı) — web aynı tona geçene kadar bilinçli fark. "Kabul et / Onayla" bu varyant.
+- **Büyük harf `uppercase` sınıfıyla YAZILMAZ**: RN metni dil bilgisiz büyüttüğü için "SANA ANLATABILIR"
+  çıkıyordu. Yerine `UstEtiket` (ui.jsx) ya da `buyukHarf` (`src/lib/metin.js`, yalnızca mobil;
+  `format.js` web kopyası olduğu için ona eklenmedi). Web'de `lang="tr"` doğru çevirdiği için
+  `uppercase` kalıyor — port ederken sınıfı taşıma.
+- **Rezervasyon bağlamı adresten** (`/dersler?rezerve=<matchId>`) ve öğrencinin konusu TEK tanımdan
+  (`src/lib/iliski.js` → `ogrenciKonusu`): Arkadaşlar kartındaki "Ders rezerve et" yalnızca öğrenci
+  tarafta, konulu eşleşmede çıkar; anlatan tarafta bilgi satırı var. Web'de `Matches.jsx` düğme koşulu
+  ve `Sessions.jsx` ön seçimsiz — aynı çıkmaz orada duruyor.
+
 - `localStorage` → oturum + HWID **SecureStore**'da, tercihler AsyncStorage'da
   (`src/lib/storage.js`). Oturum açılışta BİR KEZ okunur, sonrası bellekte —
   `getToken()` senkron kalmalı (axios interceptor; SignalR fabrikası `tazeTokenAl` de

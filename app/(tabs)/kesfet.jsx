@@ -232,7 +232,9 @@ export default function Kesfet() {
   useEffect(() => {
     if (!istenenSekme) return
     if (SEKMELER.some((s) => s.key === istenenSekme)) setSekme(istenenSekme)
-    router.setParams({ sekme: '' })
+    // Bir sonraki tura ertelenir: ilk commit'teki setParams soğuk açılışta etkisiz (dersler.jsx ?rezerve= notu).
+    const zamanlayici = setTimeout(() => router.setParams({ sekme: '' }), 0)
+    return () => clearTimeout(zamanlayici)
   }, [istenenSekme, router])
   const [term, setTerm] = useState('')
   const [filters, setFilters] = useState(VARSAYILAN_FILTRELER)

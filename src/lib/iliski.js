@@ -68,6 +68,11 @@ export function iliskiHaritasi(eslesmeler) {
  * öğrenci olduğum bir konu yok.
  */
 export function ogrenciKonusu(m) {
+  /* Tür tanımı SUNUCUDA: RequestedTopicId null olan eşleşme konusuz (üniversite ağı) eşleşmedir ve
+     BookSession.cs rezervasyonu 409 ile reddeder. Konusuz dal OfferedTopicId'yi doğrulamadığı için
+     elle çağrılan uçla offered dolu bir konusuz eşleşme doğabiliyor; bu kontrol olmadan kart hem
+     "ders içermez" hem "Ders rezerve et" gösteriyordu. */
+  if (!m.requestedTopicId) return null
   const topicId = m.iAmInitiator ? m.requestedTopicId : m.offeredTopicId
   if (!topicId) return null
   return { topicId, topicName: m.iAmInitiator ? m.requestedTopicName : m.offeredTopicName }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -135,7 +135,10 @@ export default function Akis() {
   */
   const seekSayisi = portfolio.data ? mySeekCount : null
   const oncekiSeek = useRef(seekSayisi)
-  useEffect(() => {
+  /* useLayoutEffect: 0→N render'ında liste boş ve loading=false geliyor; pasif efekt boyamadan SONRA
+     koştuğu için "Şimdilik öneri yok" bir kare görünüyordu (5 turda 5, ölçüldü). Layout efektindeki
+     setState boyamadan önce işleniyor. */
+  useLayoutEffect(() => {
     const onceki = oncekiSeek.current
     oncekiSeek.current = seekSayisi
     if (onceki === null || seekSayisi === null) return
