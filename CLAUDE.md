@@ -188,8 +188,12 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
 
 ## Web'den bilinçli sapmalar
 
-- **`success` düğme tonu emerald-700** (`ui.jsx`, beyazla 5.48:1). Web `ui.jsx` hâlâ emerald-600
-  (3.77:1, AA altı) — web aynı tona geçene kadar bilinçli fark. "Kabul et / Onayla" bu varyant.
+- **Mobilde yeşil YOK** (kullanıcı kararı, A düzeni: yeşil marka paletinin dışındaydı). `Button`'da
+  `success` varyantı kalktı; "Kabul et / Onayla / Doğrula" gibi olumlu eylemler `primary`
+  (brand-600). Olumlu durum rozeti brand-100 + brand-800, başarı bildirimi (`Notice success`)
+  brand-50 + brand-200 kenar + brand-800 metin. Web hâlâ emerald kullanıyor — bilinçli fark;
+  web sayfası port edilirken emerald sınıfı taşınmaz, "Dokunma ve yüzey dili"ndeki rol tablosuna
+  çevrilir. `theme.js`'te `emerald` export'u da yok.
 - **Büyük harf `uppercase` sınıfıyla YAZILMAZ**: RN metni dil bilgisiz büyüttüğü için "SANA ANLATABILIR"
   çıkıyordu. Yerine `UstEtiket` (ui.jsx) ya da `buyukHarf` (`src/lib/metin.js`, yalnızca mobil;
   `format.js` web kopyası olduğu için ona eklenmedi). Web'de `lang="tr"` doğru çevirdiği için
@@ -335,6 +339,18 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
   icat etmez.
 - Renk DEĞERİ gereken yerler (tab bar, SVG, StatusBar) `src/lib/theme.js`'ten okur —
   hex'i elle yazma, palet tek kaynaktan gelsin.
+- **Renk rolleri (A düzeni)** — renk anlam taşır, süs değildir:
+  - Birincil ve olumlu EYLEM: `bg-brand-600 active:bg-brand-700` + beyaz.
+  - Olumlu DURUM (Arkadaşın, Tamamlandı, Yayında, canlı bağlantı): rozet `bg-brand-100
+    text-brand-800`, düz metin `text-brand-700`, şerit/nokta `bg-brand-500`.
+  - BEKLEYEN / DİKKAT: YALNIZCA amber (rozet `bg-amber-100 text-amber-800`, kutu
+    `border-amber-200 bg-amber-50 text-amber-900`). Amber başka anlam için kullanılmaz.
+  - TEHLİKE (hata, itiraz, iptal, engel, yıkıcı eylem ve onun geri alınamaz sonucunu anlatan
+    uyarı: `Notice tone="danger"`) ve sayaç (`SayacRozeti`, okunmamış mesaj dahil): rose.
+  - Anlamsız etiket / kategori (yön, forum kategorisi): `bg-brand-50 text-brand-800` ile
+    `bg-slate-100 text-slate-700` sırayla.
+  - Yeşil, mor (violet) ve gök mavisi (sky) YOK — kategori ya da avatar rengi olarak da.
+  - İstisna, malzeme rengi: değerlendirme yıldızları ve madalya/rozet altın-bronzu amber kalır.
 
 ## Adım planı
 

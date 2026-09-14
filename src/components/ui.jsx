@@ -33,10 +33,9 @@ const BUTON_VARYANT = {
   primary: { kutu: 'bg-brand-600 active:bg-brand-700', yazi: 'text-white' },
   secondary: { kutu: 'bg-white border border-slate-300 active:bg-slate-50', yazi: 'text-slate-700' },
   danger: { kutu: 'bg-rose-600 active:bg-rose-700', yazi: 'text-white' },
-  // emerald-600 beyazla 3.77:1 idi; 700 = 5.48:1. Beş varyantın içinde AA'yı (4.5:1) geçemeyen
-  // tek dolgulu düğmeydi ve en sık basılan kararları taşıyor: "Kabul et", "Kanıtı incele ve
-  // onayla", "Doğrula". Web ui.jsx:7 hâlâ emerald-600 — bu ton oraya da taşınmalı.
-  success: { kutu: 'bg-emerald-700 active:bg-emerald-800', yazi: 'text-white' },
+  // `success` varyantı YOK: "Kabul et", "Onayla", "Doğrula" gibi olumlu eylemler primary.
+  // Yeşil marka paletinin dışındaydı (kullanıcı kararı, A düzeni); bilinmeyen varyant
+  // aşağıdaki `?? primary` ile yine primary'ye düşer.
   ghost: { kutu: 'active:bg-slate-100', yazi: 'text-slate-600' },
 }
 
@@ -144,10 +143,15 @@ export function UstEtiket({ className = '', children, ...props }) {
   )
 }
 
+/*
+  Rozet rolleri: success = olumlu durum (brand-800/brand-100 6.34:1), warning = YALNIZCA
+  bekleyen/dikkat, danger = tehlike. Olumlu durum marka mavisi: yeşil marka paletinin
+  dışındaydı (kullanıcı kararı, A düzeni). Anlamı olmayan etiket (kategori, yön) neutral.
+*/
 const ROZET_TONLARI = {
   neutral: { kutu: 'bg-slate-100', yazi: 'text-slate-700' },
   brand: { kutu: 'bg-brand-100', yazi: 'text-brand-700' },
-  success: { kutu: 'bg-emerald-100', yazi: 'text-emerald-700' },
+  success: { kutu: 'bg-brand-100', yazi: 'text-brand-800' },
   warning: { kutu: 'bg-amber-100', yazi: 'text-amber-800' },
   danger: { kutu: 'bg-rose-100', yazi: 'text-rose-700' },
 }
@@ -310,10 +314,16 @@ export function Girdi({ className = '', onFocus, onBlur, ...props }) {
   )
 }
 
+/* Başarı bildirimi marka mavisi (brand-800/brand-50 7.16:1): yeşil marka paletinin dışındaydı
+   (kullanıcı kararı, A düzeni). info ile aynı görünüm; ayrı anahtar çağıranın niyetini taşıyor.
+   warning YALNIZCA bekleyen/dikkat. Yıkıcı ya da geri alınamaz eylemin SONUCUNU anlatan uyarı
+   (hesap silme, itiraz) danger: amber'de kalınca yönetimdeki ban ve arkadaşlık sonlandırma
+   onaylarından hafif okunuyordu. ErrorBox ile aynı kutu (rose-800/rose-50 7.30:1). */
 const NOTICE_TONLARI = {
-  success: { kutu: 'border-emerald-200 bg-emerald-50', yazi: 'text-emerald-800' },
+  success: { kutu: 'border-brand-200 bg-brand-50', yazi: 'text-brand-800' },
   info: { kutu: 'border-brand-200 bg-brand-50', yazi: 'text-brand-800' },
   warning: { kutu: 'border-amber-200 bg-amber-50', yazi: 'text-amber-900' },
+  danger: { kutu: 'border-rose-200 bg-rose-50', yazi: 'text-rose-800' },
 }
 
 /** Kısa süreli bilgi/başarı bildirimi (sayfa üstünde) — web Notice'in portu. */

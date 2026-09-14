@@ -62,10 +62,20 @@ import {
     bağlayıcı değer her zaman sunucunun mintAmount'u.
 */
 
+/*
+  Olumlu durum marka mavisi: yeşil marka paletinin dışındaydı (kullanıcı kararı, A düzeni).
+  Amber yalnızca bekleyene, rose tehlikeye.
+
+  Planlanmış ile Tamamlandı ikisi de mavi ailede, bu yüzden GÜÇLERİ ayrı: yaklaşan ders
+  dolu şerit ve mavi takvimle öne çıkıyor, tamamlanan ders geçmişte sakin duruyor (açık
+  şerit, gri takvim) ve rengini yalnızca "Tamamlandı" rozeti taşıyor. Aynı güçte
+  çizildiklerinde iki kart birebir aynı görünüyordu (önizlemede ölçüldü); geçmişte arka
+  arkaya dizilen on iki dolu mavi şerit de yaklaşan dersin vurgusunu siliyordu.
+*/
 const DURUM_STILI = {
   Booked: { serit: 'bg-brand-500', takvim: 'bg-brand-100', takvimYazi: 'text-brand-700', rozet: 'brand', vurgu: 'text-brand-700' },
   AwaitingApproval: { serit: 'bg-amber-400', takvim: 'bg-amber-100', takvimYazi: 'text-amber-800', rozet: 'warning', vurgu: 'text-amber-700' },
-  Completed: { serit: 'bg-emerald-500', takvim: 'bg-emerald-100', takvimYazi: 'text-emerald-700', rozet: 'success', vurgu: 'text-emerald-700' },
+  Completed: { serit: 'bg-brand-200', takvim: 'bg-slate-100', takvimYazi: 'text-slate-600', rozet: 'success', vurgu: 'text-brand-700' },
   Disputed: { serit: 'bg-rose-500', takvim: 'bg-rose-100', takvimYazi: 'text-rose-700', rozet: 'danger', vurgu: 'text-rose-700' },
   Cancelled: { serit: 'bg-rose-300', takvim: 'bg-rose-100', takvimYazi: 'text-rose-700', rozet: 'danger', vurgu: 'text-rose-700' },
   Expired: { serit: 'bg-slate-300', takvim: 'bg-slate-100', takvimYazi: 'text-slate-700', rozet: 'neutral', vurgu: 'text-slate-600' },
@@ -731,7 +741,7 @@ function SessionKarti({ session, onAction, past = false, kilitli = false }) {
         )}
 
         {session.canApprove && (
-          <Button variant="success" disabled={kilitli} onPress={() => onAction({ type: 'approve', session })}>
+          <Button variant="primary" disabled={kilitli} onPress={() => onAction({ type: 'approve', session })}>
             Kanıtı incele ve onayla
           </Button>
         )}
@@ -1229,7 +1239,7 @@ function ApproveModal({ session, onClose, onApproved, onReport, onDispute }) {
           <Button variant="danger" disabled={onaylaniyor} onPress={onDispute}>
             İtiraz et
           </Button>
-          <Button variant="success" loading={onaylaniyor} disabled={onaylaniyor} onPress={approve}>
+          <Button variant="primary" loading={onaylaniyor} disabled={onaylaniyor} onPress={approve}>
             Onayla
           </Button>
         </>
@@ -1379,7 +1389,7 @@ function DisputeModal({ session, onClose, onDone }) {
       }
     >
       <View className="gap-4 pb-2">
-        <Notice tone="warning">
+        <Notice tone="danger">
           İtiraz, dersi yönetim hakemliğine taşır: {session.otherDisplayName} kişisine puan
           YAZILMAZ ve karar verilene kadar donar. Bu dersi artık onaylayamazsın. Yalnızca
           ders gerçekten yapılmadıysa ya da kanıt bu derse ait değilse itiraz et.
@@ -1706,7 +1716,7 @@ function HareketSatiri({ row, ilk }) {
 
       <View className="shrink-0 items-end">
         <Text
-          className={`text-sm font-semibold ${kazanc ? 'text-emerald-700' : 'text-slate-600'}`}
+          className={`text-sm font-semibold ${kazanc ? 'text-brand-700' : 'text-slate-600'}`}
           style={{ fontVariant: ['tabular-nums'] }}
         >
           {signedCredit(row.amount)}

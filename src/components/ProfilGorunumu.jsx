@@ -120,9 +120,10 @@ export function ProfilGorunumu({ userId, kendiProfilim = false, onYuklendi, onHa
       />
 
       <KonuPaneli title="Anlatabilirim" tone="brand" topics={p.canTeach} emptyText="Henüz konu eklenmemiş." />
+      {/* Yön durum değil kategori: ikinci panel neutral (yeşil kalktı, kullanıcı kararı, A düzeni). */}
       <KonuPaneli
         title="Öğrenmek istiyorum"
-        tone="success"
+        tone="neutral"
         topics={p.wantsToLearn}
         emptyText="Henüz konu eklenmemiş."
       />

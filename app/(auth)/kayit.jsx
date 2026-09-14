@@ -256,7 +256,7 @@ export default function Kayit() {
       ⚠️ ÖNCEKİ "GÖNDERDİK" BİLDİRİMİ BURADA SÖNDÜRÜLÜYOR.
 
       `resendDone` bir kez true olup hiç geri dönmezse, bu denemenin SONUCU ne olursa
-      olsun yeşil "yeni bir kod gönderdik" kutusu ekranda kalır. Hata durumunda ekranda
+      olsun "yeni bir kod gönderdik" başarı kutusu ekranda kalır. Hata durumunda ekranda
       aynı anda hem "gönderdik" hem hata mesajı durur ve kullanıcı hangisine
       inanacağını bilemez.
     */

@@ -99,17 +99,18 @@ export function ReviewModal({ session, open, onay, onClose, onSubmitted }) {
           arkadaki Notice aynı metni zaten duyuruyor, ikinci kez okutmak tekrar olurdu.
           ✓ dairesi süs; metin kendi başına yetiyor, ekran okuyucudan gizli.
           "+N" ya da kutlama animasyonu YOK: puan öğrenciye yazılmıyor.
+          Olumlu vurgu marka mavisi: yeşil marka paletinin dışındaydı (kullanıcı kararı, A düzeni).
         */}
         {onay ? (
-          <View className="flex-row items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+          <View className="flex-row items-center gap-3 rounded-xl border border-brand-200 bg-brand-50 p-3">
             <View
               accessibilityElementsHidden
               importantForAccessibility="no-hide-descendants"
-              className="h-8 w-8 items-center justify-center rounded-full bg-emerald-700"
+              className="h-8 w-8 items-center justify-center rounded-full bg-brand-600"
             >
               <Text className="font-bold text-white">✓</Text>
             </View>
-            <Text className="flex-1 text-sm font-medium text-emerald-800">{onay}</Text>
+            <Text className="flex-1 text-sm font-medium text-brand-800">{onay}</Text>
           </View>
         ) : null}
 

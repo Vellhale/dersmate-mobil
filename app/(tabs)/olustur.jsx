@@ -120,7 +120,8 @@ export default function Olustur() {
                 sırası bilerek değişmedi; nereden başlanacağını sıra değil düğme söylüyor. */}
             <PortfoyBolumu
               title="Verebileceğim konular"
-              tone="success"
+              /* Yön durum değil kategori: brand / neutral çifti (yeşil kalktı, kullanıcı kararı, A düzeni). */
+              tone="neutral"
               aciklama="Onaylanan her ders sana puan kazandırır."
               emptyText="Henüz anlatabileceğin bir konu eklemedin. En iyi olduğun konuyla başla."
               entries={offers}

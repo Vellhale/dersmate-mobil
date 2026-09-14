@@ -285,7 +285,7 @@ function HesabiSilModali({ open, onClose, onDeleted }) {
       }
     >
       <View className="gap-4 pb-2">
-        <Notice tone="warning">
+        <Notice tone="danger">
           Bu işlem geri alınamaz. Hesabına bir daha giriş yapamazsın.
         </Notice>
 

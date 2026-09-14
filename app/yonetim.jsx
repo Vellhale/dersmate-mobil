@@ -861,7 +861,7 @@ const ADAY_DURUMU = {
 const ADAY_KARARLARI = {
   Verify: {
     label: 'Doğrula',
-    variant: 'success',
+    variant: 'primary',
     title: 'Beyanı doğrula',
     hint: 'Profilde "Doğrulandı" rozeti görünür. Gerekçeye hangi belgeyi gördüğünü yaz — sistemde belge kaydı yok, bu not tek dayanak.',
     ornek: 'Örn: Öğrenci belgesi e-posta ile gönderildi, 2026 bahar dönemi.',
@@ -1071,7 +1071,7 @@ function AdayKarti({ row, onKarar }) {
       aksiyonlar={
         <>
           {row.reviewStatus !== 'Verified' && (
-            <Button variant="success" onPress={() => onKarar({ row, karar: 'Verify' })}>
+            <Button variant="primary" onPress={() => onKarar({ row, karar: 'Verify' })}>
               Doğrula
             </Button>
           )}
@@ -1126,7 +1126,7 @@ function AdayKarti({ row, onKarar }) {
         {/* Davranışsal sinyal: beyanı fiilen kullanıyor mu? */}
         <Text
           className={`text-xs ${
-            row.completedVolunteerSessions > 0 ? 'font-medium text-emerald-700' : 'text-slate-600'
+            row.completedVolunteerSessions > 0 ? 'font-medium text-brand-700' : 'text-slate-600'
           }`}
         >
           Gönüllü ders: {row.completedVolunteerSessions} tamamlandı · {row.volunteerOfferCount} açık
@@ -1300,7 +1300,7 @@ const KARARLAR = [
     value: 'ForTutor',
     label: 'Eğitmen haklı — puanı bas',
     hint: 'Ders tamamlanmış sayılır ve eğitmene süreye göre puan yazılır.',
-    variant: 'success',
+    variant: 'primary',
   },
   {
     value: 'Dismissed',

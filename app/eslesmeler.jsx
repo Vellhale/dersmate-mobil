@@ -302,7 +302,7 @@ function MatchKarti({ match, tab, router, onChanged }) {
             {/* Etiketlerde ad: kart başına aynı "Kabul et / Reddet" ekran okuyucuda kimin isteği
                 olduğunu söylemiyordu. Görünen metinle başlıyor (WCAG 2.5.3). */}
             <Button
-              variant="success"
+              variant="primary"
               className="flex-1"
               loading={busy === 'accept'}
               accessibilityLabel={`Kabul et, ${match.otherDisplayName}`}
@@ -378,9 +378,11 @@ function MatchKarti({ match, tab, router, onChanged }) {
         )}
       </View>
 
+      {/* Sonlandırma geri alınamaz: yıkıcı eylem onayı rose (A düzeni). Amber yalnızca
+          bekleyen durumu anlatır; yönetimdeki ban onayıyla aynı kutu. */}
       {confirmClose && (
-        <View className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-          <Text className="text-sm text-amber-900">
+        <View className="mt-3 rounded-lg border border-rose-200 bg-rose-50 p-3">
+          <Text className="text-sm text-rose-800">
             <Text className="font-semibold">{match.otherDisplayName}</Text> ile arkadaşlığın
             sonlandırılsın mı? Sohbet geçmişin durur ama yeni mesaj yazamazsın ve bu arkadaşlıktan
             ders rezerve edilemez. Geri alınamaz.

@@ -114,7 +114,7 @@ export default function Konusma() {
 
     Bağlantı koptuğu sırada karşı tarafın yazdığı mesajlar canlı olarak gelemiyor;
     yeniden bağlanınca da yalnızca gruba KATILINIYOR, geçmiş yeniden okunmuyordu.
-    Sonuç: başlıktaki nokta yeşile dönüp "Canlı bağlantı" yazıyor — yani kullanıcı her
+    Sonuç: başlıktaki nokta maviye dönüp "Canlı bağlantı" yazıyor — yani kullanıcı her
     şeyin yolunda olduğunu sanıyor — ama kopukluk sırasındaki mesajlar sohbette hiç
     görünmüyor. Ancak ekran kapatılıp yeniden açılırsa ortaya çıkıyorlardı.
 
@@ -497,9 +497,12 @@ function LinkliMetin({ metin, className, linkClassName }) {
   Bağlantı durumu — web'deki ConnectionBadge'in dar-ekran hâli: başlıkta metinli rozet
   yerine renkli NOKTA (yer yok), metin accessibilityLabel'da. Liste ekranındaki tam
   rozet zaten durumu kelimeyle söylüyor.
+
+  Olumlu durum marka mavisi: yeşil marka paletinin dışındaydı (kullanıcı kararı, A düzeni).
+  brand-500 beyaz başlıkta 3.9:1, grafik nesne eşiğini (3:1) geçiyor.
 */
 const NOKTA_RENK = {
-  connected: 'bg-emerald-500',
+  connected: 'bg-brand-500',
   connecting: 'bg-amber-400',
   reconnecting: 'bg-amber-400',
   disconnected: 'bg-rose-500',

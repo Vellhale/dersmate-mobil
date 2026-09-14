@@ -5,7 +5,7 @@ import { SeviyeRozeti } from './SeviyeRozeti'
 import { YonetimRozeti } from './YonetimRozeti'
 import { KepIkonu, KitapIkonu, TakasIkonu, YildizIkonu } from './Ikonlar'
 import { Button, Card, UstEtiket } from './ui'
-import { amber, brand, emerald, slate } from '../lib/theme'
+import { amber, brand, slate } from '../lib/theme'
 
 /*
   AKIŞ KARTI — web'deki Discover öneri kartının (Suggestions içindeki CamKart)
@@ -47,9 +47,12 @@ function PuanSatiri({ ortalama, adet }) {
   )
 }
 
+/* success = olumlu durum ("Karşılıklı takas"). Olumlu durum marka mavisi: yeşil marka paletinin
+   dışındaydı (kullanıcı kararı, A düzeni). Yön etiketleri durum değil kategori: biri brand,
+   diğeri neutral. */
 const ETIKET_TONLARI = {
   brand: { kutu: 'bg-brand-100', yazi: 'text-brand-700', ikon: brand[700] },
-  success: { kutu: 'bg-emerald-100', yazi: 'text-emerald-700', ikon: emerald[700] },
+  success: { kutu: 'bg-brand-100', yazi: 'text-brand-800', ikon: brand[800] },
   neutral: { kutu: 'bg-slate-100', yazi: 'text-slate-700', ikon: slate[600] },
 }
 
@@ -152,7 +155,7 @@ export function IlanKarti({ kisi, onIstek, konuDurumu }) {
       {kisi.theyWantToLearn?.length > 0 && (
         <TopicList
           title="Senden öğrenmek istiyor"
-          tone="success"
+          tone="neutral"
           ikon={KitapIkonu}
           topics={kisi.theyWantToLearn}
         />

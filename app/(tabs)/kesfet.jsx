@@ -1202,7 +1202,7 @@ function EngellilerModali({ open, onClose, liste, onKaldir }) {
                       accessibilityLabel={`${kisi.displayName} için engel kaldırıldı`}
                       className="min-h-[44px] w-[150px] items-center justify-center"
                     >
-                      <Text className="text-sm font-medium text-emerald-700">Kaldırıldı</Text>
+                      <Text className="text-sm font-medium text-brand-700">Kaldırıldı</Text>
                     </View>
                   ) : (
                     <Button

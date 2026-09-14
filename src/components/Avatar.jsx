@@ -11,6 +11,10 @@ import { useYetkiliGorsel } from './YetkiliGorsel'
  * bir renk seçilir, böylece fotoğrafı olmayan kişiler de listede birbirinden ayırt edilir.
  * Tek tip gri bir daire, sohbet ve akış listelerini okunmaz hâle getirirdi.
  *
+ * Ayrım gökkuşağıyla değil marka mavisi + slate basamaklarıyla: sky/emerald/amber/rose/violet
+ * marka paletinin dışındaydı ve durum renkleriyle karışıyordu (kullanıcı kararı, A düzeni).
+ * Beşi de beyaz baş harfle en az 4.5:1 (brand-600 4.90, slate-600 7.58).
+ *
  * WEB'DEN FARK: object URL + önbellek havuzu yerine <Image source={{uri, headers}}> —
  * RN Image kendi disk önbelleğini taşıyor (bkz. api.avatarImageSource). Avatar yoksa
  * sunucu 404 döner, onError baş harf yer tutucusuna düşürür. Büyütme katmanı
@@ -18,7 +22,7 @@ import { useYetkiliGorsel } from './YetkiliGorsel'
  * zaten bilinçli olarak kapalıydı (tıklama kişiye gitmeli, fotoğrafa değil).
  */
 
-const RENKLER = ['bg-brand-600', 'bg-sky-600', 'bg-emerald-600', 'bg-amber-600', 'bg-rose-600', 'bg-violet-600']
+const RENKLER = ['bg-brand-600', 'bg-brand-700', 'bg-brand-800', 'bg-slate-600', 'bg-slate-700']
 
 function renkSec(userId = '') {
   let sum = 0
