@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FlatList, Image, Platform, Pressable, Text, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import { api } from '../src/lib/api'
 import { useYetkiliGorsel } from '../src/components/YetkiliGorsel'
 import { amber, rose, slate } from '../src/lib/theme'
+import { eylemBekliyor } from '../src/lib/dersDurumu'
+import { ogrenciKonusu } from '../src/lib/iliski'
 import { useAsync } from '../src/state/useAsync'
 import { useWallet } from '../src/state/WalletContext'
 import { Avatar } from '../src/components/Avatar'
@@ -31,11 +33,13 @@ import {
   Modal,
   Notice,
   Spinner,
+  UstEtiket,
 } from '../src/components/ui'
 
 /*
   DERSLERİM — web'deki pages/Sessions.jsx'in portu. Web'in iki sabit sütunu mobilde
-  TEK AKIŞA iner: aksiyon bekleyenler → planlanmış → saati geçmiş açıklar → geçmiş.
+  TEK AKIŞA iner: aksiyon bekleyenler → itirazda → planlanmış → saati geçmiş açıklar →
+  geçmiş. ("İtirazda" mobilde ayrı başlık; web itirazları aksiyon grubunda tutuyor.)
 
   İKİ BİLİNÇLİ MOBİL FARKI:
   • Geçmiş SAYFA DEĞİŞTİRMEZ, BİRİKİR (iş kuralı 4): 5'erli sayfalar FlatList
@@ -50,18 +54,28 @@ import {
   • 20 sn'lik tick: geri sayımlar ve gruplama canlı aksın — saati dolan ders sayfa
     yenilenmeden doğru tarafa geçsin.
   • Rezervasyonu yapan taraf HER ZAMAN ÖĞRENCİ: seçilebilir konu, karşı tarafın BANA
-    anlatacağı konudur (iAmInitiator ? requestedTopic : offeredTopic) — tersini
-    listelemek puanı yanlış tarafa yazdırırdı.
+    anlatacağı konudur (lib/iliski.js → ogrenciKonusu) — tersini listelemek puanı yanlış
+    tarafa yazdırırdı.
   • Onay/tamamlama/iptal/şikayet çift gönderime karşı REF kilidi taşır: state bir
     sonraki render'a kadar eski değeri gösterir, kilit render beklemez.
   • Puan önizlemesi GÖSTERİM sabiti (30 dk blok = 50 puan, SessionRules ile birebir);
     bağlayıcı değer her zaman sunucunun mintAmount'u.
 */
 
+/*
+  Olumlu durum marka mavisi: yeşil marka paletinin dışındaydı (kullanıcı kararı, A düzeni).
+  Amber yalnızca bekleyene, rose tehlikeye.
+
+  Planlanmış ile Tamamlandı ikisi de mavi ailede, bu yüzden GÜÇLERİ ayrı: yaklaşan ders
+  dolu şerit ve mavi takvimle öne çıkıyor, tamamlanan ders geçmişte sakin duruyor (açık
+  şerit, gri takvim) ve rengini yalnızca "Tamamlandı" rozeti taşıyor. Aynı güçte
+  çizildiklerinde iki kart birebir aynı görünüyordu (önizlemede ölçüldü); geçmişte arka
+  arkaya dizilen on iki dolu mavi şerit de yaklaşan dersin vurgusunu siliyordu.
+*/
 const DURUM_STILI = {
   Booked: { serit: 'bg-brand-500', takvim: 'bg-brand-100', takvimYazi: 'text-brand-700', rozet: 'brand', vurgu: 'text-brand-700' },
   AwaitingApproval: { serit: 'bg-amber-400', takvim: 'bg-amber-100', takvimYazi: 'text-amber-800', rozet: 'warning', vurgu: 'text-amber-700' },
-  Completed: { serit: 'bg-emerald-500', takvim: 'bg-emerald-100', takvimYazi: 'text-emerald-700', rozet: 'success', vurgu: 'text-emerald-700' },
+  Completed: { serit: 'bg-brand-200', takvim: 'bg-slate-100', takvimYazi: 'text-slate-600', rozet: 'success', vurgu: 'text-brand-700' },
   Disputed: { serit: 'bg-rose-500', takvim: 'bg-rose-100', takvimYazi: 'text-rose-700', rozet: 'danger', vurgu: 'text-rose-700' },
   Cancelled: { serit: 'bg-rose-300', takvim: 'bg-rose-100', takvimYazi: 'text-rose-700', rozet: 'danger', vurgu: 'text-rose-700' },
   Expired: { serit: 'bg-slate-300', takvim: 'bg-slate-100', takvimYazi: 'text-slate-700', rozet: 'neutral', vurgu: 'text-slate-600' },
@@ -81,6 +95,31 @@ export default function Dersler() {
   const [notice, setNotice] = useState(null)
   const [bookOpen, setBookOpen] = useState(false)
   const [dialog, setDialog] = useState(null) // { type, session }
+
+  /*
+    ?rezerve=<matchId> — REZERVASYON BAĞLAMI ADRESTEN GELİR (Arkadaşlar kartı, Akış ve YKS
+    kartlarındaki "Ders rezerve et"). Eskiden bu düğmeler parametresiz buraya iniyordu:
+    kullanıcı "+ Rezerve et"e yeniden basıp az önce dokunduğu arkadaşı listeden yeniden
+    seçiyordu. Artık sayfa açık ve o arkadaş seçili geliyor (tek dokunuş).
+
+    Parametre okunur okunmaz adresten SİLİNİR: adres bir KOMUT taşıyor, durum değil. Kalsaydı
+    ekran aynı adresle yeniden kurulduğunda (web önizlemesinde sayfa yenileme) kullanıcının
+    çoktan kapattığı sayfa kendiliğinden yeniden açılırdı. Ön seçim ayrı state'te; kapanışta
+    ve tazelemede sıfırlanıyor, yoksa "+ Rezerve et"le açılan sonraki sayfa eski arkadaşı
+    seçili getirirdi.
+  */
+  const { rezerve } = useLocalSearchParams()
+  const [onSecim, setOnSecim] = useState(null)
+  useEffect(() => {
+    if (!rezerve) return
+    setOnSecim(String(rezerve))
+    setBookOpen(true)
+    /* Bir sonraki tura ERTELENİYOR: ekranın ilk commit'inde çağrılan setParams gezinme durumu
+       henüz kurulmadığı için soğuk açılışta (derin bağlantı, web'de adres) etkisiz kalıyordu;
+       sayfa yenilenince rezervasyon yeniden açılıyordu (ölçüldü). */
+    const zamanlayici = setTimeout(() => router.setParams({ rezerve: '' }), 0)
+    return () => clearTimeout(zamanlayici)
+  }, [rezerve, router])
 
   /*
     GEÇMİŞİN BİRİKEN KISMI: sessions.data.past ilk 5'i taşır; sonraki sayfalar buraya
@@ -105,13 +144,52 @@ export default function Dersler() {
   */
   const gecmisNesil = useRef(0)
 
+  /*
+    TAZELEME KİLİDİ — işlemden sonra liste sunucudan dönene kadar kart düğmeleri pasif.
+
+    Tazeleme sessiz olduğu için kartlar ekranda kalıyor, ama gösterdikleri durum bir önceki
+    listeye ait: az önce iptal edilen dersin "İptal"i ya da onaylanan dersin "Kanıtı incele
+    ve onayla"sı yanıt gelene kadar hâlâ basılabilir duruyordu. İkinci basış sunucudan hata
+    döner ve kullanıcı, işlemi ASLINDA başarılıyken kırmızı kutu görürdü.
+  */
+  const [tazeleniyor, setTazeleniyor] = useState(false)
+  const listeRef = useRef(null)
+
+  /*
+    YUKARI KAYDIRMA İSTEĞİ — refresh() içinde doğrudan değil, commit'ten SONRA koşan efektte.
+
+    refresh() modal hâlâ ekrandayken çağrılıyor. Kaydırma orada başlatılınca web önizlemesinde
+    şikayetten sonra liste yerinde kaldı (ölçüldü: scrollTop 4226'da sabit, bildirim görünmüyor).
+    RN Web'in Modal odak tuzağı modal sökülürken onu açan düğmeye focus() veriyor
+    (ModalFocusTrap temizleyicisi). Şikayette bu çağrı kaydırma henüz ilerlemeden geldi ve
+    kaydırmayı durdurdu. İptalde kaydırma o anda 580'e inmişti ve sürdü, yani sonuç zamanlamaya
+    kalıyordu. Sökülen bileşenin efekt temizleyicileri yeni efektlerden önce koşuyor: buradaki
+    kaydırma her zaman odak iadesinden sonra başlıyor. Native'de odak iadesi yok, sıra orada
+    da zararsız.
+  */
+  const [yukariKaydir, setYukariKaydir] = useState(0)
+  useEffect(() => {
+    if (yukariKaydir) listeRef.current?.scrollToOffset({ offset: 0, animated: true })
+  }, [yukariKaydir])
+
   useEffect(() => {
     gecmisNesil.current += 1
     gecmisKilit.current = false
     setEkGecmis([])
     setGecmisSayfa(1)
     setGecmisHata(null)
+    setTazeleniyor(false)
+    /* Uçuştaki "daha getir" yanıtı yukarıdaki nesil kuralıyla ATILIYOR ve kendi finally'si
+       eski nesle ait olduğu için bayrağı indirmiyor. Burada indirilmezse liste dibindeki
+       spinner, isteği çoktan çöpe atılmış bir sayfa için süresiz dönerdi. */
+    setGecmisYukleniyor(false)
   }, [sessions.data])
+
+  // Tazeleme hatayla biterse data değişmez ve yukarıdaki efekt koşmaz: kilit burada açılır,
+  // yoksa düğmeler ErrorBox'ın yanında kalıcı olarak pasif kalırdı.
+  useEffect(() => {
+    if (sessions.error) setTazeleniyor(false)
+  }, [sessions.error])
 
   const [tick, setTick] = useState(0)
   useEffect(() => {
@@ -123,13 +201,21 @@ export default function Dersler() {
     const active = sessions.data?.active ?? []
     const simdi = Date.now()
 
-    const aksiyonBekliyor = (s) => s.canComplete || s.canApprove || s.status === 'Disputed'
+    /*
+      Aksiyon tanımı Akış başlığındaki Derslerim sayacıyla ORTAK (lib/dersDurumu.js): rozet
+      "2" deyip burada tek kart görünmesin. İtirazdaki dersler eskiden bu grubun içindeydi,
+      ama onlarda kullanıcının basabileceği bir düğme yok, karar yönetimde. Ayrı başlığa
+      alındılar. Aksi hâlde "Senden aksiyon bekleyenler" yapılamayacak bir iş vaat ediyordu.
+    */
+    const aksiyonBekliyor = (s) => eylemBekliyor(s, simdi)
+    const itirazda = (s) => s.status === 'Disputed'
     const saatiGecti = (s) => new Date(s.scheduledEndUtc).getTime() <= simdi
 
     return {
       action: active.filter(aksiyonBekliyor),
-      upcoming: active.filter((s) => !aksiyonBekliyor(s) && !saatiGecti(s)),
-      gecmisAcik: active.filter((s) => !aksiyonBekliyor(s) && saatiGecti(s)),
+      itirazda: active.filter(itirazda),
+      upcoming: active.filter((s) => !aksiyonBekliyor(s) && !saatiGecti(s) && s.status !== 'Disputed'),
+      gecmisAcik: active.filter((s) => !aksiyonBekliyor(s) && saatiGecti(s) && s.status !== 'Disputed'),
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessions.data, tick])
@@ -178,11 +264,33 @@ export default function Dersler() {
     }
   }
 
-  function refresh(message) {
+  /*
+    İŞLEM SONRASI TAZELEME — SESSİZ.
+
+    Eskiden sessions.reload() spinner'lı yüklemeydi: loading true olunca liste boşalıyor,
+    kartların yerine "Yükleniyor…" geliyor ve yarım saniye sonra kartlar geri dönüyordu.
+    Kaydırma konumu da o arada 0'a düşüyordu. Boşalan liste onEndReached'i tetikliyor,
+    tetiklenen sayfa yeni nesil yüzünden atılıyor ve liste dibindeki spinner saniyelerce
+    dönüyordu. Artık elde veri varken liste yerinde kalıyor; değişen kartlar yanıtla güncelleniyor.
+
+    YUKARI KAYDIRMA BİLİNÇLİ: sonuç cümlesi (Notice) listenin başında. Kullanıcı derin
+    kaydırmışken işlem yapınca cümle görünmüyordu, sayfa sessizce "bir şey olmadı" gibi
+    duruyordu. Kalıcı çözüm ekranın altında duran bir bildirim (Toast); gelene kadar
+    konum tepeye dönüyor.
+
+    veriDegisti: false — işlem ders listesini değiştirmiyor (şikayet dersin akışına
+    dokunmaz). Listeyi yeniden çekmek yalnızca birikmiş geçmiş sayfalarını 5'e sıfırlardı.
+  */
+  function refresh(message, { veriDegisti = true } = {}) {
     setDialog(null)
     setBookOpen(false)
+    setOnSecim(null)
     if (message) setNotice(message)
-    sessions.reload()
+    setYukariKaydir((n) => n + 1)
+    if (veriDegisti) {
+      setTazeleniyor(true)
+      sessions.reload({ silent: true })
+    }
     matches.reload({ silent: true })
     // Onay puan basar; seviye rozeti aynı cüzdan ucundan besleniyor.
     refreshWallet()
@@ -199,7 +307,12 @@ export default function Dersler() {
   const hicDersYok =
     !sessions.error &&
     sessions.data != null &&
-    groups.action.length + groups.upcoming.length + groups.gecmisAcik.length + gecmisItems.length === 0
+    groups.action.length +
+      groups.itirazda.length +
+      groups.upcoming.length +
+      groups.gecmisAcik.length +
+      gecmisItems.length ===
+      0
 
   const baslikBolumu = (
     <View className="gap-3 pb-1">
@@ -215,7 +328,10 @@ export default function Dersler() {
 
       <ErrorBox error={sessions.error} onRetry={sessions.reload} />
 
-      {sessions.loading ? (
+      {/* Spinner YALNIZCA elde hiç veri yokken. "Yeniden dene" düz reload çağırıyor ve
+          loading'i veri varken de kaldırıyor; koşul yalnızca loading olsaydı eldeki liste
+          yine "Yükleniyor…"a dönüp kaydırma konumunu silerdi. */}
+      {sessions.loading && sessions.data == null ? (
         <Loading />
       ) : hicDersYok ? (
         <EmptyState
@@ -239,7 +355,18 @@ export default function Dersler() {
                 Senden aksiyon bekleyenler
               </AltBaslik>
               {groups.action.map((s) => (
-                <SessionKarti key={s.sessionId} session={s} onAction={setDialog} />
+                <SessionKarti key={s.sessionId} session={s} onAction={setDialog} kilitli={tazeleniyor} />
+              ))}
+            </>
+          )}
+
+          {/* Aksiyonun hemen altında: kullanıcı itiraz ettiği dersi arıyor ve Planlanmış'ın
+              altında kaybolmamalı. Başlık bekleyenin kim olduğunu söylüyor. */}
+          {groups.itirazda.length > 0 && (
+            <>
+              <AltBaslik sayi={groups.itirazda.length}>İtirazda, karar yönetimde</AltBaslik>
+              {groups.itirazda.map((s) => (
+                <SessionKarti key={s.sessionId} session={s} onAction={setDialog} kilitli={tazeleniyor} />
               ))}
             </>
           )}
@@ -248,7 +375,7 @@ export default function Dersler() {
             <>
               <AltBaslik sayi={groups.upcoming.length}>Planlanmış</AltBaslik>
               {groups.upcoming.map((s) => (
-                <SessionKarti key={s.sessionId} session={s} onAction={setDialog} />
+                <SessionKarti key={s.sessionId} session={s} onAction={setDialog} kilitli={tazeleniyor} />
               ))}
             </>
           )}
@@ -259,7 +386,7 @@ export default function Dersler() {
                 Saati geçti, hâlâ açık
               </AltBaslik>
               {groups.gecmisAcik.map((s) => (
-                <SessionKarti key={s.sessionId} session={s} onAction={setDialog} />
+                <SessionKarti key={s.sessionId} session={s} onAction={setDialog} kilitli={tazeleniyor} />
               ))}
             </>
           )}
@@ -282,16 +409,29 @@ export default function Dersler() {
           <Text className="text-xl text-slate-500">←</Text>
         </Pressable>
         <Text className="flex-1 text-lg font-bold text-slate-900">Derslerim</Text>
-        <Button onPress={() => setBookOpen(true)}>+ Rezerve et</Button>
+        {/* İkincil: başlıkta her an duran dolgulu düğme, listedeki acil onayla ("Kanıtı incele
+            ve onayla") göz için yarışıyordu. Rezervasyon artık çoğunlukla arkadaş kartından,
+            bağlamıyla geliyor; buradaki düğme genel giriş. */}
+        <Button variant="secondary" onPress={() => setBookOpen(true)}>
+          + Rezerve et
+        </Button>
       </View>
 
       {/* Geçmiş, FlatList'in KENDİSİ (iş kuralı 4): 5'erli sayfalar onEndReached ile
           birikir. Aktif bölümler başlıkta yaşar — sunucu aktifleri zaten sınırlı ve
-          TAM döndürür (aksiyon bekleyen ders sayfanın altında kalmamalı). */}
+          TAM döndürür (aksiyon bekleyen ders sayfanın altında kalmamalı).
+          Liste boşaltma koşulu loading DEĞİL data: yükleme sırasında data=[] vermek,
+          içerik kısaldığı için onEndReached'i tetikliyordu ve o sayfa isteği tazeleme
+          dönünce çöpe gidiyordu. extraData: hücreler data değişmeden yeniden çizilmez,
+          kilit yalnızca bir state. */}
       <FlatList
-        data={sessions.loading ? [] : gecmisItems}
+        ref={listeRef}
+        data={sessions.data == null ? [] : gecmisItems}
+        extraData={tazeleniyor}
         keyExtractor={(s) => s.sessionId}
-        renderItem={({ item }) => <SessionKarti session={item} onAction={setDialog} past />}
+        renderItem={({ item }) => (
+          <SessionKarti session={item} onAction={setDialog} kilitli={tazeleniyor} past />
+        )}
         contentContainerClassName="gap-3 p-4"
         ListHeaderComponent={baslikBolumu}
         onEndReached={dahaGetir}
@@ -304,7 +444,9 @@ export default function Dersler() {
               </View>
             )}
             <ErrorBox error={gecmisHata} onRetry={dahaGetir} />
-            {!sessions.loading && !hicDersYok && <PuanGecmisi />}
+            {/* data'ya bağlı, loading'e değil: tazelemede sökülse açık defter kapanır ve
+                yüklenmiş sayfaları kaybolurdu. */}
+            {sessions.data != null && !hicDersYok && <PuanGecmisi />}
           </View>
         }
       />
@@ -312,7 +454,17 @@ export default function Dersler() {
       {bookOpen && (
         <BookModal
           matches={matches.data?.active ?? []}
-          onClose={() => setBookOpen(false)}
+          baslangicMatchId={onSecim}
+          /* Sayfa artık ekran kurulurken de açılıyor (?rezerve=) ve myMatches o an henüz dönmemiş
+             olabiliyor. Yükleme ve hata ayrı söylenmezse boş liste "Henüz arkadaşın yok" diye
+             okunurdu: arkadaşı olan kullanıcıya yanlış teşhis. */
+          yukleniyor={matches.data == null && !matches.error}
+          hata={matches.data == null ? matches.error : null}
+          onYenidenDene={() => matches.reload()}
+          onClose={() => {
+            setBookOpen(false)
+            setOnSecim(null)
+          }}
           onBooked={(code, mintAmount) =>
             refresh(
               `Ders rezerve edildi (eğitmen ${mintAmount} puan kazanacak). ` +
@@ -337,10 +489,17 @@ export default function Dersler() {
           session={dialog.session}
           onClose={() => setDialog(null)}
           onApproved={(credits, session) => {
-            refresh(`Ders onaylandı. Eğitmene ${credits} puan yazıldı.`)
+            /* Puan anlatana yazılıyor; cümle alıcıyı adıyla söylüyor ("+N" ya da "kazandın"
+               dili yok). Gönüllü derste sunucu 0 basar: "0 puan yazıldı" bir kayıp gibi
+               okunacağı için sayı hiç yazılmaz. */
+            const onay =
+              credits > 0
+                ? `Ders onaylandı. ${session.otherDisplayName} kişisine ${credits} puan yazıldı.`
+                : 'Ders onaylandı.'
+            refresh(onay)
             // Değerlendirme onayın hemen ardından: yorum ancak tamamlanmış dersin
             // çıktısı olabilir ve bu an tam olarak o an.
-            setDialog({ type: 'review', session })
+            setDialog({ type: 'review', session, onay })
           }}
           onReport={() => setDialog({ type: 'report', session: dialog.session })}
           onDispute={() => setDialog({ type: 'dispute', session: dialog.session })}
@@ -364,11 +523,20 @@ export default function Dersler() {
         <ReviewModal
           open
           session={dialog.session}
+          /* ONAY ANI KORUNUYOR. Onay cümlesi Notice'e yazılıyordu ama bildirim %85 yükseklikteki
+             bu sayfanın ARKASINDA kalıyordu; Gönder'den sonra "Değerlendirmen kaydedildi" onu
+             eziyordu. Onay veren öğrenci döngünün kapandığını hiçbir anda görmüyordu. Cümle
+             artık sayfanın başında ve gönderimde silinmiyor, değerlendirme teşekkürü ARDINA
+             ekleniyor. "Şimdi değil" (onClose) Notice'e dokunmuyor, onay cümlesi yerinde kalıyor.
+             veriDegisti: false — değerlendirme ders listesini değiştirmiyor; onay zaten listeyi
+             tazeledi, yeniden çekmek biriken geçmiş sayfalarını 5'e sıfırlardı. */
+          onay={dialog.onay}
           onClose={() => setDialog(null)}
-          onSubmitted={() => {
-            setDialog(null)
-            refresh('Değerlendirmen kaydedildi. Teşekkürler!')
-          }}
+          onSubmitted={() =>
+            refresh(`${dialog.onay ?? ''} Değerlendirmen kaydedildi, teşekkürler!`.trim(), {
+              veriDegisti: false,
+            })
+          }
         />
       )}
 
@@ -377,7 +545,11 @@ export default function Dersler() {
           key={dialog.session.sessionId}
           session={dialog.session}
           onClose={() => setDialog(null)}
-          onDone={() => refresh('Şikayetin yönetime iletildi. Karşı tarafa bildirilmez.')}
+          /* Şikayet dersin akışını değiştirmiyor (ReportModal metni de bunu söylüyor): liste
+             yeniden çekilmez, kullanıcının biriktirdiği geçmiş sayfaları yerinde kalır. */
+          onDone={() =>
+            refresh('Şikayetin yönetime iletildi. Karşı tarafa bildirilmez.', { veriDegisti: false })
+          }
         />
       )}
 
@@ -398,13 +570,13 @@ function AltBaslik({ children, sayi, tone = 'slate' }) {
   const amber = tone === 'amber'
   return (
     <View className="flex-row items-center gap-2.5 pt-1">
-      <Text
-        className={`shrink-0 text-xs font-semibold uppercase tracking-wider ${
+      <UstEtiket
+        className={`shrink-0 text-xs font-semibold tracking-wider ${
           amber ? 'text-amber-700' : 'text-slate-600'
         }`}
       >
         {children}
-      </Text>
+      </UstEtiket>
       {sayi !== undefined && <Badge tone={amber ? 'warning' : 'neutral'}>{String(sayi)}</Badge>}
       <View className="h-px flex-1 bg-slate-200" />
     </View>
@@ -427,9 +599,9 @@ function TarihBlogu({ utcString, stil }) {
 
   return (
     <View className="w-16 shrink-0 self-start overflow-hidden rounded-xl border border-slate-200 bg-white">
-      <Text className={`py-1 text-center text-xs font-semibold uppercase tracking-wide ${stil.takvim} ${stil.takvimYazi}`}>
+      <UstEtiket className={`py-1 text-center text-xs font-semibold tracking-wide ${stil.takvim} ${stil.takvimYazi}`}>
         {gecerli ? AY_KISALTMASI.format(tarih) : '—'}
-      </Text>
+      </UstEtiket>
       <Text className="pt-2 text-center text-2xl font-bold leading-none text-slate-900" style={{ fontVariant: ['tabular-nums'] }}>
         {gecerli ? GUN_SAYISI.format(tarih) : '—'}
       </Text>
@@ -455,8 +627,12 @@ function UyariSatiri({ children }) {
   DERS KARTI — üç bölgeli sabit iskelet (web kararı): NE ZAMAN (takvim yaprağı) →
   NE/KİMLE (başlık, kişi, meta) → NE YAPMALIYIM (alt aksiyon şeridi). Sıra her kartta
   aynı; düğmeler kartın alt kenarına yapışık.
+
+  kilitli: işlem sonrası tazeleme sürüyor, kartın durumu bayat olabilir (bkz. Dersler →
+  TAZELEME KİLİDİ). Düğmeler görünür kalıyor, yalnızca basılamıyor: kaybolup geri gelmeleri
+  kartın yüksekliğini oynatır ve kaydırmayı sıçratırdı.
 */
-function SessionKarti({ session, onAction, past = false }) {
+function SessionKarti({ session, onAction, past = false, kilitli = false }) {
   const router = useRouter()
   const startsIn = remainingText(session.scheduledStartUtc)
   const endsIn = remainingText(session.scheduledEndUtc)
@@ -559,26 +735,26 @@ function SessionKarti({ session, onAction, past = false }) {
           uzasın düğmeler alt kenarda, göz hep aynı noktayı arar. */}
       <View className="flex-row flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-5 py-3.5">
         {session.iAmTutor && session.status === 'Booked' && (
-          <Button disabled={!completeReady} onPress={() => onAction({ type: 'complete', session })}>
+          <Button disabled={kilitli || !completeReady} onPress={() => onAction({ type: 'complete', session })}>
             Dersi tamamladım
           </Button>
         )}
 
         {session.canApprove && (
-          <Button variant="success" onPress={() => onAction({ type: 'approve', session })}>
+          <Button variant="primary" disabled={kilitli} onPress={() => onAction({ type: 'approve', session })}>
             Kanıtı incele ve onayla
           </Button>
         )}
 
         {/* Şikayet HER derste açık; savunma düğmesi YOK — şikayet tek yönlüdür. */}
         {!session.canApprove && (
-          <Button variant="secondary" onPress={() => onAction({ type: 'report', session })}>
+          <Button variant="secondary" disabled={kilitli} onPress={() => onAction({ type: 'report', session })}>
             Şikayet et
           </Button>
         )}
 
         {session.canCancel && (
-          <Button variant="secondary" onPress={() => onAction({ type: 'cancel', session })}>
+          <Button variant="secondary" disabled={kilitli} onPress={() => onAction({ type: 'cancel', session })}>
             İptal
           </Button>
         )}
@@ -589,7 +765,8 @@ function SessionKarti({ session, onAction, past = false }) {
 
 /* ── REZERVASYON ─────────────────────────────────────────────────────────── */
 
-function BookModal({ matches, onClose, onBooked }) {
+function BookModal({ matches, baslangicMatchId, yukleniyor, hata, onYenidenDene, onClose, onBooked }) {
+  const router = useRouter()
   // Sunucudaki izinli süre kümesiyle birebir (SessionRules.AllowedDurations).
   const DURATION_OPTIONS = [30, 60]
   // GÖSTERİM sabitleri — SessionRules.MintPerBlock/MintBlockMinutes ile birebir;
@@ -622,15 +799,34 @@ function BookModal({ matches, onClose, onBooked }) {
     Rezervasyonu YAPAN taraf her zaman ÖĞRENCİ: seçilebilir konu, karşı tarafın BANA
     anlatacağı konudur. Her ikisini listelemek, kullanıcının kendi anlatacağı konuya
     öğrenci olarak kaydolmasına yol açardı (ders açılır, puan yanlış tarafa yazılır).
+    Tanım TEK YERDE (lib/iliski.js → ogrenciKonusu): Arkadaşlar kartındaki "Ders rezerve et"
+    de ona bakıyor. İki ayrı koşulken kart düğmeyi çiziyor, bu liste o arkadaşı göstermiyordu.
   */
   const options = matches.map((match) => ({
     match,
-    topicId: match.iAmInitiator ? match.requestedTopicId : match.offeredTopicId,
-    topicName: match.iAmInitiator ? match.requestedTopicName : match.offeredTopicName,
+    ...(ogrenciKonusu(match) ?? { topicId: null, topicName: null }),
   }))
 
   const selected = options.find((o) => o.match.matchId === matchId) ?? null
   const bookable = options.filter((o) => o.topicId)
+
+  /*
+    ÖN SEÇİM — kullanıcı zaten seçtiyse dokunulmaz. Adresten gelen arkadaş listede varsa o
+    seçilir; yoksa (arkadaşlık bu arada bitti ya da o derste anlatan benim) hiçbir şey
+    seçilmez, kullanıcı listeden seçer. Adres yoksa ve tek seçenek varsa o: tek radyoya
+    dokunmayı istemek bir adım fazlaydı.
+    Bağımlılık listenin UZUNLUĞU: dizi her render'da yeniden kuruluyor, kendisine bağlanmak
+    efekti her render'da koştururdu. Sayfa yükleme sürerken açıldıysa liste 0'dan n'e çıkınca
+    efekt yeniden koşuyor.
+  */
+  useEffect(() => {
+    if (matchId) return
+    if (baslangicMatchId) {
+      if (bookable.some((o) => o.match.matchId === baslangicMatchId)) setMatchId(baslangicMatchId)
+      return
+    }
+    if (bookable.length === 1) setMatchId(bookable[0].match.matchId)
+  }, [bookable.length, baslangicMatchId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const puanOnizleme = (Number(duration) / BLOK_DAKIKA) * BLOK_PUANI
 
@@ -663,7 +859,7 @@ function BookModal({ matches, onClose, onBooked }) {
       onClose={onClose}
       title="Ders rezerve et"
       footer={
-        matches.length === 0 || bookable.length === 0 ? null : (
+        yukleniyor || hata || matches.length === 0 || bookable.length === 0 ? null : (
           <>
             <Button variant="secondary" onPress={onClose}>
               Vazgeç
@@ -675,16 +871,34 @@ function BookModal({ matches, onClose, onBooked }) {
         )
       }
     >
-      {matches.length === 0 ? (
+      {yukleniyor ? (
+        <Loading />
+      ) : hata ? (
+        <ErrorBox error={hata} onRetry={onYenidenDene} />
+      ) : matches.length === 0 ? (
         <EmptyState
           title="Henüz arkadaşın yok"
           description="Önce Keşfet'ten istek gönder ve karşı tarafın kabul etmesini bekle."
+          action={<KesfeteGit onClose={onClose} router={router} />}
         />
       ) : bookable.length === 0 ? (
-        <EmptyState
-          title="Arkadaşlarında sana anlatılacak konu yok"
-          description="Mevcut arkadaşlarında ders anlatan taraf sensin. Ders almak için Keşfet'ten yeni bir istek gönder."
-        />
+        /* İKİ AYRI SEBEP, İKİ AYRI CÜMLE. Eski tek metin ("ders anlatan taraf sensin") yalnızca
+           konusu olan arkadaşlıkta doğruydu; arkadaşlıklarının hepsi konusuz (üniversite ağı,
+           Arkadaş Ekle) olan kullanıcıya, olmayan bir derste anlatıcı olduğunu söylüyordu.
+           İkisinde de çıkış Keşfet: sayfa eylemsiz bir çıkmazdı. */
+        matches.every((m) => !m.requestedTopicId) ? (
+          <EmptyState
+            title="Arkadaşlıklarında ders konusu yok"
+            description="Sohbet için eklenen arkadaşlıklar ders içermez. Ders almak için Keşfet'ten bir konu seçip istek gönder."
+            action={<KesfeteGit onClose={onClose} router={router} />}
+          />
+        ) : (
+          <EmptyState
+            title="Bu arkadaşlıklarda anlatan taraf sensin"
+            description="Rezervasyonu dersi alan taraf yapar. Sen de ders almak istersen Keşfet'ten istek gönder."
+            action={<KesfeteGit onClose={onClose} router={router} />}
+          />
+        )
       ) : (
         <View className="gap-4 pb-2">
           <View>
@@ -699,7 +913,10 @@ function BookModal({ matches, onClose, onBooked }) {
                   <Pressable
                     key={option.match.matchId}
                     accessibilityRole="radio"
-                    accessibilityState={{ checked: secili }}
+                    // accessibilityState DEĞİL aria-checked: RN Web 0.21 accessibilityState'i DOM'a
+                    // yazmıyor (EslesmeIstegiModali'nde ölçüldü). Ön seçim artık kendiliğinden
+                    // geliyor ve seçili olduğunu ekran okuyucu da duymalı; aria-* iki platformda okunur.
+                    aria-checked={secili}
                     onPress={() => setMatchId(option.match.matchId)}
                     className={`min-h-[44px] justify-center rounded-lg border px-3 py-2
                                 ${secili ? 'border-brand-500 bg-brand-50' : 'border-slate-200 bg-white'}`}
@@ -776,7 +993,7 @@ function BookModal({ matches, onClose, onBooked }) {
                   <Pressable
                     key={dk}
                     accessibilityRole="radio"
-                    accessibilityState={{ checked: aktif }}
+                    aria-checked={aktif}
                     onPress={() => setDuration(dk)}
                     className={`min-h-[44px] flex-1 items-center justify-center rounded-lg border
                                 ${aktif ? 'border-brand-500 bg-brand-50' : 'border-slate-200 bg-white'}`}
@@ -793,7 +1010,7 @@ function BookModal({ matches, onClose, onBooked }) {
           {/* ÖZET ŞERİDİ — kararın tamamı tek bakışta. Sayı açıkça "eğitmenin kazanacağı
               puan" diye etiketli: etiketsiz sayı ücret gibi okunur (web kararı). */}
           <View className="rounded-xl border border-brand-100 bg-brand-50 px-4 py-3">
-            <Text className="text-xs font-semibold uppercase tracking-wide text-brand-700">Özet</Text>
+            <UstEtiket className="text-xs font-semibold tracking-wide text-brand-700">Özet</UstEtiket>
             <View className="mt-2 gap-1.5">
               <OzetSatiri ad="Konu" deger={selected?.topicName ?? 'Arkadaş seçilmedi'} soluk={!selected} />
               <OzetSatiri ad="Anlatan" deger={selected?.match.otherDisplayName ?? '—'} soluk={!selected} />
@@ -822,11 +1039,28 @@ function BookModal({ matches, onClose, onBooked }) {
   )
 }
 
+/** Rezervasyon çıkmazlarının ortak çıkışı. Sayfa önce kapanır: RN Modal ekranların üstünde
+    ayrı bir katmanda duruyor, açık kalsaydı Keşfet onun ALTINDA açılır ve görünmezdi. */
+function KesfeteGit({ onClose, router }) {
+  return (
+    <Button
+      onPress={() => {
+        onClose()
+        router.push('/kesfet')
+      }}
+    >
+      Keşfet'e git
+    </Button>
+  )
+}
+
 function OzetSatiri({ ad, deger, soluk = false }) {
   return (
     <View className="flex-row items-baseline justify-between gap-3">
       <Text className="shrink-0 text-sm text-brand-700">{ad}</Text>
-      <Text className={`shrink text-right text-sm ${soluk ? 'text-brand-700/70' : 'font-medium text-brand-800'}`}>
+      {/* Boş değer ("Arkadaş seçilmedi") dolu değerden ağırlık ve bir ton farkıyla ayrışıyor,
+          saydamlıkla değil: brand-700/70 brand-50 zeminde 3.14:1'di; brand-700 5.56:1. */}
+      <Text className={`shrink text-right text-sm ${soluk ? 'text-brand-700' : 'font-medium text-brand-800'}`}>
         {deger}
       </Text>
     </View>
@@ -903,7 +1137,10 @@ function CompleteModal({ session, onClose, onDone }) {
             maxLength={12}
             autoCapitalize="characters"
             autoCorrect={false}
-            placeholder={session.verificationCode}
+            /* Placeholder kodun KENDİSİ değil: kod hemen üstteki Notice'te yazıyor. Placeholder
+               slate-500'e koyulaştıktan sonra hazır kod, girdiye çoktan yazılmış bir değer gibi
+               görünüp kullanıcıyı boş alanla "Gönder"e bastırabilirdi. */
+            placeholder="Kodu buraya yaz"
             className="font-mono uppercase tracking-wider"
           />
         </Field>
@@ -1002,7 +1239,7 @@ function ApproveModal({ session, onClose, onApproved, onReport, onDispute }) {
           <Button variant="danger" disabled={onaylaniyor} onPress={onDispute}>
             İtiraz et
           </Button>
-          <Button variant="success" loading={onaylaniyor} disabled={onaylaniyor} onPress={approve}>
+          <Button variant="primary" loading={onaylaniyor} disabled={onaylaniyor} onPress={approve}>
             Onayla
           </Button>
         </>
@@ -1152,7 +1389,7 @@ function DisputeModal({ session, onClose, onDone }) {
       }
     >
       <View className="gap-4 pb-2">
-        <Notice tone="warning">
+        <Notice tone="danger">
           İtiraz, dersi yönetim hakemliğine taşır: {session.otherDisplayName} kişisine puan
           YAZILMAZ ve karar verilene kadar donar. Bu dersi artık onaylayamazsın. Yalnızca
           ders gerçekten yapılmadıysa ya da kanıt bu derse ait değilse itiraz et.
@@ -1479,7 +1716,7 @@ function HareketSatiri({ row, ilk }) {
 
       <View className="shrink-0 items-end">
         <Text
-          className={`text-sm font-semibold ${kazanc ? 'text-emerald-700' : 'text-slate-600'}`}
+          className={`text-sm font-semibold ${kazanc ? 'text-brand-700' : 'text-slate-600'}`}
           style={{ fontVariant: ['tabular-nums'] }}
         >
           {signedCredit(row.amount)}

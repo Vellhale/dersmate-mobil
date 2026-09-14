@@ -107,6 +107,20 @@ export function KonuSecici({ open, onClose, onSelect, konular, yukleniyor = fals
 
   const agac = useMemo(() => agacKur(konular), [konular])
 
+  /*
+    TEK KÖKLÜ KATALOGDA SINAV BASAMAĞI ATLANIR: katalogda yalnızca YKS var ve "Hangi
+    sınav?" diye tek seçenekli bir soru sormak, cevabı belli bir dokunuş istemekti. Kök
+    yine kırıntıda duruyor, yani kullanıcı hangi sınavın içinde olduğunu görüyor.
+    Döngü yok: kırıntıda köke basmak (kirintiyaGit(0)) sinav'ı SIFIRLAMAZ, yalnızca alt
+    basamakları; ekran "TYT mi, AYT mi?"de kalır. Katalog ikinci bir kök alırsa koşul
+    düşer ve soru kendiliğinden geri gelir. Efekt sıfırlama efektinden SONRA koşuyor:
+    her açılışta önce yol boşalır, sonra tek kök yeniden seçilir. Web'de bu atlama yok.
+  */
+  useEffect(() => {
+    if (!open || yukleniyor) return
+    if (!sinav && agac.size === 1) setSinav([...agac.keys()][0])
+  }, [open, yukleniyor, agac, sinav])
+
   const seviyeler = sinav ? agac.get(sinav) : null
   const dersler = seviye && seviyeler ? seviyeler.get(seviye) : null
   const konuListesi = ders && dersler ? (dersler.get(ders) ?? []) : []

@@ -188,6 +188,21 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
 
 ## Web'den bilinçli sapmalar
 
+- **Mobilde yeşil YOK** (kullanıcı kararı, A düzeni: yeşil marka paletinin dışındaydı). `Button`'da
+  `success` varyantı kalktı; "Kabul et / Onayla / Doğrula" gibi olumlu eylemler `primary`
+  (brand-600). Olumlu durum rozeti brand-100 + brand-800, başarı bildirimi (`Notice success`)
+  brand-50 + brand-200 kenar + brand-800 metin. Web hâlâ emerald kullanıyor — bilinçli fark;
+  web sayfası port edilirken emerald sınıfı taşınmaz, "Dokunma ve yüzey dili"ndeki rol tablosuna
+  çevrilir. `theme.js`'te `emerald` export'u da yok.
+- **Büyük harf `uppercase` sınıfıyla YAZILMAZ**: RN metni dil bilgisiz büyüttüğü için "SANA ANLATABILIR"
+  çıkıyordu. Yerine `UstEtiket` (ui.jsx) ya da `buyukHarf` (`src/lib/metin.js`, yalnızca mobil;
+  `format.js` web kopyası olduğu için ona eklenmedi). Web'de `lang="tr"` doğru çevirdiği için
+  `uppercase` kalıyor — port ederken sınıfı taşıma.
+- **Rezervasyon bağlamı adresten** (`/dersler?rezerve=<matchId>`) ve öğrencinin konusu TEK tanımdan
+  (`src/lib/iliski.js` → `ogrenciKonusu`): Arkadaşlar kartındaki "Ders rezerve et" yalnızca öğrenci
+  tarafta, konulu eşleşmede çıkar; anlatan tarafta bilgi satırı var. Web'de `Matches.jsx` düğme koşulu
+  ve `Sessions.jsx` ön seçimsiz — aynı çıkmaz orada duruyor.
+
 - `localStorage` → oturum + HWID **SecureStore**'da, tercihler AsyncStorage'da
   (`src/lib/storage.js`). Oturum açılışta BİR KEZ okunur, sonrası bellekte —
   `getToken()` senkron kalmalı (axios interceptor; SignalR fabrikası `tazeTokenAl` de
@@ -267,7 +282,22 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
     her yeni yer başarıdan sonra `engelDegisti()` çağırmalı. Sayaç api.js'e konamaz:
     önizleme api nesnesini `onizlemeApi` ile eziyor.
   - İlk odak `useFocusEffect`'te de çalışır (ekran odaktayken kurulursa); ilk çekimi
-    zaten yapan ekranda o çağrı atlanmalı.
+    zaten yapan ekranda o çağrı atlanmalı. ⚠️ Kurulum efektinde indirilen `kuruluyor`
+    bayrağı bunu YAPAMIYOR: expo-router'ın `useFocusEffect`'i ilk çağrıyı bir render
+    geciktiriyor (`useOptionalNavigation`) ve bayrağı inmiş buluyor. Yeni ekranlar
+    `src/state/useOnePlanaGelince.js`'i kullanmalı (kurulum anındaki `isFocused()`'a
+    bakıyor). `eslesmeler.jsx` ve `ArkadaslarBolumu` hâlâ eski kalıpta; önizlemede
+    açılışta `myMatches` / `userFriends` ikişer kez çağrılıyor (2026-09-14 ölçümü).
+- **Akış başlığında bekleyen iş sayaçları mobilde var, web'de yok.** Web `Layout.jsx`
+  yalnızca okunmamış mesaj rozeti taşıyor. Mobilde Arkadaşlar ikonu gelen istek sayısını
+  (`myMatches`), Derslerim ikonu kullanıcının kapatabileceği ders sayısını
+  (`mySessions(1, 1)`) gösteriyor; push olmadığı için 14 günde düşen isteği ve 48 saatte
+  otomatik onaylanan dersi kullanıcıya haber veren tek şey bunlar. "İşlem bekliyor"
+  tanımı TEK yerde (`src/lib/dersDurumu.js` → `eylemBekliyor`) ve Derslerim'in aksiyon
+  grubu da onu kullanıyor. Aynı turda Derslerim'de itirazdaki (`Disputed`) dersler aksiyon
+  grubundan "İtirazda, karar yönetimde" başlığına çıktı; web onları hâlâ aksiyonda
+  gösteriyor. Sayaçlar odakta VE ön plana dönüşte tazeleniyor
+  (`src/state/useOnePlanaGelince.js`): odak olayı uygulama arka plandan dönünce gelmiyor.
 - Avatar önbellek sayacı **diskte** (`KEYS.avatarSurumleri`). Fresco'nun disk önbelleği
   uygulama yeniden başlatmalarını aşıyor; sayaç bellekte kalırsa açılışta temel URI'ye
   dönülür ve eski görsel ağa hiç çıkmadan sunulur.
@@ -309,6 +339,18 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
   icat etmez.
 - Renk DEĞERİ gereken yerler (tab bar, SVG, StatusBar) `src/lib/theme.js`'ten okur —
   hex'i elle yazma, palet tek kaynaktan gelsin.
+- **Renk rolleri (A düzeni)** — renk anlam taşır, süs değildir:
+  - Birincil ve olumlu EYLEM: `bg-brand-600 active:bg-brand-700` + beyaz.
+  - Olumlu DURUM (Arkadaşın, Tamamlandı, Yayında, canlı bağlantı): rozet `bg-brand-100
+    text-brand-800`, düz metin `text-brand-700`, şerit/nokta `bg-brand-500`.
+  - BEKLEYEN / DİKKAT: YALNIZCA amber (rozet `bg-amber-100 text-amber-800`, kutu
+    `border-amber-200 bg-amber-50 text-amber-900`). Amber başka anlam için kullanılmaz.
+  - TEHLİKE (hata, itiraz, iptal, engel, yıkıcı eylem ve onun geri alınamaz sonucunu anlatan
+    uyarı: `Notice tone="danger"`) ve sayaç (`SayacRozeti`, okunmamış mesaj dahil): rose.
+  - Anlamsız etiket / kategori (yön, forum kategorisi): `bg-brand-50 text-brand-800` ile
+    `bg-slate-100 text-slate-700` sırayla.
+  - Yeşil, mor (violet) ve gök mavisi (sky) YOK — kategori ya da avatar rengi olarak da.
+  - İstisna, malzeme rengi: değerlendirme yıldızları ve madalya/rozet altın-bronzu amber kalır.
 
 ## Adım planı
 

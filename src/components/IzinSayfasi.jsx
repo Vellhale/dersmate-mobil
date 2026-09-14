@@ -22,6 +22,17 @@ import { Button, Modal } from './ui'
   Web'deki "reddet ve devam et" davranışı korundu: reddin bedeli yok, uygulama aynı
   şekilde çalışır (bkz. IZIN_KATEGORILERI'ndeki zorunlu kategori açıklaması).
 */
+
+/**
+ * İzin sayfası kapandıktan sonra ardından açılacak katmanın beklediği süre (ms).
+ *
+ * ui.jsx'teki alt sayfa `animationType="slide"` ile kapanıyor; beklemeden açılan katman
+ * (ürün turu, Oluştur'un ?ekle= seçicisi) sayfa hâlâ aşağı süzülürken üstüne biner ve iki
+ * katman bir an için yine üst üste görünür. iOS'ta kapanan RN Modal'la aynı karede açılan
+ * ikinci Modal hiç görünmeyebilir. Tek yerde, çünkü sayı animasyona bağlı.
+ */
+export const IZIN_KAPANMA_SURESI = 350
+
 export function IzinSayfasi() {
   const { mutlakaSor, ayarlarAcik, ayarlariKapat, kaydet, izin } = useIzin()
   const router = useRouter()
@@ -137,6 +148,9 @@ export function IzinSayfasi() {
                 /* hitSlop 6: anahtar 32px çizilir (14×8 oranı korunsun diye) ama
                    dokunma alanı 44px — iznin TEK kontrolü, dokunma hedefi kuralının
                    çiğnenebileceği son yer burası. */
+                /* Kapalı zemin slate-500 (beyaz topla ve kart zeminiyle 4.76:1). slate-300
+                   1.48:1'di: kapalı anahtar kartta yalnızca beyaz bir topa indirgeniyor,
+                   "burada bir kontrol var" demiyordu (WCAG 1.4.11, 3:1). */
                 <Pressable
                   accessibilityRole="switch"
                   accessibilityState={{ checked: analitik }}
@@ -144,7 +158,7 @@ export function IzinSayfasi() {
                   onPress={() => setAnalitik((v) => !v)}
                   hitSlop={6}
                   className={`h-8 w-14 shrink-0 justify-center rounded-full px-1
-                              ${analitik ? 'bg-brand-600' : 'bg-slate-300'}`}
+                              ${analitik ? 'bg-brand-600' : 'bg-slate-500'}`}
                 >
                   <View
                     className={`h-6 w-6 rounded-full bg-white ${analitik ? 'self-end' : 'self-start'}`}

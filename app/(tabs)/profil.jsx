@@ -186,6 +186,10 @@ export default function Profil() {
             çıkmamalı: geri alınamaz bir işlem, "Çıkış yap"ın yanında eşit ağırlıkta
             durursa yanlışlıkla dokunulur. Çözüm: altbilginin en dibinde, ayrı bir
             satırda ve sönük — arayan bulur, aramayan çarpmaz.
+
+            Sönüklük RENKTEN değil punto ve konumdan geliyor: slate-400 (2.56:1), aradığı
+            işlemi bulan kullanıcının okuyamayacağı kadar soluktu. slate-500 AA'yı geçiyor;
+            12px ve en dipteki ayrı satır "öne çıkmasın" işini tek başına görüyor.
           */}
           <View className="mt-2 items-center border-t border-slate-100 pt-3">
             <Pressable
@@ -193,7 +197,7 @@ export default function Profil() {
               onPress={() => setDialog('sil')}
               className="min-h-[44px] justify-center px-2"
             >
-              <Text className="text-sm text-slate-400">Hesabımı sil</Text>
+              <Text className="text-xs text-slate-500">Hesabımı sil</Text>
             </Pressable>
           </View>
         </View>
@@ -281,7 +285,7 @@ function HesabiSilModali({ open, onClose, onDeleted }) {
       }
     >
       <View className="gap-4 pb-2">
-        <Notice tone="warning">
+        <Notice tone="danger">
           Bu işlem geri alınamaz. Hesabına bir daha giriş yapamazsın.
         </Notice>
 

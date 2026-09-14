@@ -4,8 +4,8 @@ import { Avatar } from './Avatar'
 import { SeviyeRozeti } from './SeviyeRozeti'
 import { YonetimRozeti } from './YonetimRozeti'
 import { KepIkonu, KitapIkonu, TakasIkonu, YildizIkonu } from './Ikonlar'
-import { Button, Card } from './ui'
-import { amber, brand, emerald, slate } from '../lib/theme'
+import { Button, Card, UstEtiket } from './ui'
+import { amber, brand, slate } from '../lib/theme'
 
 /*
   AKIŞ KARTI — web'deki Discover öneri kartının (Suggestions içindeki CamKart)
@@ -21,6 +21,14 @@ import { amber, brand, emerald, slate } from '../lib/theme'
   • bio null ise satır TAMAMEN düşer — boş çizgi kalmaz.
   • "Karşılıklı takas" etiketi kimlik sütununun DIŞINDA, tam genişlikte: dar sütunda
     kırpılan etiket bilgi vermez.
+
+  • EYLEM KONU DURUMUNU BİLİYOR (opsiyonel `konuDurumu`, bkz. lib/iliski.js → konuHaritasi).
+    Eskiden istek gönderilince kart hiç değişmiyordu: bildirim liste başında, kaydırılmış
+    akışta ekran dışında kalıyordu ve aynı konuya ikinci basış sunucunun 409'unu okutuyordu.
+    Arkadaş olunan kişiye de aynı "Arkadaş isteği gönder" gösteriliyordu. Durum KONU başına:
+    kişinin anlattığı konuların HEPSİ kapsandıysa düğme değişiyor (arkadaşlığı süren konu
+    varsa rezervasyona, yoksa pasif "İstek gönderildi"); bir kısmı kapsandıysa istek düğmesi
+    kalıyor ve kapsananlar altında yazıyor, çünkü kalan konuya istek atmak geçerli.
 
   Web'in CamKart'ı (saydam cam yüzeyi) TAŞINMADI: o, masaüstündeki dekoratif zemin
   ızgarasının üstünde anlam kazanıyordu; mobil akışta kartlar ui.jsx'teki tek yüzey
@@ -39,9 +47,12 @@ function PuanSatiri({ ortalama, adet }) {
   )
 }
 
+/* success = olumlu durum ("Karşılıklı takas"). Olumlu durum marka mavisi: yeşil marka paletinin
+   dışındaydı (kullanıcı kararı, A düzeni). Yön etiketleri durum değil kategori: biri brand,
+   diğeri neutral. */
 const ETIKET_TONLARI = {
   brand: { kutu: 'bg-brand-100', yazi: 'text-brand-700', ikon: brand[700] },
-  success: { kutu: 'bg-emerald-100', yazi: 'text-emerald-700', ikon: emerald[700] },
+  success: { kutu: 'bg-brand-100', yazi: 'text-brand-800', ikon: brand[800] },
   neutral: { kutu: 'bg-slate-100', yazi: 'text-slate-700', ikon: slate[600] },
 }
 
@@ -71,7 +82,7 @@ function TopicList({ title, tone, ikon: Ikon, topics }) {
     <View className="mt-3">
       <View className="flex-row items-center gap-1.5">
         <Ikon renk={slate[600]} boy={14} />
-        <Text className="text-xs font-medium uppercase tracking-wide text-slate-600">{title}</Text>
+        <UstEtiket className="text-xs font-medium tracking-wide text-slate-600">{title}</UstEtiket>
       </View>
       <View className="mt-1.5 flex-row flex-wrap gap-1.5">
         {/* Ders adı OPAKLIKLA soldurulmuyor: opacity-70, 12px metni pastel zeminde AA
@@ -88,8 +99,15 @@ function TopicList({ title, tone, ikon: Ikon, topics }) {
   )
 }
 
-export function IlanKarti({ kisi, onIstek }) {
+export function IlanKarti({ kisi, onIstek, konuDurumu }) {
   const router = useRouter()
+
+  // konuDurumu verilmediyse (ilişkiler henüz yüklenmedi) hiçbir konu kapsanmış sayılmaz.
+  const kapsanan = (kisi.theyCanTeach ?? [])
+    .map((t) => ({ t, d: konuDurumu?.(kisi.userId, t.topicId) }))
+    .filter((x) => x.d)
+  const hepsi = kisi.theyCanTeach?.length > 0 && kapsanan.length === kisi.theyCanTeach.length
+  const aktifMatch = kapsanan.find((x) => x.d.durum === 'aktif')?.d.matchId
 
   return (
     <Card>
@@ -137,14 +155,34 @@ export function IlanKarti({ kisi, onIstek }) {
       {kisi.theyWantToLearn?.length > 0 && (
         <TopicList
           title="Senden öğrenmek istiyor"
-          tone="success"
+          tone="neutral"
           ikon={KitapIkonu}
           topics={kisi.theyWantToLearn}
         />
       )}
 
       <View className="mt-4">
-        <Button onPress={() => onIstek(kisi)}>Arkadaş isteği gönder</Button>
+        {hepsi && aktifMatch ? (
+          <Button variant="secondary" onPress={() => router.push(`/dersler?rezerve=${aktifMatch}`)}>
+            Ders rezerve et
+          </Button>
+        ) : hepsi ? (
+          /* Etikette ad var: TalkBack akıştaki birden fazla pasif düğmeyi ayırt etsin. */
+          <Button variant="secondary" disabled accessibilityLabel={`İstek gönderildi, ${kisi.displayName}`}>
+            ✓ İstek gönderildi
+          </Button>
+        ) : (
+          <>
+            <Button onPress={() => onIstek(kisi)}>Arkadaş isteği gönder</Button>
+            {kapsanan.length > 0 && (
+              <Text numberOfLines={2} className="mt-2 text-xs text-slate-600">
+                {`✓ ${kapsanan
+                  .map((x) => `${x.t.topicName}: ${x.d.durum === 'aktif' ? 'arkadaşlığınızda' : 'istek bekliyor'}`)
+                  .join(' · ')}`}
+              </Text>
+            )}
+          </>
+        )}
       </View>
     </Card>
   )

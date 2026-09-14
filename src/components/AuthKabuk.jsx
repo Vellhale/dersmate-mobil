@@ -57,7 +57,10 @@ export function AuthKabuk({ title, subtitle, children, altBilgi = true }) {
               {VAATLER.map(([ikon, metin]) => (
                 <View key={metin} className="flex-row items-center gap-2">
                   <Text className="text-sm">{ikon}</Text>
-                  <Text className="text-xs leading-relaxed text-brand-100">{metin}</Text>
+                  {/* Beyaz, brand-100 değil: gradyanın en açık tonu düz brand-600 ve brand-100 onun
+                      üstünde 3.86:1'di (12px metin için AA 4.5:1 ister). Beyaz 4.90:1, koyulaşan
+                      tonlarda daha yüksek. Başlıktan ayrışma renkten değil punto ve kalınlıktan. */}
+                  <Text className="text-xs leading-relaxed text-white">{metin}</Text>
                 </View>
               ))}
             </View>

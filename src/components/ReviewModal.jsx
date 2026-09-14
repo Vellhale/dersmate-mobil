@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { api } from '../lib/api'
+import { amber, slate } from '../lib/theme'
+import { YildizIkonu } from './Ikonlar'
 import { Button, ErrorBox, Field, Girdi, Modal } from './ui'
 
 /*
@@ -29,7 +31,7 @@ const SCORE_FIELDS = [
   { key: 'punctualityScore', label: 'Zamanlama', hint: 'Ders vaktinde başladı mı?' },
 ]
 
-export function ReviewModal({ session, open, onClose, onSubmitted }) {
+export function ReviewModal({ session, open, onay, onClose, onSubmitted }) {
   const [scores, setScores] = useState({ score: 0, teachingScore: 0, punctualityScore: 0 })
   const [tags, setTags] = useState([])
   const [comment, setComment] = useState('')
@@ -37,8 +39,10 @@ export function ReviewModal({ session, open, onClose, onSubmitted }) {
   const [busy, setBusy] = useState(false)
 
   // Üç puanın da verilmesi beklenir: eksik puanı 5 sayıp göndermek, kullanıcının
-  // söylemediği bir şeyi ona söyletmek olurdu.
-  const ready = SCORE_FIELDS.every((f) => scores[f.key] >= 1)
+  // söylemediği bir şeyi ona söyletmek olurdu. Eksikler AD ADINA tutuluyor: pasif
+  // "Gönder" basınca hiçbir yanıt vermiyordu; footer artık hangi satırların kaldığını söylüyor.
+  const eksik = SCORE_FIELDS.filter((f) => scores[f.key] < 1)
+  const ready = eksik.length === 0
 
   function toggleTag(value) {
     setTags((current) =>
@@ -67,6 +71,18 @@ export function ReviewModal({ session, open, onClose, onSubmitted }) {
       title="Dersi değerlendir"
       footer={
         <>
+          {/* `w-full`: footer flex-row flex-wrap, metin düğmelerin üstünde kendi satırına
+              iner. Her puanda liste kısaldığı için canlı bölge kalanı yeniden okutuyor.
+              Bölge Text'te değil View'da ve `collapsable={false}` taşıyor: Text aria-live'ı
+              native'de çözmüyor, düzleşen View da bölgeyi kaybediyor (gerekçe
+              EslesmeIstegiModali footer'ında). */}
+          {eksik.length > 0 && (
+            <View aria-live="polite" collapsable={false} className="w-full">
+              <Text className="text-right text-xs text-slate-600">
+                Göndermek için puanla: {eksik.map((f) => f.label).join(', ')}
+              </Text>
+            </View>
+          )}
           <Button variant="secondary" onPress={onClose}>
             Şimdi değil
           </Button>
@@ -77,6 +93,27 @@ export function ReviewModal({ session, open, onClose, onSubmitted }) {
       }
     >
       <View className="gap-5 pb-2">
+        {/*
+          ONAY CÜMLESİ SAYFANIN BAŞINDA: arkadaki bildirim bu sayfanın altında kalıyor ve
+          öğrenci onayın sonucunu (kime kaç puan yazıldı) hiç görmüyordu. Ek duyuru YOK:
+          arkadaki Notice aynı metni zaten duyuruyor, ikinci kez okutmak tekrar olurdu.
+          ✓ dairesi süs; metin kendi başına yetiyor, ekran okuyucudan gizli.
+          "+N" ya da kutlama animasyonu YOK: puan öğrenciye yazılmıyor.
+          Olumlu vurgu marka mavisi: yeşil marka paletinin dışındaydı (kullanıcı kararı, A düzeni).
+        */}
+        {onay ? (
+          <View className="flex-row items-center gap-3 rounded-xl border border-brand-200 bg-brand-50 p-3">
+            <View
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              className="h-8 w-8 items-center justify-center rounded-full bg-brand-600"
+            >
+              <Text className="font-bold text-white">✓</Text>
+            </View>
+            <Text className="flex-1 text-sm font-medium text-brand-800">{onay}</Text>
+          </View>
+        ) : null}
+
         <View className="rounded-xl bg-brand-50 p-4">
           <Text className="text-sm text-slate-600">Değerlendirdiğin ders</Text>
           <Text className="mt-0.5 font-semibold text-slate-900">
@@ -140,7 +177,14 @@ export function ReviewModal({ session, open, onClose, onSubmitted }) {
   )
 }
 
-/** Yıldız satırı — radyo grubu: ekran okuyucu "5 üzerinden 4" diyebilsin. */
+/**
+ * Yıldız satırı — radyo grubu: ekran okuyucu "5 üzerinden 4" diyebilsin.
+ *
+ * Yıldız SVG, Unicode ★ değil. ★ Android'de yedek fonta düşüyor ve boş/dolu aynı glifti:
+ * seçimi yalnızca renk anlatıyordu, o da beyazda 1.48:1 (slate-300) ile 1.67:1 (amber-400)
+ * arasında. Şimdi seçili yıldız DOLU amber-600 (3.19:1), seçilmemiş yalnızca slate-500
+ * çizgi (4.76:1): biçim farkı renkten bağımsız okunuyor.
+ */
 function YildizSatiri({ label, hint, value, onChange }) {
   return (
     <View>
@@ -162,7 +206,11 @@ function YildizSatiri({ label, hint, value, onChange }) {
             onPress={() => onChange(star)}
             className="h-11 w-11 items-center justify-center rounded-lg active:bg-slate-50"
           >
-            <Text className={`text-2xl ${star <= value ? 'text-amber-400' : 'text-slate-300'}`}>★</Text>
+            <YildizIkonu
+              boy={28}
+              renk={star <= value ? amber[600] : slate[500]}
+              dolgu={star <= value ? amber[600] : 'none'}
+            />
           </Pressable>
         ))}
       </View>

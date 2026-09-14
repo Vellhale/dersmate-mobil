@@ -120,7 +120,9 @@ export function SubjectBadges({ userId, kendiProfilim = false }) {
                   {p.subject}
                 </Text>
                 <View className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
-                  <View className="h-full rounded-full bg-slate-300" style={{ width: `${oran}%` }} />
+                  {/* Dolgu brand-500: slate-300 dolgu slate-100 rayda 1.36:1'di ve ilerlemenin
+                      kendisi seçilmiyordu; brand-500 aynı rayda 3.55:1 (WCAG 1.4.11). */}
+                  <View className="h-full rounded-full bg-brand-500" style={{ width: `${oran}%` }} />
                 </View>
                 <Text className="shrink-0 text-xs text-slate-500" style={{ fontVariant: ['tabular-nums'] }}>
                   {p.hours}/{hedef ?? ESIKLER.at(-1)} sa

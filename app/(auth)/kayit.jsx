@@ -19,6 +19,9 @@ const KOD_DAKIKA = 15
  * bağlantıya basmak kutuyu da işaretlerdi. Çözüm: dış Pressable yalnızca kutu +
  * metnin boş alanını kapsıyor, bağlantılar kendi onPress'leriyle üstte duruyor
  * (RN'de iç Text.onPress dıştaki Pressable'ı yutar).
+ *
+ * Boş kutunun kenarı slate-500 (beyazda 4.76:1); slate-300 1.48:1'di ve zorunlu onayların
+ * işaretlenecek bir kutu olduğu zeminde seçilmiyordu (WCAG 1.4.11, 3:1).
  */
 function OnayKutusu({ secili, onToggle, children }) {
   return (
@@ -30,7 +33,7 @@ function OnayKutusu({ secili, onToggle, children }) {
     >
       <View
         className={`mt-0.5 h-5 w-5 shrink-0 items-center justify-center rounded border-2
-                    ${secili ? 'border-brand-600 bg-brand-600' : 'border-slate-300 bg-white'}`}
+                    ${secili ? 'border-brand-600 bg-brand-600' : 'border-slate-500 bg-white'}`}
       >
         {secili && <Text className="text-xs font-bold text-white">✓</Text>}
       </View>
@@ -253,7 +256,7 @@ export default function Kayit() {
       ⚠️ ÖNCEKİ "GÖNDERDİK" BİLDİRİMİ BURADA SÖNDÜRÜLÜYOR.
 
       `resendDone` bir kez true olup hiç geri dönmezse, bu denemenin SONUCU ne olursa
-      olsun yeşil "yeni bir kod gönderdik" kutusu ekranda kalır. Hata durumunda ekranda
+      olsun "yeni bir kod gönderdik" başarı kutusu ekranda kalır. Hata durumunda ekranda
       aynı anda hem "gönderdik" hem hata mesajı durur ve kullanıcı hangisine
       inanacağını bilemez.
     */
@@ -361,6 +364,9 @@ export default function Kayit() {
                 returnKeyType verilince üstte bir araç çubuğu çiziyor ve düğme metnini
                 İngilizce "Done" olarak SABİT yazıyor. Etiketi Türkçeleştirilmezse ekrandaki
                 tek İngilizce metin olurdu. (Android'de bu prop yok sayılıyor.)
+
+                Placeholder "000000" DEĞİL: slate-500'e koyulaşınca altı sıfır, girilmiş bir
+                kod gibi okunuyor ve "Doğrula"nın neden kapalı olduğu anlaşılmıyordu.
               */}
               <Girdi
                 value={kod}
@@ -369,7 +375,7 @@ export default function Kayit() {
                 textContentType="oneTimeCode"
                 autoComplete="email-otp"
                 autoCorrect={false}
-                placeholder="000000"
+                placeholder={`${KOD_UZUNLUK} haneli kod`}
                 returnKeyType="done"
                 inputAccessoryViewButtonLabel="Bitti"
                 onSubmitEditing={onDogrula}

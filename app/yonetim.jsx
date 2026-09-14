@@ -21,6 +21,7 @@ import {
   Notice,
   SectionTitle,
   Spinner,
+  UstEtiket,
 } from '../src/components/ui'
 
 /*
@@ -133,9 +134,12 @@ export default function Yonetim() {
                   >
                     {item.label}
                   </Text>
+                  {/* rose-600 (beyazla 4.70:1); rose-500 3.67:1'di ve 10px metin AA'nın büyük metin
+                      muafiyetine giremeyecek kadar küçüktü, punto da 11px'e çıktı. SayacRozeti
+                      DEĞİL: o 9'dan sonra "9+" yazıyor, yönetim kuyruğunda gerçek sayı iş yükü. */}
                   {sayi > 0 && (
-                    <View className="rounded-full bg-rose-500 px-1.5 py-0.5">
-                      <Text className="text-[10px] font-bold leading-none text-white">{sayi}</Text>
+                    <View className="rounded-full bg-rose-600 px-1.5 py-0.5">
+                      <Text className="text-[11px] font-semibold leading-none text-white">{sayi}</Text>
                     </View>
                   )}
                 </Pressable>
@@ -857,7 +861,7 @@ const ADAY_DURUMU = {
 const ADAY_KARARLARI = {
   Verify: {
     label: 'Doğrula',
-    variant: 'success',
+    variant: 'primary',
     title: 'Beyanı doğrula',
     hint: 'Profilde "Doğrulandı" rozeti görünür. Gerekçeye hangi belgeyi gördüğünü yaz — sistemde belge kaydı yok, bu not tek dayanak.',
     ornek: 'Örn: Öğrenci belgesi e-posta ile gönderildi, 2026 bahar dönemi.',
@@ -1067,7 +1071,7 @@ function AdayKarti({ row, onKarar }) {
       aksiyonlar={
         <>
           {row.reviewStatus !== 'Verified' && (
-            <Button variant="success" onPress={() => onKarar({ row, karar: 'Verify' })}>
+            <Button variant="primary" onPress={() => onKarar({ row, karar: 'Verify' })}>
               Doğrula
             </Button>
           )}
@@ -1122,7 +1126,7 @@ function AdayKarti({ row, onKarar }) {
         {/* Davranışsal sinyal: beyanı fiilen kullanıyor mu? */}
         <Text
           className={`text-xs ${
-            row.completedVolunteerSessions > 0 ? 'font-medium text-emerald-700' : 'text-slate-600'
+            row.completedVolunteerSessions > 0 ? 'font-medium text-brand-700' : 'text-slate-600'
           }`}
         >
           Gönüllü ders: {row.completedVolunteerSessions} tamamlandı · {row.volunteerOfferCount} açık
@@ -1296,7 +1300,7 @@ const KARARLAR = [
     value: 'ForTutor',
     label: 'Eğitmen haklı — puanı bas',
     hint: 'Ders tamamlanmış sayılır ve eğitmene süreye göre puan yazılır.',
-    variant: 'success',
+    variant: 'primary',
   },
   {
     value: 'Dismissed',
@@ -1557,17 +1561,17 @@ function IncelemeSayfasi({ disputeId, onClose, onKarara }) {
           {/* İKİ TARAFIN BEYANI. Eğitmen yanıtı yoksa bu da hakem için bir veridir. */}
           <View className="gap-2">
             <View className="rounded-xl border border-rose-200 bg-rose-50 p-3">
-              <Text className="text-xs font-medium uppercase tracking-wide text-rose-700">
+              <UstEtiket className="text-xs font-medium tracking-wide text-rose-700">
                 Öğrencinin iddiası · {formatDateTime(d.createdAtUtc)}
-              </Text>
+              </UstEtiket>
               <Text className="mt-1 text-sm leading-relaxed text-slate-700">{d.description}</Text>
             </View>
 
             <View className="rounded-xl border border-slate-200 bg-white p-3">
-              <Text className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              <UstEtiket className="text-xs font-medium tracking-wide text-slate-500">
                 Eğitmenin savunması
                 {d.tutorStatementAtUtc ? ` · ${formatDateTime(d.tutorStatementAtUtc)}` : ''}
-              </Text>
+              </UstEtiket>
               {d.tutorStatement ? (
                 <Text className="mt-1 text-sm leading-relaxed text-slate-700">
                   {d.tutorStatement}
@@ -1632,7 +1636,7 @@ function TarafKarti({ baslik, taraf, onBan, pasif }) {
     <View className="rounded-xl border border-slate-200 p-3">
       <View className="flex-row items-start justify-between gap-2">
         <View className="min-w-0 flex-1">
-          <Text className="text-xs uppercase tracking-wide text-slate-600">{baslik}</Text>
+          <UstEtiket className="text-xs tracking-wide text-slate-600">{baslik}</UstEtiket>
           <Text numberOfLines={1} className="font-medium text-slate-800">
             {taraf.displayName}
           </Text>

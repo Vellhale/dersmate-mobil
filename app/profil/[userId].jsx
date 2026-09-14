@@ -270,11 +270,13 @@ function BaskaKisiIslemleri({ kisi, onNotice }) {
     gerçek bloğa geçerken sayfa zıplardı. Cümlelerde AD YOK: tek satıra kilitli cümle adla
     uzayınca anlamı taşıyan fiil kesiliyordu (320 dp'de "… sana arkadaş isteği …"); kimin
     profili olduğu hemen alttaki kartta yazıyor.
+
+    Olumlu durum marka mavisi: yeşil marka paletinin dışındaydı (kullanıcı kararı, A düzeni).
   */
   const durum = engelli
     ? { metin: 'Bu kişiyi engelledin.', ton: 'text-rose-700' }
     : iliski?.durum === ILISKI.arkadas
-      ? { metin: 'Arkadaşsınız.', ton: 'text-emerald-700' }
+      ? { metin: 'Arkadaşsınız.', ton: 'text-brand-700' }
       : iliski?.durum === ILISKI.gelen
         ? { metin: 'Sana arkadaş isteği gönderdi.', ton: 'text-slate-700' }
         : iliski?.durum === ILISKI.giden

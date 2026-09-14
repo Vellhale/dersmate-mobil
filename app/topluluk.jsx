@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { api } from '../src/lib/api'
 import { useAuth } from '../src/state/AuthContext'
-import { amber, brand, rose, slate } from '../src/lib/theme'
+import { amber, brand, slate } from '../src/lib/theme'
 import { Avatar } from '../src/components/Avatar'
 import { SeviyeRozeti } from '../src/components/SeviyeRozeti'
 import { BayrakIkonu, MesajIkonu, OyOkuIkonu, UyariIkonu } from '../src/components/Ikonlar'
@@ -21,6 +21,7 @@ import {
   Modal,
   Notice,
   Spinner,
+  UstEtiket,
 } from '../src/components/ui'
 
 /*
@@ -178,22 +179,27 @@ const ETIKETLER = [
 ]
 
 /*
-  Etiket renkleri: 100/700-800 çiftleri — ui.jsx'teki Badge tonlarıyla aynı aile, yani
-  forum kendi renk dilini kurmuyor. (Badge doğrudan kullanılamıyor: tonları violet ve
-  sky taşımıyor, altı etiket ise birbirinden ayrışmak zorunda.)
+  Etiket renkleri: kategori bir DURUM değil, anlam taşımayan bir etiket. Bu yüzden iki
+  nötr tint sırayla dönüyor (A düzeni): brand-50/800 (7.16:1) ve slate-100/700.
+  Eskiden her etikete ayrı renk (amber, yeşil, mor, rose, gök mavisi) veriliyordu; o
+  renkler üründe bekleyen/tehlike gibi durumları anlattığı için etiket "uyarı" gibi
+  okunuyordu. Etiket zaten adıyla ayrışıyor, rengin ayırması gerekmiyor.
 
-  Marka mavisi SORU etiketine verildi: bu üründe soru sormak ana eylem.
+  Sıra, SORU marka tintine düşecek biçimde başlıyor: bu üründe soru sormak ana eylem.
 */
+const MARKA_ETIKET = { kutu: 'bg-brand-50', yazi: 'text-brand-800' }
+const NOTR_ETIKET = { kutu: 'bg-slate-100', yazi: 'text-slate-700' }
+
 const ETIKET_TONU = {
-  stres: { kutu: 'bg-amber-100', yazi: 'text-amber-800' },
-  soru: { kutu: 'bg-brand-100', yazi: 'text-brand-700' },
-  kaynak: { kutu: 'bg-emerald-100', yazi: 'text-emerald-700' },
-  program: { kutu: 'bg-violet-100', yazi: 'text-violet-700' },
-  motivasyon: { kutu: 'bg-rose-100', yazi: 'text-rose-700' },
-  tercih: { kutu: 'bg-sky-100', yazi: 'text-sky-800' },
+  stres: NOTR_ETIKET,
+  soru: MARKA_ETIKET,
+  kaynak: NOTR_ETIKET,
+  program: MARKA_ETIKET,
+  motivasyon: NOTR_ETIKET,
+  tercih: MARKA_ETIKET,
 }
 
-const VARSAYILAN_ETIKET_TONU = { kutu: 'bg-slate-100', yazi: 'text-slate-700' }
+const VARSAYILAN_ETIKET_TONU = NOTR_ETIKET
 
 const ETIKET_ADI = Object.fromEntries(ETIKETLER.map((e) => [e.key, e.label]))
 
@@ -367,9 +373,11 @@ function YazarSatiri({ yazar, damga, kucuk = false }) {
 /*
   OY RAYI.
 
-  Renk oyun yönünü söylüyor: yukarı marka mavisi (bu ürünün "evet" rengi), aşağı rose.
-  Sayı da oyun rengini alıyor — kullanıcı kendi oyunu, okların hangisinin dolu olduğuna
-  bakmadan görebiliyor.
+  Renk oyun yönünü söylüyor: yukarı marka mavisi (bu ürünün "evet" rengi), aşağı koyu
+  slate. Aşağı oy bir TEHLİKE değil, bir görüş: rose kullanıcının verdiği oyu hata ya da
+  yıkıcı eylem gibi gösteriyordu (A düzeni). Sayı da oyun rengini alıyor — kullanıcı
+  kendi oyunu, okların hangisinin dolu olduğuna bakmadan görebiliyor; bunun için oysuz
+  sayı slate-600, aşağı oylu sayı slate-800 (ikisi de beyazda AA'nın çok üstünde).
 
   ⚠️ GÖSTERİLEN SAYI = arti − eksi. Kendi oyu AYRICA EKLENMİYOR: sunucudan gelen
   upvoteCount/downvoteCount kullanıcının kendi oyunu zaten içeriyor.
@@ -384,7 +392,7 @@ function YazarSatiri({ yazar, damga, kucuk = false }) {
 function OyRayi({ arti, eksi, oy = 0, onOy, kucuk = false, yatay = false }) {
   const olcu = kucuk ? 'h-9 w-9' : 'h-11 w-11'
   const hedefBuyutme = kucuk ? { top: 4, bottom: 4, left: 6, right: 6 } : undefined
-  const sayiRengi = oy === 1 ? 'text-brand-700' : oy === -1 ? 'text-rose-700' : 'text-slate-800'
+  const sayiRengi = oy === 1 ? 'text-brand-700' : oy === -1 ? 'text-slate-800' : 'text-slate-600'
 
   return (
     <View
@@ -400,8 +408,10 @@ function OyRayi({ arti, eksi, oy = 0, onOy, kucuk = false, yatay = false }) {
       >
         {/* Tek çizim, iki yön: OyOkuIkonu YUKARI çizilir, aşağı oy 180° döndürülür.
             Gövdeli ok (sap + baş) basılabilir bir eylem gibi okunur; çıplak chevron
-            oy düğmesinde "aşağı kaydır" gibi dururdu (bkz. Ikonlar.jsx). */}
-        <OyOkuIkonu renk={oy === 1 ? brand[600] : slate[400]} boy={18} kalinlik={oy === 1 ? 2.6 : 2} />
+            oy düğmesinde "aşağı kaydır" gibi dururdu (bkz. Ikonlar.jsx).
+            Oy verilmemiş ok slate-500 (beyazda 4.76:1); slate-400 2.56:1'di ve oy vermenin
+            TEK yolu bu iki ok — eşiğin (WCAG 1.4.11, 3:1) altında kalamazlar. */}
+        <OyOkuIkonu renk={oy === 1 ? brand[700] : slate[500]} boy={18} kalinlik={oy === 1 ? 2.6 : 2} />
       </Pressable>
 
       <Text
@@ -417,10 +427,10 @@ function OyRayi({ arti, eksi, oy = 0, onOy, kucuk = false, yatay = false }) {
         accessibilityState={{ selected: oy === -1 }}
         hitSlop={hedefBuyutme}
         onPress={() => onOy(-1)}
-        className={`${olcu} items-center justify-center rounded-lg ${oy === -1 ? 'bg-rose-50' : 'active:bg-slate-100'}`}
+        className={`${olcu} items-center justify-center rounded-lg ${oy === -1 ? 'bg-slate-100' : 'active:bg-slate-100'}`}
       >
         <View style={{ transform: [{ rotate: '180deg' }] }}>
-          <OyOkuIkonu renk={oy === -1 ? rose[600] : slate[400]} boy={18} kalinlik={oy === -1 ? 2.6 : 2} />
+          <OyOkuIkonu renk={oy === -1 ? slate[800] : slate[500]} boy={18} kalinlik={oy === -1 ? 2.6 : 2} />
         </View>
       </Pressable>
     </View>
@@ -1034,9 +1044,9 @@ function FiltreSeridi({
       </Text>
 
       <View className="mt-4 border-t border-slate-100 pt-4">
-        <Text className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+        <UstEtiket className="mb-2 text-xs font-medium tracking-wide text-slate-500">
           Tarih
-        </Text>
+        </UstEtiket>
         <View className="flex-row flex-wrap gap-2">
           {/* Görünen metin kısa ("Hafta"), okunan ad tam ("Bu hafta"): dört pil tek
               satıra sığsın ama ekran okuyucu kısaltmayı çözmek zorunda kalmasın. */}
@@ -1047,9 +1057,9 @@ function FiltreSeridi({
           ))}
         </View>
 
-        <Text className="mb-2 mt-4 text-xs font-medium uppercase tracking-wide text-slate-500">
+        <UstEtiket className="mb-2 mt-4 text-xs font-medium tracking-wide text-slate-500">
           Etiket
-        </Text>
+        </UstEtiket>
         <View className="flex-row flex-wrap gap-2">
           {ETIKETLER.map(({ key, label }) => (
             <Pil key={key} aktif={etiket === key} onPress={() => onEtiket(key)}>
