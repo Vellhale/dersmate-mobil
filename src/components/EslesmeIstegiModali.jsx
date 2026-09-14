@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { api } from '../lib/api'
+import { ILISKI } from '../lib/iliski'
 import { Button, ErrorBox, Modal } from './ui'
 
 /*
@@ -23,6 +24,10 @@ import { Button, ErrorBox, Modal } from './ui'
   listeden SİLİNMİYOR: kişinin anlattığı konu kaybolsa kullanıcı onu kartta görüp burada
   arardı. Pasifleştirme konu başına, kişi başına değil: Türev'de arkadaş olunan kişiden
   Limit istemek geçerli bir istek. Seçilebilir tek konu kaldıysa önceden seçili geliyor.
+
+  KİŞİ İLİŞKİSİ (opsiyonel `kisiIliskisi`, bkz. lib/iliski.js → iliskiHaritasi): yalnızca
+  isteğin SONUCUNU anlatan cümle için. Zaten arkadaş olunan kişiye "arkadaş olursunuz"
+  denmez; ilişki bilinmiyorsa (yükleniyor ya da hata) da denmez — olumlu bir iddia bilgi ister.
 */
 
 /**
@@ -60,7 +65,7 @@ function SecimSatiri({ secili, pasif = false, ek = null, onPress, children }) {
   )
 }
 
-export function EslesmeIstegiModali({ person, myOffers, konuDurumu, onClose, onSent }) {
+export function EslesmeIstegiModali({ person, myOffers, konuDurumu, kisiIliskisi, onClose, onSent }) {
   const [requestedTopicId, setRequestedTopicId] = useState(null)
   const [offeredTopicId, setOfferedTopicId] = useState(null)
   const [error, setError] = useState(null)
@@ -83,8 +88,13 @@ export function EslesmeIstegiModali({ person, myOffers, konuDurumu, onClose, onS
   // Seçilebilir TEK konu kaldıysa o seçili gelir: soru yok, cevabı zaten belli. Yalnızca
   // hedef değişince koşuyor, konuDurumu bağımlılık DEĞİL: sayfa açıkken gelen odak
   // tazelemesi kullanıcının yaptığı seçimi ezmesin.
+  // KAPANIŞTA SIFIRLAMA YOK: person null olunca userId de değişiyor ve efekt koşuyor.
+  // Seçim silinseydi, sayfa aşağı kayarken footer'a "konuyu seç" ipucu geri gelir, sayfa bir
+  // satır yukarı sıçrar ve az önce gönderilen istek pasif düğmeyle kapanırdı (sonKisi ile
+  // aynı kusur sınıfı). Yeniden açılışta userId undefined → id değiştiği için form yine sıfırlanır.
   useEffect(() => {
-    const secilebilir = (person?.theyCanTeach ?? []).filter((t) => !konuDurumu?.(person.userId, t.topicId))
+    if (!person) return
+    const secilebilir = (person.theyCanTeach ?? []).filter((t) => !konuDurumu?.(person.userId, t.topicId))
     setRequestedTopicId(secilebilir.length === 1 ? secilebilir[0].topicId : null)
     setOfferedTopicId(null)
     setError(null)
@@ -94,6 +104,11 @@ export function EslesmeIstegiModali({ person, myOffers, konuDurumu, onClose, onS
   // Karşı tarafın öğrenmek istedikleri ∩ benim verebildiklerim = geçerli takas teklifi.
   const wantedTopicIds = new Set((gosterilen?.theyWantToLearn ?? []).map((t) => t.topicId))
   const tradeableOffers = (myOffers ?? []).filter((o) => wantedTopicIds.has(o.topicId))
+
+  // `gosterilen`dan okunuyor, person'dan değil: kapanış animasyonunda cümle değişip sayfa
+  // yüksekliği oynamasın. `kisiIliskisi` yoksa ilişki bilinmiyor → arkadaş DEĞİL sayılmaz.
+  const arkadasDegil =
+    Boolean(gosterilen && kisiIliskisi) && kisiIliskisi(gosterilen.userId)?.durum !== ILISKI.arkadas
 
   async function submit() {
     if (busy || !person) return
@@ -124,14 +139,25 @@ export function EslesmeIstegiModali({ person, myOffers, konuDurumu, onClose, onS
           {/*
             PASİF DÜĞME NEDENİNİ SÖYLER: "İsteği gönder" konu seçilmeden basılamıyor ve
             basınca hiçbir yanıt vermiyordu; kullanıcı neyin eksik olduğunu tahmin etmek
-            zorundaydı. `w-full` metni footer'ın (flex-row flex-wrap) kendi satırına indirir.
-            `aria-live`: Android ve web'de değişen metin okunur; accessibilityLiveRegion
-            RN Web'de kullanım dışı uyarısı veriyor, native çözümleyici ikisini de tanıyor.
+            zorundaydı. `w-full` sarmalayıcıyı footer'ın (flex-row flex-wrap) kendi satırına indirir.
+
+            CANLI BÖLGE VIEW'DA, TEXT'TE DEĞİL — iki tuzak var (RN 0.86):
+            • Text `aria-live`ı native'de ÇÖZMÜYOR: Text.js yalnızca busy/checked/disabled/
+              expanded/hidden/label/selected'ı çeviriyor; native çevirici
+              (AccessibilityProps.cpp) de enableNativeViewPropTransformations bayrağına bağlı ve
+              bayrak varsayılan kapalı. View.js ise aria-live'ı accessibilityLiveRegion'a
+              kendisi çeviriyor; RN Web DOM'a aria-live yazıyor, eski adın kullanım dışı
+              uyarısı da çıkmıyor.
+            • `collapsable={false}` ŞART: Fabric yalnızca yerleşim taşıyan View'u düzleştiriyor
+              ve live region bu kararda sayılmıyor (ViewShadowNode.cpp → formsView). Düzleşen
+              View'un canlı bölgesi native görünümle birlikte kaybolurdu.
           */}
           {!requestedTopicId && (
-            <Text aria-live="polite" className="w-full text-right text-xs text-slate-600">
-              Göndermek için almak istediğin konuyu seç.
-            </Text>
+            <View aria-live="polite" collapsable={false} className="w-full">
+              <Text className="text-right text-xs text-slate-600">
+                Göndermek için almak istediğin konuyu seç.
+              </Text>
+            </View>
           )}
           <Button variant="secondary" onPress={onClose}>
             Vazgeç
@@ -190,10 +216,15 @@ export function EslesmeIstegiModali({ person, myOffers, konuDurumu, onClose, onS
           </View>
 
           {/* İsteğin SONUCU gönderimden ÖNCE anlatılır: kullanıcı kabulden sonra ne
-              olacağını bilmiyordu. Üçü de sunucu davranışı — RespondMatch kabulde sohbeti
-              açıyor, BookSession yalnızca kabul edilmiş eşleşmenin konularına ders alıyor. */}
+              olacağını bilmiyordu. Hepsi sunucu davranışı — RespondMatch kabulde HER eşleşmeye
+              kendi sohbetini açıyor (arkadaşla ikinci konuda da yeni sohbet), BookSession
+              yalnızca kabul edilmiş eşleşmenin konularına ders alıyor. "Arkadaş olursunuz"
+              yalnızca arkadaş olmadığı BİLİNEN kişide: sunucu farklı konuda arkadaşa da istek
+              kabul ediyor (MatchRequests.cs yalnızca aynı konuda bekleyeni reddediyor). */}
           <Text className="text-xs text-slate-600">
-            Kabul edilince arkadaş olursunuz, sohbet açılır ve bu konuda ders rezerve edebilirsin.
+            {arkadasDegil
+              ? 'Kabul edilince arkadaş olursunuz, sohbet açılır ve bu konuda ders rezerve edebilirsin.'
+              : 'Kabul edilince bu konuda sohbet açılır ve ders rezerve edebilirsin.'}
           </Text>
 
           <ErrorBox error={error} />

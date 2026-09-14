@@ -633,6 +633,8 @@ export default function Kesfet() {
         person={hedef}
         myOffers={myOffers}
         konuDurumu={iliskiler.yukleniyor ? undefined : iliskiler.konuDurumu}
+        // Hata da "bilinmiyor": boş harita herkesi arkadaş değil gösterirdi.
+        kisiIliskisi={iliskiler.yukleniyor || iliskiler.hata ? undefined : iliskiler.iliski}
         onClose={() => setHedef(null)}
         onSent={(name, topicId) => {
           const id = hedef.userId

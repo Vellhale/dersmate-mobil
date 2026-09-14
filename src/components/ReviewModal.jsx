@@ -70,11 +70,16 @@ export function ReviewModal({ session, open, onClose, onSubmitted }) {
       footer={
         <>
           {/* `w-full`: footer flex-row flex-wrap, metin düğmelerin üstünde kendi satırına
-              iner. Her puanda liste kısaldığı için `aria-live` kalanı yeniden okutuyor. */}
+              iner. Her puanda liste kısaldığı için canlı bölge kalanı yeniden okutuyor.
+              Bölge Text'te değil View'da ve `collapsable={false}` taşıyor: Text aria-live'ı
+              native'de çözmüyor, düzleşen View da bölgeyi kaybediyor (gerekçe
+              EslesmeIstegiModali footer'ında). */}
           {eksik.length > 0 && (
-            <Text aria-live="polite" className="w-full text-right text-xs text-slate-600">
-              Göndermek için puanla: {eksik.map((f) => f.label).join(', ')}
-            </Text>
+            <View aria-live="polite" collapsable={false} className="w-full">
+              <Text className="text-right text-xs text-slate-600">
+                Göndermek için puanla: {eksik.map((f) => f.label).join(', ')}
+              </Text>
+            </View>
           )}
           <Button variant="secondary" onPress={onClose}>
             Şimdi değil
