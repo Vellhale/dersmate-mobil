@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FlatList, Image, Platform, Pressable, Text, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
 import DateTimePicker from '@react-native-community/datetimepicker'
@@ -8,6 +8,7 @@ import { api } from '../src/lib/api'
 import { useYetkiliGorsel } from '../src/components/YetkiliGorsel'
 import { amber, rose, slate } from '../src/lib/theme'
 import { eylemBekliyor } from '../src/lib/dersDurumu'
+import { ogrenciKonusu } from '../src/lib/iliski'
 import { useAsync } from '../src/state/useAsync'
 import { useWallet } from '../src/state/WalletContext'
 import { Avatar } from '../src/components/Avatar'
@@ -52,8 +53,8 @@ import {
   • 20 sn'lik tick: geri sayımlar ve gruplama canlı aksın — saati dolan ders sayfa
     yenilenmeden doğru tarafa geçsin.
   • Rezervasyonu yapan taraf HER ZAMAN ÖĞRENCİ: seçilebilir konu, karşı tarafın BANA
-    anlatacağı konudur (iAmInitiator ? requestedTopic : offeredTopic) — tersini
-    listelemek puanı yanlış tarafa yazdırırdı.
+    anlatacağı konudur (lib/iliski.js → ogrenciKonusu) — tersini listelemek puanı yanlış
+    tarafa yazdırırdı.
   • Onay/tamamlama/iptal/şikayet çift gönderime karşı REF kilidi taşır: state bir
     sonraki render'a kadar eski değeri gösterir, kilit render beklemez.
   • Puan önizlemesi GÖSTERİM sabiti (30 dk blok = 50 puan, SessionRules ile birebir);
@@ -83,6 +84,27 @@ export default function Dersler() {
   const [notice, setNotice] = useState(null)
   const [bookOpen, setBookOpen] = useState(false)
   const [dialog, setDialog] = useState(null) // { type, session }
+
+  /*
+    ?rezerve=<matchId> — REZERVASYON BAĞLAMI ADRESTEN GELİR (Arkadaşlar kartı, Akış ve YKS
+    kartlarındaki "Ders rezerve et"). Eskiden bu düğmeler parametresiz buraya iniyordu:
+    kullanıcı "+ Rezerve et"e yeniden basıp az önce dokunduğu arkadaşı listeden yeniden
+    seçiyordu. Artık sayfa açık ve o arkadaş seçili geliyor (tek dokunuş).
+
+    Parametre okunur okunmaz adresten SİLİNİR: adres bir KOMUT taşıyor, durum değil. Kalsaydı
+    ekran aynı adresle yeniden kurulduğunda (web önizlemesinde sayfa yenileme) kullanıcının
+    çoktan kapattığı sayfa kendiliğinden yeniden açılırdı. Ön seçim ayrı state'te; kapanışta
+    ve tazelemede sıfırlanıyor, yoksa "+ Rezerve et"le açılan sonraki sayfa eski arkadaşı
+    seçili getirirdi.
+  */
+  const { rezerve } = useLocalSearchParams()
+  const [onSecim, setOnSecim] = useState(null)
+  useEffect(() => {
+    if (!rezerve) return
+    setOnSecim(String(rezerve))
+    setBookOpen(true)
+    router.setParams({ rezerve: '' })
+  }, [rezerve, router])
 
   /*
     GEÇMİŞİN BİRİKEN KISMI: sessions.data.past ilk 5'i taşır; sonraki sayfalar buraya
@@ -191,6 +213,7 @@ export default function Dersler() {
   function refresh(message) {
     setDialog(null)
     setBookOpen(false)
+    setOnSecim(null)
     if (message) setNotice(message)
     sessions.reload()
     matches.reload({ silent: true })
@@ -308,7 +331,12 @@ export default function Dersler() {
           <Text className="text-xl text-slate-500">←</Text>
         </Pressable>
         <Text className="flex-1 text-lg font-bold text-slate-900">Derslerim</Text>
-        <Button onPress={() => setBookOpen(true)}>+ Rezerve et</Button>
+        {/* İkincil: başlıkta her an duran dolgulu düğme, listedeki acil onayla ("Kanıtı incele
+            ve onayla") göz için yarışıyordu. Rezervasyon artık çoğunlukla arkadaş kartından,
+            bağlamıyla geliyor; buradaki düğme genel giriş. */}
+        <Button variant="secondary" onPress={() => setBookOpen(true)}>
+          + Rezerve et
+        </Button>
       </View>
 
       {/* Geçmiş, FlatList'in KENDİSİ (iş kuralı 4): 5'erli sayfalar onEndReached ile
@@ -338,7 +366,17 @@ export default function Dersler() {
       {bookOpen && (
         <BookModal
           matches={matches.data?.active ?? []}
-          onClose={() => setBookOpen(false)}
+          baslangicMatchId={onSecim}
+          /* Sayfa artık ekran kurulurken de açılıyor (?rezerve=) ve myMatches o an henüz dönmemiş
+             olabiliyor. Yükleme ve hata ayrı söylenmezse boş liste "Henüz arkadaşın yok" diye
+             okunurdu: arkadaşı olan kullanıcıya yanlış teşhis. */
+          yukleniyor={matches.data == null && !matches.error}
+          hata={matches.data == null ? matches.error : null}
+          onYenidenDene={() => matches.reload()}
+          onClose={() => {
+            setBookOpen(false)
+            setOnSecim(null)
+          }}
           onBooked={(code, mintAmount) =>
             refresh(
               `Ders rezerve edildi (eğitmen ${mintAmount} puan kazanacak). ` +
@@ -615,7 +653,8 @@ function SessionKarti({ session, onAction, past = false }) {
 
 /* ── REZERVASYON ─────────────────────────────────────────────────────────── */
 
-function BookModal({ matches, onClose, onBooked }) {
+function BookModal({ matches, baslangicMatchId, yukleniyor, hata, onYenidenDene, onClose, onBooked }) {
+  const router = useRouter()
   // Sunucudaki izinli süre kümesiyle birebir (SessionRules.AllowedDurations).
   const DURATION_OPTIONS = [30, 60]
   // GÖSTERİM sabitleri — SessionRules.MintPerBlock/MintBlockMinutes ile birebir;
@@ -648,15 +687,34 @@ function BookModal({ matches, onClose, onBooked }) {
     Rezervasyonu YAPAN taraf her zaman ÖĞRENCİ: seçilebilir konu, karşı tarafın BANA
     anlatacağı konudur. Her ikisini listelemek, kullanıcının kendi anlatacağı konuya
     öğrenci olarak kaydolmasına yol açardı (ders açılır, puan yanlış tarafa yazılır).
+    Tanım TEK YERDE (lib/iliski.js → ogrenciKonusu): Arkadaşlar kartındaki "Ders rezerve et"
+    de ona bakıyor. İki ayrı koşulken kart düğmeyi çiziyor, bu liste o arkadaşı göstermiyordu.
   */
   const options = matches.map((match) => ({
     match,
-    topicId: match.iAmInitiator ? match.requestedTopicId : match.offeredTopicId,
-    topicName: match.iAmInitiator ? match.requestedTopicName : match.offeredTopicName,
+    ...(ogrenciKonusu(match) ?? { topicId: null, topicName: null }),
   }))
 
   const selected = options.find((o) => o.match.matchId === matchId) ?? null
   const bookable = options.filter((o) => o.topicId)
+
+  /*
+    ÖN SEÇİM — kullanıcı zaten seçtiyse dokunulmaz. Adresten gelen arkadaş listede varsa o
+    seçilir; yoksa (arkadaşlık bu arada bitti ya da o derste anlatan benim) hiçbir şey
+    seçilmez, kullanıcı listeden seçer. Adres yoksa ve tek seçenek varsa o: tek radyoya
+    dokunmayı istemek bir adım fazlaydı.
+    Bağımlılık listenin UZUNLUĞU: dizi her render'da yeniden kuruluyor, kendisine bağlanmak
+    efekti her render'da koştururdu. Sayfa yükleme sürerken açıldıysa liste 0'dan n'e çıkınca
+    efekt yeniden koşuyor.
+  */
+  useEffect(() => {
+    if (matchId) return
+    if (baslangicMatchId) {
+      if (bookable.some((o) => o.match.matchId === baslangicMatchId)) setMatchId(baslangicMatchId)
+      return
+    }
+    if (bookable.length === 1) setMatchId(bookable[0].match.matchId)
+  }, [bookable.length, baslangicMatchId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const puanOnizleme = (Number(duration) / BLOK_DAKIKA) * BLOK_PUANI
 
@@ -689,7 +747,7 @@ function BookModal({ matches, onClose, onBooked }) {
       onClose={onClose}
       title="Ders rezerve et"
       footer={
-        matches.length === 0 || bookable.length === 0 ? null : (
+        yukleniyor || hata || matches.length === 0 || bookable.length === 0 ? null : (
           <>
             <Button variant="secondary" onPress={onClose}>
               Vazgeç
@@ -701,16 +759,34 @@ function BookModal({ matches, onClose, onBooked }) {
         )
       }
     >
-      {matches.length === 0 ? (
+      {yukleniyor ? (
+        <Loading />
+      ) : hata ? (
+        <ErrorBox error={hata} onRetry={onYenidenDene} />
+      ) : matches.length === 0 ? (
         <EmptyState
           title="Henüz arkadaşın yok"
           description="Önce Keşfet'ten istek gönder ve karşı tarafın kabul etmesini bekle."
+          action={<KesfeteGit onClose={onClose} router={router} />}
         />
       ) : bookable.length === 0 ? (
-        <EmptyState
-          title="Arkadaşlarında sana anlatılacak konu yok"
-          description="Mevcut arkadaşlarında ders anlatan taraf sensin. Ders almak için Keşfet'ten yeni bir istek gönder."
-        />
+        /* İKİ AYRI SEBEP, İKİ AYRI CÜMLE. Eski tek metin ("ders anlatan taraf sensin") yalnızca
+           konusu olan arkadaşlıkta doğruydu; arkadaşlıklarının hepsi konusuz (üniversite ağı,
+           Arkadaş Ekle) olan kullanıcıya, olmayan bir derste anlatıcı olduğunu söylüyordu.
+           İkisinde de çıkış Keşfet: sayfa eylemsiz bir çıkmazdı. */
+        matches.every((m) => !m.requestedTopicId) ? (
+          <EmptyState
+            title="Arkadaşlıklarında ders konusu yok"
+            description="Sohbet için eklenen arkadaşlıklar ders içermez. Ders almak için Keşfet'ten bir konu seçip istek gönder."
+            action={<KesfeteGit onClose={onClose} router={router} />}
+          />
+        ) : (
+          <EmptyState
+            title="Bu arkadaşlıklarda anlatan taraf sensin"
+            description="Rezervasyonu dersi alan taraf yapar. Sen de ders almak istersen Keşfet'ten istek gönder."
+            action={<KesfeteGit onClose={onClose} router={router} />}
+          />
+        )
       ) : (
         <View className="gap-4 pb-2">
           <View>
@@ -725,7 +801,10 @@ function BookModal({ matches, onClose, onBooked }) {
                   <Pressable
                     key={option.match.matchId}
                     accessibilityRole="radio"
-                    accessibilityState={{ checked: secili }}
+                    // accessibilityState DEĞİL aria-checked: RN Web 0.21 accessibilityState'i DOM'a
+                    // yazmıyor (EslesmeIstegiModali'nde ölçüldü). Ön seçim artık kendiliğinden
+                    // geliyor ve seçili olduğunu ekran okuyucu da duymalı; aria-* iki platformda okunur.
+                    aria-checked={secili}
                     onPress={() => setMatchId(option.match.matchId)}
                     className={`min-h-[44px] justify-center rounded-lg border px-3 py-2
                                 ${secili ? 'border-brand-500 bg-brand-50' : 'border-slate-200 bg-white'}`}
@@ -802,7 +881,7 @@ function BookModal({ matches, onClose, onBooked }) {
                   <Pressable
                     key={dk}
                     accessibilityRole="radio"
-                    accessibilityState={{ checked: aktif }}
+                    aria-checked={aktif}
                     onPress={() => setDuration(dk)}
                     className={`min-h-[44px] flex-1 items-center justify-center rounded-lg border
                                 ${aktif ? 'border-brand-500 bg-brand-50' : 'border-slate-200 bg-white'}`}
@@ -845,6 +924,21 @@ function BookModal({ matches, onClose, onBooked }) {
         </View>
       )}
     </Modal>
+  )
+}
+
+/** Rezervasyon çıkmazlarının ortak çıkışı. Sayfa önce kapanır: RN Modal ekranların üstünde
+    ayrı bir katmanda duruyor, açık kalsaydı Keşfet onun ALTINDA açılır ve görünmezdi. */
+function KesfeteGit({ onClose, router }) {
+  return (
+    <Button
+      onPress={() => {
+        onClose()
+        router.push('/kesfet')
+      }}
+    >
+      Keşfet'e git
+    </Button>
   )
 }
 

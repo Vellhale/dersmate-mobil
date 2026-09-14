@@ -15,6 +15,10 @@
   ⚠️ Web'de de aynı boşluk var (Profile.jsx ve Discover.jsx myMatches okumuyor); bu
   düzeltme mobilde doğdu, web'e taşınmalı. `ogrenciKonusu` ve `konuHaritasi` (Akış ve
   YKS kartlarının konu durumu) da web'de yok, onlar da taşınacaklar listesinde.
+  `ogrenciKonusu`nun iki tüketicisi daha web'de eksik: Matches.jsx "Ders rezerve et"i hâlâ
+  `requestedTopicName`e bakarak çiziyor (anlatanın ben olduğum takassız arkadaşlıkta da
+  çıkıyor ve boş rezervasyon sayfasına götürüyor), Sessions.jsx de `?rezerve=` ön seçimini
+  bilmiyor (mobil: app/eslesmeler.jsx, app/dersler.jsx).
 */
 
 /** Kimlikler iki kaynaktan geliyor (adres, liste yanıtı); harf büyüklüğü farkı eşleşmeyi ıskalatmasın. */

@@ -8,6 +8,7 @@ import { useInbox } from '../src/state/InboxContext'
 import { formatDateTime } from '../src/lib/format'
 import { Avatar } from '../src/components/Avatar'
 import { Badge, Button, EmptyState, ErrorBox, Loading, Notice, SayacRozeti } from '../src/components/ui'
+import { ogrenciKonusu } from '../src/lib/iliski'
 
 /*
   ARKADAŞLAR — web'deki pages/Matches.jsx'in portu. Tab çubuğunun üstünde yığın ekranı
@@ -25,11 +26,16 @@ import { Badge, Button, EmptyState, ErrorBox, Loading, Notice, SayacRozeti } fro
   • Üç sekme kısa adla (Gelen/Giden/Arkadaş): dar ekranda uzun ad iki satıra kırılıp
     şeridi tırtıklıyordu; sayaç kalır, uzun ad düşer. "Arkadaşlar" sayaçla birlikte
     sığmadığı için kısa ad "Arkadaş" (web'de 375px'te ölçüldü).
-  • Konusuz eşleşme = üniversite ağı isteği: requestedTopicName null gelir ve kart
-    "Sohbet isteği" der — boş bir "Almak istediğin:" satırı basılmaz.
+  • Konusuz eşleşme (üniversite ağı ya da Arkadaş Ekle isteği): requestedTopicName null
+    gelir ve kart "Arkadaşlık · ders içermez" der — boş bir "Almak istediğin:" satırı
+    basılmaz. Eskiden "Üniversite ağı · Sohbet isteği" diyordu; ama Arkadaş Ekle'den gelen
+    istek de konusuz ve kabul edilmiş arkadaşlıkta "istek" sözü yanlıştı. Kartın asıl
+    söylemesi gereken, bu ilişkiden ders rezerve edilemeyeceği.
   • Sonlandırma tek taraflı ve geri alınamaz — tek tıkla olmaz, satır içi onay kutusu.
-  • Üniversite ağı eşleşmesinden ders REZERVE EDİLEMEZ (sunucu da reddeder): konusuz
-    eşleşmede "Ders rezerve et" düğmesi hiç çizilmez.
+  • "Ders rezerve et" yalnızca bu eşleşmede ÖĞRENCİ olduğum bir konu varsa çizilir
+    (lib/iliski.js → ogrenciKonusu; Derslerim'in rezervasyon listesiyle aynı tanım).
+    Konusuz eşleşmeden ders rezerve edilemez (sunucu da reddeder). Takassız ve anlatanın
+    ben olduğum eşleşmede de yok: rezervasyonu dersi alan taraf yapar.
 */
 
 const TABS = [
@@ -279,7 +285,7 @@ function MatchKarti({ match, tab, router, onChanged }) {
         </Text>
       ) : (
         <Text className="mt-3 text-sm text-slate-600">
-          Üniversite ağı · <Text className="font-semibold text-slate-800">Sohbet isteği</Text>
+          Arkadaşlık · <Text className="font-semibold text-slate-800">ders içermez</Text>
         </Text>
       )}
 
@@ -335,8 +341,21 @@ function MatchKarti({ match, tab, router, onChanged }) {
             {/* min-w-[45%]: flex-1'in tabanı 0 olduğu için satır hiç sarmıyordu; Sonlandır 94 px'ini
                 alıyor, iki birincil eylem kalan alana sıkışıp varsayılan boyutta harf ortasından
                 bölünüyordu ("Sohb/et"). Artık Sonlandır gerekirse alt satıra iniyor. */}
-            {match.requestedTopicName && (
-              <Button variant="secondary" className="min-w-[45%] flex-1" onPress={() => router.push('/dersler')}>
+            {/*
+              KOŞUL `requestedTopicName` DEĞİL, öğrenci konusu. Eski koşul, karşı tarafın benden
+              takassız ders istediği arkadaşlıkta da düğmeyi çiziyordu: rezervasyon listesinde o
+              arkadaş hiç yok (anlatan benim) ve düğme "sana anlatılacak konu yok" diyen boş bir
+              sayfaya çıkıyordu. Adres de parametresizdi; kullanıcı Derslerim'de "+ Rezerve et"e
+              yeniden basıp arkadaşını listeden yeniden seçiyordu. ?rezerve= sayfayı bu arkadaş
+              seçili açar (app/dersler.jsx).
+            */}
+            {ogrenciKonusu(match) && (
+              <Button
+                variant="secondary"
+                className="min-w-[45%] flex-1"
+                accessibilityLabel={`Ders rezerve et, ${match.otherDisplayName}`}
+                onPress={() => router.push(`/dersler?rezerve=${match.matchId}`)}
+              >
                 Ders rezerve et
               </Button>
             )}
@@ -347,6 +366,14 @@ function MatchKarti({ match, tab, router, onChanged }) {
             >
               Sonlandır
             </Button>
+            {/* Düğmenin yokluğu tek başına bir şey anlatmıyor: ders konusu olan arkadaşlıkta
+                kullanıcı "neden rezerve edemiyorum?" diye kalıyordu. w-full satırı kırar. */}
+            {!ogrenciKonusu(match) && match.requestedTopicName ? (
+              <Text className="w-full text-xs text-slate-600">
+                Bu derste anlatan sensin; rezervasyonu {match.otherDisplayName} yapar. Saati sohbette
+                kararlaştırın.
+              </Text>
+            ) : null}
           </>
         )}
       </View>
