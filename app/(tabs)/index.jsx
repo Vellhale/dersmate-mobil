@@ -28,8 +28,15 @@ import { EmptyState, ErrorBox, Loading, Notice, SayacRozeti } from '../../src/co
   • api.suggestions(20) — öneriler "Almak istediğim konular" portföyünden türer;
     portföyde Seek yoksa kullanıcıya bunu söyleyen bilgi kutusu çıkar.
   • Portföyün Offer girdileri arkadaş isteği modalındaki takas teklifi listesini besler.
-  • İstek gönderilince önerilerin SESSİZ tazelenmesi (silent): liste spinner'a
-    dönmeden güncellenir.
+
+  İSTEK SONUCU DOKUNULAN KARTTA (web'den sapma): web istek gönderilince önerileri sessizce
+  tazeliyor; mobilde bu tazeleme KALDIRILDI. Öneri yanıtı istekten etkilenmiyor
+  (GetMatchSuggestions eşleşmeleri süzmüyor), yani tazeleme karta yeni bir şey getirmiyor,
+  en fazla kartları yeniden sıralayıp kaydırılmış akışı oynatıyordu. Asıl kusur da
+  çözülmüyordu: bildirim liste başında, kaydırılmış akışta ekran dışında kalıyor, kart
+  değişmiyor ve aynı konuya ikinci basış sunucunun 409'unu okutuyordu. Şimdi kart konu
+  durumunu biliyor (useIliskiler → konuDurumu): gönderilen konu kartın altında hemen
+  "istek bekliyor" oluyor.
 
   ÇEKEREK YENİLEME: akış deseninin beklenen jesti. useAsync'in loading bayrağı sessiz
   tazelemede yükselmediği için RefreshControl kendi yerel bayrağını taşır ve veri
@@ -140,7 +147,17 @@ export default function Akis() {
       <FlatList
         data={suggestions.data ?? []}
         keyExtractor={(kisi) => kisi.userId}
-        renderItem={({ item }) => <IlanKarti kisi={item} onIstek={setHedef} />}
+        renderItem={({ item }) => (
+          <IlanKarti
+            kisi={item}
+            onIstek={setHedef}
+            // İlk yanıt gelmeden durum VERİLMİYOR ("bilinmiyor", "kapsanan yok" değil); kart o arada
+            // varsayılan istek düğmesini çiziyor, yanıt gelince konuya göre değişiyor.
+            konuDurumu={iliskiler.yukleniyor ? undefined : iliskiler.konuDurumu}
+          />
+        )}
+        // Veri dizisi değişmeden kart durumu değişiyor: FlatList satırları yeniden çizsin.
+        extraData={iliskiler.konuDurumu}
         contentContainerClassName="gap-3 p-4"
         /* Yüzen sekme çubuğu içeriğin ÜSTÜNDE duruyor; alt dolgu olmadan son öğe onun
            altında kalır (bkz. src/lib/sekmeCubugu.js). */
@@ -186,11 +203,13 @@ export default function Akis() {
       <EslesmeIstegiModali
         person={hedef}
         myOffers={myOffers}
+        konuDurumu={iliskiler.yukleniyor ? undefined : iliskiler.konuDurumu}
         onClose={() => setHedef(null)}
-        onSent={(name) => {
+        onSent={(name, topicId) => {
+          const id = hedef.userId
           setHedef(null)
+          iliskiler.konuIstendi(id, topicId)
           setNotice(`${name} kişisine arkadaş isteği gönderildi. Kabul edilince sohbet açılacak.`)
-          suggestions.reload({ silent: true })
         }}
       />
     </SafeAreaView>

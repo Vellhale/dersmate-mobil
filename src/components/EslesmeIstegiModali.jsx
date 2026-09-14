@@ -17,18 +17,32 @@ import { Button, ErrorBox, Modal } from './ui'
     verebildiklerimin KESİŞİMİNDEN seçilebilir (geçerli takas teklifi).
   • Teklifsiz göndermek sorun değil — ders almak ücretsiz (iş kuralı 1); ipucu metni
     bunu açıkça söylüyor.
+
+  KONU DURUMU (opsiyonel `konuDurumu`, bkz. lib/iliski.js → konuHaritasi): arkadaşlığı
+  süren ya da isteği bekleyen konu satırı PASİF ve nedenini yanında söylüyor. Satır
+  listeden SİLİNMİYOR: kişinin anlattığı konu kaybolsa kullanıcı onu kartta görüp burada
+  arardı. Pasifleştirme konu başına, kişi başına değil: Türev'de arkadaş olunan kişiden
+  Limit istemek geçerli bir istek. Seçilebilir tek konu kaldıysa önceden seçili geliyor.
 */
 
-/** Tek seçim satırı: radyo işareti + etiket. 44px dokunma hedefi. */
-function SecimSatiri({ secili, onPress, children }) {
+/**
+ * Tek seçim satırı: radyo işareti + etiket. 44px dokunma hedefi.
+ * `pasif` satır basılamıyor; `ek` nedenini etiketin sonuna yazıyor. Neden METİNDE, yalnızca
+ * soluk renkte değil: renk farkı ekran okuyucuya ve renk ayırt edemeyene hiçbir şey demez.
+ */
+function SecimSatiri({ secili, pasif = false, ek = null, onPress, children }) {
   return (
     <Pressable
       accessibilityRole="radio"
       // radio rolünün doğru durumu 'checked' — 'selected' TalkBack'te okunmuyordu.
-      accessibilityState={{ checked: secili }}
+      // accessibilityState DEĞİL aria-checked: RN Web 0.21 accessibilityState'i DOM'a hiç
+      // yazmıyor (önizlemede ölçüldü, seçili satırda aria-checked yoktu). aria-* iki platformda
+      // da okunuyor; pasif durumu `disabled` hem aria-disabled'a hem erişim durumuna yazıyor.
+      aria-checked={pasif ? false : secili}
+      disabled={pasif}
       onPress={onPress}
       className={`min-h-[44px] flex-row items-center gap-3 rounded-lg border px-3 py-2
-                  ${secili ? 'border-brand-500 bg-brand-50' : 'border-slate-200 bg-white'}`}
+                  ${pasif ? 'border-slate-200 bg-slate-50' : secili ? 'border-brand-500 bg-brand-50' : 'border-slate-200 bg-white'}`}
     >
       <View
         className={`h-5 w-5 items-center justify-center rounded-full border-2
@@ -36,14 +50,17 @@ function SecimSatiri({ secili, onPress, children }) {
       >
         {secili && <View className="h-2.5 w-2.5 rounded-full bg-brand-600" />}
       </View>
-      <Text className={`flex-1 text-sm ${secili ? 'font-medium text-brand-800' : 'text-slate-700'}`}>
+      <Text
+        className={`flex-1 text-sm ${pasif ? 'text-slate-500' : secili ? 'font-medium text-brand-800' : 'text-slate-700'}`}
+      >
         {children}
+        {pasif && ek ? ` — ${ek}` : null}
       </Text>
     </Pressable>
   )
 }
 
-export function EslesmeIstegiModali({ person, myOffers, onClose, onSent }) {
+export function EslesmeIstegiModali({ person, myOffers, konuDurumu, onClose, onSent }) {
   const [requestedTopicId, setRequestedTopicId] = useState(null)
   const [offeredTopicId, setOfferedTopicId] = useState(null)
   const [error, setError] = useState(null)
@@ -63,10 +80,15 @@ export function EslesmeIstegiModali({ person, myOffers, onClose, onSent }) {
 
   // Hedef değişince form sıfırlanır — web'de aynı iş `key` ile yapılıyordu: önceki
   // kişinin seçimi/hatası yeni kişide görünmesin.
+  // Seçilebilir TEK konu kaldıysa o seçili gelir: soru yok, cevabı zaten belli. Yalnızca
+  // hedef değişince koşuyor, konuDurumu bağımlılık DEĞİL: sayfa açıkken gelen odak
+  // tazelemesi kullanıcının yaptığı seçimi ezmesin.
   useEffect(() => {
-    setRequestedTopicId(null)
+    const secilebilir = (person?.theyCanTeach ?? []).filter((t) => !konuDurumu?.(person.userId, t.topicId))
+    setRequestedTopicId(secilebilir.length === 1 ? secilebilir[0].topicId : null)
     setOfferedTopicId(null)
     setError(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [person?.userId])
 
   // Karşı tarafın öğrenmek istedikleri ∩ benim verebildiklerim = geçerli takas teklifi.
@@ -83,7 +105,8 @@ export function EslesmeIstegiModali({ person, myOffers, onClose, onSent }) {
         requestedTopicId,
         offeredTopicId: offeredTopicId || null,
       })
-      onSent(person.displayName)
+      // Konu da dönüyor: çağıran dokunulan kartı o konu için "istek bekliyor"a çeviriyor.
+      onSent(person.displayName, requestedTopicId)
     } catch (err) {
       setError(err)
     } finally {
@@ -113,15 +136,20 @@ export function EslesmeIstegiModali({ person, myOffers, onClose, onSent }) {
             <Text className="text-sm font-medium text-slate-700">
               {gosterilen.displayName} kişisinden almak istediğin konu
             </Text>
-            {gosterilen.theyCanTeach.map((topic) => (
-              <SecimSatiri
-                key={topic.topicId}
-                secili={requestedTopicId === topic.topicId}
-                onPress={() => setRequestedTopicId(topic.topicId)}
-              >
-                {topic.topicName} ({topic.subjectName})
-              </SecimSatiri>
-            ))}
+            {gosterilen.theyCanTeach.map((topic) => {
+              const d = konuDurumu?.(gosterilen.userId, topic.topicId)
+              return (
+                <SecimSatiri
+                  key={topic.topicId}
+                  secili={requestedTopicId === topic.topicId}
+                  pasif={Boolean(d)}
+                  ek={d?.durum === 'aktif' ? 'Arkadaşlığınızda' : d ? 'İstek bekliyor' : null}
+                  onPress={() => setRequestedTopicId(topic.topicId)}
+                >
+                  {topic.topicName} ({topic.subjectName})
+                </SecimSatiri>
+              )
+            })}
           </View>
 
           <View className="gap-2">

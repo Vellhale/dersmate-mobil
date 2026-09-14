@@ -327,8 +327,11 @@ export default function Kesfet() {
   )
   const engelSayisi = engellilerim.data?.length ?? 0
 
-  // Kişi gösteren iki sekmede kartlar ilişkiyi biliyor (bkz. lib/iliski.js).
-  const iliskiler = useIliskiler(universiteKipi || arkadasKipi)
+  /* Üç sekmede de kartlar ilişkiyi biliyor (bkz. lib/iliski.js): Üniversite ve Arkadaş Ekle
+     kişiyi, YKS ilan kartı KONUYU soruyor (konuDurumu). YKS eskiden hariçti ("kişi
+     göstermiyor"); oysa ilan bir kişinin konusu ve arkadaşlığı süren konuda "Arkadaş isteği
+     gönder" gösteriyordu. Bedeli YKS sekmesinde bir myMatches isteği. */
+  const iliskiler = useIliskiler()
 
   /*
     ENGEL BAŞKA EKRANDA DEĞİŞTİYSE ODAKTA TAZELE. Kartın profili kök yığında Keşfet'in
@@ -575,7 +578,12 @@ export default function Kesfet() {
         keyExtractor={(item) => (yksKipi ? item.offerId : item.userId)}
         renderItem={({ item }) =>
           yksKipi ? (
-            <IlanSonucKarti offer={item} onIstek={setHedef} />
+            <IlanSonucKarti
+              offer={item}
+              onIstek={setHedef}
+              // İlk yanıt gelmeden durum verilmiyor (Akış kartıyla aynı): varsayılan istek düğmesi.
+              konuDurumu={iliskiler.yukleniyor ? undefined : iliskiler.konuDurumu}
+            />
           ) : (
             /* Arkadaş Ekle kartı YENİDEN YAZILMADI: iki listede gösterilen şey aynı, bir kişi
                (web kararı). Yalnızca istek metni değişiyor. */
@@ -589,6 +597,8 @@ export default function Kesfet() {
             />
           )
         }
+        // Veri dizisi değişmeden kart durumu değişiyor (istek gönderildi, ilişkiler geldi).
+        extraData={iliskiler.konuDurumu}
         contentContainerClassName="gap-3 p-4"
         /* Yüzen sekme çubuğu içeriğin ÜSTÜNDE duruyor; alt dolgu olmadan son öğe onun
            altında kalır (bkz. src/lib/sekmeCubugu.js). */
@@ -622,9 +632,13 @@ export default function Kesfet() {
       <EslesmeIstegiModali
         person={hedef}
         myOffers={myOffers}
+        konuDurumu={iliskiler.yukleniyor ? undefined : iliskiler.konuDurumu}
         onClose={() => setHedef(null)}
-        onSent={(name) => {
+        onSent={(name, topicId) => {
+          const id = hedef.userId
           setHedef(null)
+          // Bildirim liste başında; kaydırılmış sonuçlarda geri bildirimin yeri dokunulan kart.
+          iliskiler.konuIstendi(id, topicId)
           setNotice(`${name} kişisine arkadaş isteği gönderildi. Kabul edilince sohbet açılacak.`)
         }}
       />
@@ -692,9 +706,15 @@ export default function Kesfet() {
   hiyerarşisi; SEVİYE ROZETİ YOK (arama ucu ilanı döndürür, eğitmenin genel seviyesini
   değil — yer tutucu rozet olmayan veriyi uydururdu). Puanı olmayan eğitmende "Yeni"
   rozeti puanın yokluğunu söyler.
+
+  EYLEM İLANIN KONUSUNA GÖRE (bkz. lib/iliski.js → konuHaritasi): ilan tek konu taşıdığı için
+  Akış kartındaki "bir kısmı kapsandı" ara hâli burada yok. Arkadaşlığı süren konuda
+  rezervasyon, bekleyen istekte pasif düğme; aynı eğitmenin BAŞKA konudaki ilanı ise istek
+  düğmesini koruyor (Türev'de arkadaş olunan kişiden Limit istemek geçerli).
 */
-function IlanSonucKarti({ offer, onIstek }) {
+function IlanSonucKarti({ offer, onIstek, konuDurumu }) {
   const router = useRouter()
+  const d = konuDurumu?.(offer.tutorUserId, offer.topicId)
 
   return (
     <Card>
@@ -757,23 +777,37 @@ function IlanSonucKarti({ offer, onIstek }) {
       ) : null}
 
       <View className="mt-4">
-        <Button
-          onPress={() =>
-            /* Arama sonucunda konu ZATEN belli: istek modalına tek elemanlı
-               "anlatabilir" listesiyle girilir; uç, karşı tarafın öğrenmek
-               istediklerini dönmediği için takas listesi boş kalır (web kararı). */
-            onIstek({
-              userId: offer.tutorUserId,
-              displayName: offer.tutorDisplayName,
-              theyCanTeach: [
-                { topicId: offer.topicId, topicName: offer.topicName, subjectName: offer.subjectName },
-              ],
-              theyWantToLearn: [],
-            })
-          }
-        >
-          Arkadaş isteği gönder
-        </Button>
+        {d?.durum === 'aktif' ? (
+          <Button variant="secondary" onPress={() => router.push(`/dersler?rezerve=${d.matchId}`)}>
+            Ders rezerve et
+          </Button>
+        ) : d ? (
+          <Button
+            variant="secondary"
+            disabled
+            accessibilityLabel={`İstek gönderildi, ${offer.tutorDisplayName}`}
+          >
+            ✓ İstek gönderildi
+          </Button>
+        ) : (
+          <Button
+            onPress={() =>
+              /* Arama sonucunda konu ZATEN belli: istek modalına tek elemanlı
+                 "anlatabilir" listesiyle girilir; uç, karşı tarafın öğrenmek
+                 istediklerini dönmediği için takas listesi boş kalır (web kararı). */
+              onIstek({
+                userId: offer.tutorUserId,
+                displayName: offer.tutorDisplayName,
+                theyCanTeach: [
+                  { topicId: offer.topicId, topicName: offer.topicName, subjectName: offer.subjectName },
+                ],
+                theyWantToLearn: [],
+              })
+            }
+          >
+            Arkadaş isteği gönder
+          </Button>
+        )}
       </View>
     </Card>
   )

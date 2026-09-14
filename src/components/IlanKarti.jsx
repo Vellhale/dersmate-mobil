@@ -22,6 +22,14 @@ import { amber, brand, emerald, slate } from '../lib/theme'
   • "Karşılıklı takas" etiketi kimlik sütununun DIŞINDA, tam genişlikte: dar sütunda
     kırpılan etiket bilgi vermez.
 
+  • EYLEM KONU DURUMUNU BİLİYOR (opsiyonel `konuDurumu`, bkz. lib/iliski.js → konuHaritasi).
+    Eskiden istek gönderilince kart hiç değişmiyordu: bildirim liste başında, kaydırılmış
+    akışta ekran dışında kalıyordu ve aynı konuya ikinci basış sunucunun 409'unu okutuyordu.
+    Arkadaş olunan kişiye de aynı "Arkadaş isteği gönder" gösteriliyordu. Durum KONU başına:
+    kişinin anlattığı konuların HEPSİ kapsandıysa düğme değişiyor (arkadaşlığı süren konu
+    varsa rezervasyona, yoksa pasif "İstek gönderildi"); bir kısmı kapsandıysa istek düğmesi
+    kalıyor ve kapsananlar altında yazıyor, çünkü kalan konuya istek atmak geçerli.
+
   Web'in CamKart'ı (saydam cam yüzeyi) TAŞINMADI: o, masaüstündeki dekoratif zemin
   ızgarasının üstünde anlam kazanıyordu; mobil akışta kartlar ui.jsx'teki tek yüzey
   dilini kullanır — akış, veri yoğun bir ekrandır ve dekor okumayı gölgelemez.
@@ -88,8 +96,15 @@ function TopicList({ title, tone, ikon: Ikon, topics }) {
   )
 }
 
-export function IlanKarti({ kisi, onIstek }) {
+export function IlanKarti({ kisi, onIstek, konuDurumu }) {
   const router = useRouter()
+
+  // konuDurumu verilmediyse (ilişkiler henüz yüklenmedi) hiçbir konu kapsanmış sayılmaz.
+  const kapsanan = (kisi.theyCanTeach ?? [])
+    .map((t) => ({ t, d: konuDurumu?.(kisi.userId, t.topicId) }))
+    .filter((x) => x.d)
+  const hepsi = kisi.theyCanTeach?.length > 0 && kapsanan.length === kisi.theyCanTeach.length
+  const aktifMatch = kapsanan.find((x) => x.d.durum === 'aktif')?.d.matchId
 
   return (
     <Card>
@@ -144,7 +159,27 @@ export function IlanKarti({ kisi, onIstek }) {
       )}
 
       <View className="mt-4">
-        <Button onPress={() => onIstek(kisi)}>Arkadaş isteği gönder</Button>
+        {hepsi && aktifMatch ? (
+          <Button variant="secondary" onPress={() => router.push(`/dersler?rezerve=${aktifMatch}`)}>
+            Ders rezerve et
+          </Button>
+        ) : hepsi ? (
+          /* Etikette ad var: TalkBack akıştaki birden fazla pasif düğmeyi ayırt etsin. */
+          <Button variant="secondary" disabled accessibilityLabel={`İstek gönderildi, ${kisi.displayName}`}>
+            ✓ İstek gönderildi
+          </Button>
+        ) : (
+          <>
+            <Button onPress={() => onIstek(kisi)}>Arkadaş isteği gönder</Button>
+            {kapsanan.length > 0 && (
+              <Text numberOfLines={2} className="mt-2 text-xs text-slate-600">
+                {`✓ ${kapsanan
+                  .map((x) => `${x.t.topicName}: ${x.d.durum === 'aktif' ? 'arkadaşlığınızda' : 'istek bekliyor'}`)
+                  .join(' · ')}`}
+              </Text>
+            )}
+          </>
+        )}
       </View>
     </Card>
   )
