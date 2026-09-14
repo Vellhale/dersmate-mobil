@@ -148,6 +148,9 @@ export function IzinSayfasi() {
                 /* hitSlop 6: anahtar 32px çizilir (14×8 oranı korunsun diye) ama
                    dokunma alanı 44px — iznin TEK kontrolü, dokunma hedefi kuralının
                    çiğnenebileceği son yer burası. */
+                /* Kapalı zemin slate-500 (beyaz topla ve kart zeminiyle 4.76:1). slate-300
+                   1.48:1'di: kapalı anahtar kartta yalnızca beyaz bir topa indirgeniyor,
+                   "burada bir kontrol var" demiyordu (WCAG 1.4.11, 3:1). */
                 <Pressable
                   accessibilityRole="switch"
                   accessibilityState={{ checked: analitik }}
@@ -155,7 +158,7 @@ export function IzinSayfasi() {
                   onPress={() => setAnalitik((v) => !v)}
                   hitSlop={6}
                   className={`h-8 w-14 shrink-0 justify-center rounded-full px-1
-                              ${analitik ? 'bg-brand-600' : 'bg-slate-300'}`}
+                              ${analitik ? 'bg-brand-600' : 'bg-slate-500'}`}
                 >
                   <View
                     className={`h-6 w-6 rounded-full bg-white ${analitik ? 'self-end' : 'self-start'}`}

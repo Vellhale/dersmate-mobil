@@ -36,6 +36,8 @@ export const slate = {
   (SVG renk prop'u, tab bar rozeti) için. Yalnızca KULLANILAN basamaklar tutuluyor:
   tam ölçek kopyalamak, hiç okunmayan satırlarla paleti şişirirdi.
 */
-export const amber = { 400: '#FBBF24', 500: '#F59E0B', 800: '#92400E' }
+/* amber-600 değerlendirme yıldızının dolgusu: 400 beyazda 1.67:1 kalıyordu (WCAG 1.4.11
+   grafik nesne için 3:1 istiyor); 600 = 3.19:1 ve hâlâ "yıldız sarısı" okunuyor. */
+export const amber = { 400: '#FBBF24', 500: '#F59E0B', 600: '#D97706', 800: '#92400E' }
 export const rose = { 600: '#E11D48', 800: '#9F1239' }
 export const emerald = { 700: '#047857' }

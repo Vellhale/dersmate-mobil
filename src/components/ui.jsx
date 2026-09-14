@@ -1,4 +1,4 @@
-import { Children, cloneElement, isValidElement, useEffect } from 'react'
+import { Children, cloneElement, isValidElement, useEffect, useState } from 'react'
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -277,13 +277,34 @@ export function Field({ label, hint, children }) {
  * yazılacağını ("Örn. ...") yalnızca placeholder anlatıyor. Koyulaşan placeholder girilmiş
  * bir değer gibi okunabilir: çıplak değer yazma ("000000", hazır doğrulama kodu). Örnek
  * gerekiyorsa "Örn." ile başlat, değilse ne yazılacağını söyleyen cümle yaz.
+ *
+ * KENAR slate-500 (beyazda 4.76:1, slate-50 zeminde 4.55:1). slate-200 kenar 1.23:1'di:
+ * Keşfet'in arama kutusu ve sohbetin mesaj kutusu zeminden seçilmiyor, kutunun nerede
+ * başladığını yalnızca placeholder ele veriyordu. WCAG 1.4.11 bileşen sınırı için 3:1
+ * istiyor; slate-400 (2.56:1) eşiği geçmediği için geçen en açık ton 500.
+ *
+ * ODAK 2px brand-600. RN'de outline/ring yok, odağı gösterecek tek şey kenar; ama kenar
+ * kalınlaşınca içerik 1px kayar ve yazılan metin odakla birlikte zıplardı. Dolgu aynı
+ * oranda 1px azalıyor (px-3 → 11px, py-2.5 → 9px): kenar + dolgu toplamı iki durumda da
+ * aynı. Çağıranın onFocus/onBlur'u ezilmesin diye zincirleniyor. Girdi'ye kenar ya da
+ * dolgu sınıfı veren çağıran yok; verilirse NativeWind birleştirmediği için bu hesap bozulur.
  */
-export function Girdi({ className = '', ...props }) {
+export function Girdi({ className = '', onFocus, onBlur, ...props }) {
+  const [odak, setOdak] = useState(false)
   return (
     <TextInput
       placeholderTextColor={slate[500]}
-      className={`min-h-[44px] w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5
-                  text-base text-slate-900 ${className}`}
+      onFocus={(e) => {
+        setOdak(true)
+        onFocus?.(e)
+      }}
+      onBlur={(e) => {
+        setOdak(false)
+        onBlur?.(e)
+      }}
+      className={`min-h-[44px] w-full rounded-lg bg-white text-base text-slate-900
+                  ${odak ? 'border-2 border-brand-600 px-[11px] py-[9px]' : 'border border-slate-500 px-3 py-2.5'}
+                  ${className}`}
       {...props}
     />
   )

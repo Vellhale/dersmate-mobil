@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { api } from '../lib/api'
+import { amber, slate } from '../lib/theme'
+import { YildizIkonu } from './Ikonlar'
 import { Button, ErrorBox, Field, Girdi, Modal } from './ui'
 
 /*
@@ -174,7 +176,14 @@ export function ReviewModal({ session, open, onay, onClose, onSubmitted }) {
   )
 }
 
-/** Yıldız satırı — radyo grubu: ekran okuyucu "5 üzerinden 4" diyebilsin. */
+/**
+ * Yıldız satırı — radyo grubu: ekran okuyucu "5 üzerinden 4" diyebilsin.
+ *
+ * Yıldız SVG, Unicode ★ değil. ★ Android'de yedek fonta düşüyor ve boş/dolu aynı glifti:
+ * seçimi yalnızca renk anlatıyordu, o da beyazda 1.48:1 (slate-300) ile 1.67:1 (amber-400)
+ * arasında. Şimdi seçili yıldız DOLU amber-600 (3.19:1), seçilmemiş yalnızca slate-500
+ * çizgi (4.76:1): biçim farkı renkten bağımsız okunuyor.
+ */
 function YildizSatiri({ label, hint, value, onChange }) {
   return (
     <View>
@@ -196,7 +205,11 @@ function YildizSatiri({ label, hint, value, onChange }) {
             onPress={() => onChange(star)}
             className="h-11 w-11 items-center justify-center rounded-lg active:bg-slate-50"
           >
-            <Text className={`text-2xl ${star <= value ? 'text-amber-400' : 'text-slate-300'}`}>★</Text>
+            <YildizIkonu
+              boy={28}
+              renk={star <= value ? amber[600] : slate[500]}
+              dolgu={star <= value ? amber[600] : 'none'}
+            />
           </Pressable>
         ))}
       </View>

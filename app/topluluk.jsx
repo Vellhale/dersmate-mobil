@@ -401,8 +401,10 @@ function OyRayi({ arti, eksi, oy = 0, onOy, kucuk = false, yatay = false }) {
       >
         {/* Tek çizim, iki yön: OyOkuIkonu YUKARI çizilir, aşağı oy 180° döndürülür.
             Gövdeli ok (sap + baş) basılabilir bir eylem gibi okunur; çıplak chevron
-            oy düğmesinde "aşağı kaydır" gibi dururdu (bkz. Ikonlar.jsx). */}
-        <OyOkuIkonu renk={oy === 1 ? brand[600] : slate[400]} boy={18} kalinlik={oy === 1 ? 2.6 : 2} />
+            oy düğmesinde "aşağı kaydır" gibi dururdu (bkz. Ikonlar.jsx).
+            Oy verilmemiş ok slate-500 (beyazda 4.76:1); slate-400 2.56:1'di ve oy vermenin
+            TEK yolu bu iki ok — eşiğin (WCAG 1.4.11, 3:1) altında kalamazlar. */}
+        <OyOkuIkonu renk={oy === 1 ? brand[600] : slate[500]} boy={18} kalinlik={oy === 1 ? 2.6 : 2} />
       </Pressable>
 
       <Text
@@ -421,7 +423,7 @@ function OyRayi({ arti, eksi, oy = 0, onOy, kucuk = false, yatay = false }) {
         className={`${olcu} items-center justify-center rounded-lg ${oy === -1 ? 'bg-rose-50' : 'active:bg-slate-100'}`}
       >
         <View style={{ transform: [{ rotate: '180deg' }] }}>
-          <OyOkuIkonu renk={oy === -1 ? rose[600] : slate[400]} boy={18} kalinlik={oy === -1 ? 2.6 : 2} />
+          <OyOkuIkonu renk={oy === -1 ? rose[600] : slate[500]} boy={18} kalinlik={oy === -1 ? 2.6 : 2} />
         </View>
       </Pressable>
     </View>

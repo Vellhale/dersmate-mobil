@@ -19,6 +19,9 @@ const KOD_DAKIKA = 15
  * bağlantıya basmak kutuyu da işaretlerdi. Çözüm: dış Pressable yalnızca kutu +
  * metnin boş alanını kapsıyor, bağlantılar kendi onPress'leriyle üstte duruyor
  * (RN'de iç Text.onPress dıştaki Pressable'ı yutar).
+ *
+ * Boş kutunun kenarı slate-500 (beyazda 4.76:1); slate-300 1.48:1'di ve zorunlu onayların
+ * işaretlenecek bir kutu olduğu zeminde seçilmiyordu (WCAG 1.4.11, 3:1).
  */
 function OnayKutusu({ secili, onToggle, children }) {
   return (
@@ -30,7 +33,7 @@ function OnayKutusu({ secili, onToggle, children }) {
     >
       <View
         className={`mt-0.5 h-5 w-5 shrink-0 items-center justify-center rounded border-2
-                    ${secili ? 'border-brand-600 bg-brand-600' : 'border-slate-300 bg-white'}`}
+                    ${secili ? 'border-brand-600 bg-brand-600' : 'border-slate-500 bg-white'}`}
       >
         {secili && <Text className="text-xs font-bold text-white">✓</Text>}
       </View>

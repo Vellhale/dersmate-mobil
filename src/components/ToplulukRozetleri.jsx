@@ -305,12 +305,14 @@ export function ToplulukRozetleri({
 
       {/* İlerleme çubuğu yalnızca sayaç VARKEN ve zirvede DEĞİLKEN. Sayaç yokken
           çizilseydi hep %0 duran, hiç kıpırdamayan bir çubuk olurdu — ilerleme
-          göstermeyen bir ilerleme çubuğu. */}
+          göstermeyen bir ilerleme çubuğu.
+          Dolgu brand-500 (slate-100 rayda 3.55:1); slate-300 dolgu 1.36:1'di ve çubuğun
+          ne kadar dolduğu seçilmiyordu (WCAG 1.4.11, 3:1). Branş çubuğuyla aynı ton. */}
       {sayacVar && hedef ? (
         <View className="mt-4 flex-row items-center gap-2 border-t border-slate-100 pt-4">
           <View className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
             <View
-              className="h-full rounded-full bg-slate-300"
+              className="h-full rounded-full bg-brand-500"
               style={{ width: `${Math.min(100, (toplam / hedef) * 100)}%` }}
             />
           </View>

@@ -34,6 +34,9 @@ import { Button, ErrorBox, Modal } from './ui'
  * Tek seçim satırı: radyo işareti + etiket. 44px dokunma hedefi.
  * `pasif` satır basılamıyor; `ek` nedenini etiketin sonuna yazıyor. Neden METİNDE, yalnızca
  * soluk renkte değil: renk farkı ekran okuyucuya ve renk ayırt edemeyene hiçbir şey demez.
+ *
+ * Boş halka slate-500 (beyazda 4.76:1). slate-300 halka 1.48:1'di: satırın bir seçim
+ * olduğunu söyleyen tek işaret zeminde kayboluyordu (WCAG 1.4.11, 3:1).
  */
 function SecimSatiri({ secili, pasif = false, ek = null, onPress, children }) {
   return (
@@ -51,7 +54,7 @@ function SecimSatiri({ secili, pasif = false, ek = null, onPress, children }) {
     >
       <View
         className={`h-5 w-5 items-center justify-center rounded-full border-2
-                    ${secili ? 'border-brand-600' : 'border-slate-300'}`}
+                    ${secili ? 'border-brand-600' : 'border-slate-500'}`}
       >
         {secili && <View className="h-2.5 w-2.5 rounded-full bg-brand-600" />}
       </View>

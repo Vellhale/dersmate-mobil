@@ -12,15 +12,19 @@ import { ink } from '../lib/theme'
   RN FARKI: currentColor yok — renk, kullanıldığı yerden `renk` prop'u ile gelir
   (tab bar zaten aktif/pasif rengi parametre olarak veriyor). `kalinlik` web'deki
   strokeWidth; aktif sekme kalın çizgiyle vurgulanır (web'deki Layout kararı).
+
+  `dolgu` varsayılan 'none' — set çizgi seti olarak kalıyor. Yalnızca durum taşıyan
+  işaretler doldurur: değerlendirme yıldızında boş ve dolu yıldız aynı çizgiyle çizilseydi
+  seçim yalnızca renk farkında kalırdı (renk ayırt edemeyen için hiç).
 */
 
-function Cizgi({ children, renk = ink, boy = 24, kalinlik = 2 }) {
+function Cizgi({ children, renk = ink, boy = 24, kalinlik = 2, dolgu = 'none' }) {
   return (
     <Svg
       viewBox="0 0 24 24"
       width={boy}
       height={boy}
-      fill="none"
+      fill={dolgu}
       stroke={renk}
       strokeWidth={kalinlik}
       strokeLinecap="round"
