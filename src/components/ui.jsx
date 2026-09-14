@@ -32,7 +32,10 @@ const BUTON_VARYANT = {
   primary: { kutu: 'bg-brand-600 active:bg-brand-700', yazi: 'text-white' },
   secondary: { kutu: 'bg-white border border-slate-300 active:bg-slate-50', yazi: 'text-slate-700' },
   danger: { kutu: 'bg-rose-600 active:bg-rose-700', yazi: 'text-white' },
-  success: { kutu: 'bg-emerald-600 active:bg-emerald-700', yazi: 'text-white' },
+  // emerald-600 beyazla 3.77:1 idi; 700 = 5.48:1. Beş varyantın içinde AA'yı (4.5:1) geçemeyen
+  // tek dolgulu düğmeydi ve en sık basılan kararları taşıyor: "Kabul et", "Kanıtı incele ve
+  // onayla", "Doğrula". Web ui.jsx:7 hâlâ emerald-600 — bu ton oraya da taşınmalı.
+  success: { kutu: 'bg-emerald-700 active:bg-emerald-800', yazi: 'text-white' },
   ghost: { kutu: 'active:bg-slate-100', yazi: 'text-slate-600' },
 }
 
@@ -234,11 +237,16 @@ export function Field({ label, hint, children }) {
  * Girdi — web'deki .input sınıfının karşılığı. 16px punto korunuyor: RN'de iOS'un
  * otomatik yakınlaştırma derdi yok ama 16px, dokunmatik okunabilirliğin alt sınırı
  * olarak bilinçli bir tasarım eşiğiydi; py ile birlikte ~44px yükseklik veriyor.
+ *
+ * Placeholder slate-500 (beyazda 4.76:1); slate-400 2.56:1'di ve birçok alanda ne
+ * yazılacağını ("Örn. ...") yalnızca placeholder anlatıyor. Koyulaşan placeholder girilmiş
+ * bir değer gibi okunabilir: çıplak değer yazma ("000000", hazır doğrulama kodu). Örnek
+ * gerekiyorsa "Örn." ile başlat, değilse ne yazılacağını söyleyen cümle yaz.
  */
 export function Girdi({ className = '', ...props }) {
   return (
     <TextInput
-      placeholderTextColor={slate[400]}
+      placeholderTextColor={slate[500]}
       className={`min-h-[44px] w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5
                   text-base text-slate-900 ${className}`}
       {...props}
@@ -362,7 +370,8 @@ export function Modal({ open, title, onClose, children, footer, kapatilabilir = 
                 hitSlop={12}
                 className="min-h-[32px] min-w-[32px] items-center justify-center"
               >
-                <Text className="text-lg text-slate-400">✕</Text>
+                {/* slate-500: ✕ sayfanın tek görünür çıkışı, süs değil; slate-400 2.56:1'di. */}
+                <Text className="text-lg text-slate-500">✕</Text>
               </Pressable>
             )}
           </View>

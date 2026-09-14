@@ -852,7 +852,9 @@ function OzetSatiri({ ad, deger, soluk = false }) {
   return (
     <View className="flex-row items-baseline justify-between gap-3">
       <Text className="shrink-0 text-sm text-brand-700">{ad}</Text>
-      <Text className={`shrink text-right text-sm ${soluk ? 'text-brand-700/70' : 'font-medium text-brand-800'}`}>
+      {/* Boş değer ("Arkadaş seçilmedi") dolu değerden ağırlık ve bir ton farkıyla ayrışıyor,
+          saydamlıkla değil: brand-700/70 brand-50 zeminde 3.14:1'di; brand-700 5.56:1. */}
+      <Text className={`shrink text-right text-sm ${soluk ? 'text-brand-700' : 'font-medium text-brand-800'}`}>
         {deger}
       </Text>
     </View>
@@ -929,7 +931,10 @@ function CompleteModal({ session, onClose, onDone }) {
             maxLength={12}
             autoCapitalize="characters"
             autoCorrect={false}
-            placeholder={session.verificationCode}
+            /* Placeholder kodun KENDİSİ değil: kod hemen üstteki Notice'te yazıyor. Placeholder
+               slate-500'e koyulaştıktan sonra hazır kod, girdiye çoktan yazılmış bir değer gibi
+               görünüp kullanıcıyı boş alanla "Gönder"e bastırabilirdi. */
+            placeholder="Kodu buraya yaz"
             className="font-mono uppercase tracking-wider"
           />
         </Field>

@@ -419,13 +419,14 @@ export function UrunTuru() {
           </View>
 
           {/* "Bir daha gösterme", "geç"ten AYRI: geçen kullanıcıya bir dahaki girişte
-              tekrar önerilebilir, ama açıkça istemeyene hiç sorulmamalı. */}
+              tekrar önerilebilir, ama açıkça istemeyene hiç sorulmamalı. Sönük ama okunur:
+              slate-400 2.56:1'di, slate-500 4.76:1; ikincilliği punto ve alt çizgi taşıyor. */}
           <Pressable
             accessibilityRole="button"
             onPress={() => bitir({ susturuldu: true })}
             className="mt-1 min-h-[44px] justify-center self-start"
           >
-            <Text className="text-xs text-slate-400 underline">Bir daha gösterme</Text>
+            <Text className="text-xs text-slate-500 underline">Bir daha gösterme</Text>
           </Pressable>
         </Card>
       </View>

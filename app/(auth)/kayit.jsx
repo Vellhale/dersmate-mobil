@@ -361,6 +361,9 @@ export default function Kayit() {
                 returnKeyType verilince üstte bir araç çubuğu çiziyor ve düğme metnini
                 İngilizce "Done" olarak SABİT yazıyor. Etiketi Türkçeleştirilmezse ekrandaki
                 tek İngilizce metin olurdu. (Android'de bu prop yok sayılıyor.)
+
+                Placeholder "000000" DEĞİL: slate-500'e koyulaşınca altı sıfır, girilmiş bir
+                kod gibi okunuyor ve "Doğrula"nın neden kapalı olduğu anlaşılmıyordu.
               */}
               <Girdi
                 value={kod}
@@ -369,7 +372,7 @@ export default function Kayit() {
                 textContentType="oneTimeCode"
                 autoComplete="email-otp"
                 autoCorrect={false}
-                placeholder="000000"
+                placeholder={`${KOD_UZUNLUK} haneli kod`}
                 returnKeyType="done"
                 inputAccessoryViewButtonLabel="Bitti"
                 onSubmitEditing={onDogrula}

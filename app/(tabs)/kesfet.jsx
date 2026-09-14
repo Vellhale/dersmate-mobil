@@ -1171,10 +1171,12 @@ function EngellilerModali({ open, onClose, liste, onKaldir }) {
                 >
                   <View className={sutun ? 'self-stretch' : 'min-w-0 flex-1'}>
                     {/* İki satıra kadar: sabit 150 px düğme ad sütununu 320 dp'de 122 px'e indiriyor ve
-                        onaysız "Engeli kaldır" listesinde kimliği taşıyan tek şey olan ad kesiliyordu. */}
+                        onaysız "Engeli kaldır" listesinde kimliği taşıyan tek şey olan ad kesiliyordu.
+                        Engeli kalkan satır sönükleşiyor ama OKUNUR kalıyor (slate-500, 4.76:1): kullanıcı
+                        kimin engelini kaldırdığını tam bu anda kontrol ediyor. slate-400 2.56:1'di. */}
                     <Text
                       numberOfLines={2}
-                      className={`text-sm font-medium ${kaldirildi ? 'text-slate-400' : 'text-slate-800'}`}
+                      className={`text-sm font-medium ${kaldirildi ? 'text-slate-500' : 'text-slate-800'}`}
                     >
                       {kisi.displayName}
                     </Text>

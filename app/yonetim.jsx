@@ -133,9 +133,12 @@ export default function Yonetim() {
                   >
                     {item.label}
                   </Text>
+                  {/* rose-600 (beyazla 4.70:1); rose-500 3.67:1'di ve 10px metin AA'nın büyük metin
+                      muafiyetine giremeyecek kadar küçüktü, punto da 11px'e çıktı. SayacRozeti
+                      DEĞİL: o 9'dan sonra "9+" yazıyor, yönetim kuyruğunda gerçek sayı iş yükü. */}
                   {sayi > 0 && (
-                    <View className="rounded-full bg-rose-500 px-1.5 py-0.5">
-                      <Text className="text-[10px] font-bold leading-none text-white">{sayi}</Text>
+                    <View className="rounded-full bg-rose-600 px-1.5 py-0.5">
+                      <Text className="text-[11px] font-semibold leading-none text-white">{sayi}</Text>
                     </View>
                   )}
                 </Pressable>
