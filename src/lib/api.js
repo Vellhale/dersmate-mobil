@@ -181,6 +181,30 @@ export function onOturumYenilendi(dinleyici) {
 
 /* ---------- Axios istemcisi ---------- */
 
+/*
+  TLS SERTİFİKA SABİTLEME (certificate pinning) — DEĞERLENDİRİLDİ, BİLEREK ERTELENDİ.
+
+  ⚠️ "Eksik" sanıp körü körüne EKLEME — bu blok neden EKLENMEDİĞİNİ anlatır. Uygulama
+  sunucuya standart sistem güven zinciriyle (Android CA deposu) HTTPS üzerinden bağlanır;
+  ayrıca bir sertifika/anahtar sabitlemesi (pinning) YOKTUR.
+
+  NEDEN ERTELENDİ: Üretim API'si (api.dersmate.com) Let's Encrypt/certbot kullanıyor
+  (web deposu docs/SUNUCUYA-KURULUM.md) ve sertifika ~90 GÜNDE BİR yenileniyor. YAPRAK
+  (leaf) sertifikayı sabitlemek, her yenilemede uygulamayı KIRAR: mağazadaki sürüm
+  güncelleme almadıkça hiçbir kullanıcı bağlanamaz ve geri alınamaz. Yani yaprak-pinning
+  bir güvenlik önlemi değil, kendi kendini tetikleyen bir KESİNTİ kaynağı olur. SPKI
+  (açık anahtar) ya da ara CA sabitlemesi daha stabildir AMA yine operasyonel risk taşır
+  ve yayın disiplini ister; yanlış kurulursa aynı kesintiyi verir.
+
+  DOĞRU YOL (uygulanacaksa — bu düşük-bulgu temasının KAPSAMI DIŞINDA):
+    1. Yaprağı DEĞİL, iki SPKI pin'i sabitle: canlı anahtarınki + hazır bekleyen bir
+       YEDEK anahtarınki (rollover). Tek pin'le anahtar döndürülemez.
+    2. Sertifika yenileme prosedürünü pin rotasyonuyla eşitle: yeni pin'i eski uygulama
+       da tanısın diye ÖNCE yayınla, SONRA sunucuda anahtarı çevir.
+    3. Pin uyumsuzluğunda "güvenli bağlanılamadı" ekranı + güncelleme yönlendirmesi.
+  Küçük/güvenli düşük-bulgu kapsamına sığmayan, YAYIN disiplini gerektiren mimari bir
+  karar. Karar: ERTELENDİ (gerekçe burada; ilgili transport yapılandırması app.config.js).
+*/
 const client = axios.create({
   baseURL: API_BASE,
   timeout: 30000,

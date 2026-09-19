@@ -29,6 +29,11 @@ module.exports = ({ config }) => ({
       {
         android: {
           usesCleartextTraffic: sifresizGerekli,
+          // TLS sertifika sabitleme (certificate pinning) burada BİLEREK yapılandırılmadı.
+          // Gerekçe ve doğru yol src/lib/api.js'teki axios istemcisi yorumunda. Özet:
+          // Let's Encrypt ~90 günde yenilendiği için YAPRAK-pinning uygulamayı her
+          // yenilemede kırar; SPKI + yedek-pin ise ayrı bir yayın disiplini ister.
+          // Değerlendirildi, ERTELENDİ — "eksik" sanıp körü körüne ekleme.
         },
       },
     ],
