@@ -23,7 +23,10 @@ const SAHTE_HUB = {
   • RN'in global WebSocket'i var, @microsoft/signalr onu doğrudan kullanır — polyfill
     gerekmez. LongPolling yedeği de fetch üzerinden çalışır.
   • Token, WebSocket header taşıyamadığı için accessTokenFactory ile query'den gider
-    (backend yalnızca /hubs yolunda kabul eder).
+    (backend yalnızca /hubs yolunda kabul eder). Bu, WebSocket için OLAĞAN/kaçınılmaz
+    ve web ile AYNI; güvenlik denetiminde değerlendirildi, istemcide değişiklik gerekmez.
+    Tek gerçek risk loglama (token'ın erişim günlüğüne düşmesi) ve o SUNUCU/vekil
+    tarafında ele alınıyor — web nginx'inde /hubs için maskeli log biçimi var. Karar: NOT.
   • Fabrika ASYNC ve yenileme farkında (api.js → tazeTokenAl); web'deki senkron
     getToken(). Sunucu JWT ölünce hub'ı kapatıyor ve negotiate'in 401'i tekrar
     denenmiyor. Senkron fabrikayla yeniden bağlanma ölü token'la döner, canlı akış bir
