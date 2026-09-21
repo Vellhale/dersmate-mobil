@@ -398,12 +398,22 @@ ve App Store Connect'e o adres. Metin zaten yazılı; taşınması gerekiyor.
   Oturum SecureStore'da TEK anahtarda ve yazımlar sıraya sokuluyor (`saveSession`).
   Yenileme token'ını ayrı anahtara bölme; gerekçe `storage.js`'te.
 
-  ⚠️ "Sunucuda çıkış ucu yok" ARTIK DOĞRU DEĞİL — ama mobil hâlâ öyle davranıyor.
-  Web `03dc360` ile `/api/session/logout` ucunu ekledi (yenileme token'ını iptal ediyor).
-  Mobilin `logout`'u bu ucu ÇAĞIRMIYOR: çıkış yalnızca yerel oturumu siliyor ve iptal
-  edilmemiş yenileme token'ı sunucuda 60 gün geçerli kalıyor. Yani "çıkış yaptım"
-  diyen kullanıcının oturumu sunucu tarafında açık. Taşınmayı bekleyen iş; bkz.
-  "Web ile senkron tutma" → devreden borçlar.
+  **Çıkış artık sunucuya da işliyor** (2026-09-21, web `03dc360`'ın portu). Öncesinde
+  çıkış yalnızca istemci taraflıydı: SecureStore'daki oturum siliniyor ama yenileme
+  token'ı sunucuda 60 gün geçerli kalıyordu — silinen değer yeniden ele geçirilirse
+  (cihaz yedeği, disk artığı) o süre boyunca taze erişim token'ı üretebilirdi.
+
+  `AuthContext.logout` sırası: token'ı OKU → yereli sil → `oturumuSonlandir()` ile
+  sunucuda iptal et, **beklemeden**. Ağ yokken çıkış yine kesin sonuç verir.
+
+  ⛔ `oturumuSonlandir` HAM AXIOS kullanır, `request()` değil: istemcinin 401 → yenile
+  zinciri, tam da iptal edilmek istenen token'la oturumu tazelerdi.
+
+  ⚠️ İki bilinen sınır (web'de de var): erişim token'ı ömrü dolana kadar (≤2 saat)
+  yaşar (tek cihaz iptali damgayı ileri almıyor); ve çıkış anında bir yenileme
+  uçuştaysa o turda üretilen yeni token istemcide atıldığı hâlde sunucuda canlı kalır.
+  İkincisinin kapatılması sunucunun işi. `onAuthExpired` yolunda bu çağrı YAPILMAZ —
+  orada token zaten ölü.
 - **Arkadaşlar ekranının rotası `/eslesmeler` kaldı** (`app/eslesmeler.jsx`); web #31'de
   adres `/arkadaslar` oldu, yalnızca kullanıcıya görünen metinler taşındı. Dosyayı
   yeniden adlandırma: tur çıpası `eslesmeler`, `dersmate://eslesmeler` derin bağlantısı
@@ -517,13 +527,15 @@ dosyanın aşağıda "ters yönü daha kötü" diye uyardığı durumun ta kendi
 | commit | iş | durum |
 |---|---|---|
 | `ac0a6bf` | analitik `page_path` GUID sızdırıyordu | ⬜ **incelenmedi** — mobilde GA yok ama `trackEvent` parametreleri kontrol edilmeli |
-| `03dc360` | sunucu tarafı çıkış ucu (`/api/session/logout`) | ⬜ **taşınmadı** — mobil `logout` hâlâ yalnızca yerel siliyor |
+| `03dc360` | sunucu tarafı çıkış ucu (`/api/session/logout`) | ✅ **taşındı** (2026-09-21) — `oturumuSonlandir`, mobil yolu `/api/v1/session/logout` |
 | `8f35fb6` | localStorage yenileme token'ı + kayıt numaralandırma | ✅ web'de de ERTELENDİ, taşınacak bir şey yok |
 | `3d96b36` | künye + sözleşme sürümü 2026-09-19 | ✅ **taşındı** (2026-09-21) |
 | `8dfad75` | rol token + EXIF + analitik (web PR #34) | ⬜ **incelenmedi** — EXIF temizliği mobil yüklemeleri de ilgilendirebilir |
 | `284cccb` | main'in güvenlik dalına birleşmesi | — |
 
-Bu üç ⬜ kapanmadan baseline ilerletilmemeli.
+Kalan iki ⬜ kapanmadan baseline ilerletilmemeli. (`03dc360` 2026-09-21'de kapandı;
+en eski açık iş artık `ac0a6bf`, yani baseline en fazla oraya kadar düşünülebilir —
+ama o da incelenmeden değil.)
 
 `b93422a..6aafac7` aralığında `frontend/src`'ye dokunan her PR ya taşındı ya da mobilde
 karşılığı yok: #21 → mobil PR #6 (`fe8e875`); #26, #29, #30, #31, #33 →

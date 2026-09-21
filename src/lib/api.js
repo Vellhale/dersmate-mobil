@@ -352,6 +352,53 @@ function oturumuYenile() {
   return yenilemeSozu
 }
 
+const CIKIS_YOLU = '/api/v1/session/logout'
+
+/**
+ * SUNUCU TARAFLI ÇIKIŞ — yenileme token'ını sunucuda iptal eder.
+ *
+ * NEDEN VAR: çıkış bu güne kadar YALNIZCA istemci taraflıydı. SecureStore'daki oturum
+ * siliniyordu ama yenileme token'ı sunucuda 60 GÜN geçerli kalıyordu; silinen değer
+ * yeniden ele geçirilirse (cihaz yedeği, disk artığı, adli kopya) o süre boyunca taze
+ * erişim token'ı üretmeye devam ederdi. Yani "çıkış yaptım" diyen kullanıcının oturumu
+ * sunucu tarafında açıktı. Uç web'de `03dc360` ile eklendi, mobil çağırmıyordu.
+ *
+ * ⛔ api.request() DEĞİL, HAM AXIOS. İstemcinin 401 → yenile → tekrar dene zinciri
+ * çıkışta ZARARLI: tam da iptal etmeye çalıştığımız token'la yeni bir oturum tazelerdi.
+ * Web de aynı sebeple ham fetch kullanıyor.
+ *
+ * ⛔ ASLA FIRLATMAZ ve BEKLENMEZ. Çıkış, ağ olmadan da kesin sonuç vermeli: yerel oturum
+ * çağıran tarafta zaten silindi. Burada bir hata yüzeye çıksaydı kullanıcı "çıkış
+ * başarısız" görüp ekranda oturumlu kalırdı — hâlbuki oturum gitti.
+ *
+ * tumCihazlar=false BİLİNÇLİ: telefondan çıkmak web oturumunu düşürmemeli. Sunucu
+ * "her yerden çık" için ayrı bir bayrak taşıyor; buranın niyeti o değil.
+ *
+ * ⚠️ İKİ BİLİNEN SINIR (ikisi de web'de de var):
+ *  1. Erişim token'ı ömrü dolana kadar (≤2 saat) yaşar. Tek cihaz iptali damgayı ileri
+ *     almıyor — kısa erişim + iptal edilebilir yenileme tasarımının kabul edilmiş sınırı.
+ *  2. Çıkış anında bir yenileme UÇUŞTAYSA, sunucu eski token'ı Rotated işaretlemiş
+ *     olabilir. Sunucu zaten iptalli satıra DOKUNMUYOR (idempotent, LogoutHandler), yani
+ *     zarar yok — ama o turda üretilen YENİ token istemcide atıldığı hâlde sunucuda
+ *     canlı kalır. Dar bir pencere ve kapatılması sunucunun işi (çıkış, kullanıcının
+ *     tüm zincirini sebep=SignedOut ile kapatmalı).
+ */
+export function oturumuSonlandir(refreshToken) {
+  // Önizlemede sunucu yok; ağa çıkma.
+  if (ONIZLEME || !refreshToken) return Promise.resolve()
+
+  return axios
+    .post(
+      `${API_BASE}${CIKIS_YOLU}`,
+      { refreshToken, tumCihazlar: false },
+      { timeout: 15000 },
+    )
+    .then(
+      () => {},
+      () => {},
+    )
+}
+
 /*
   SignalR accessTokenFactory için (useChatHub). Hub istekleri axios'tan geçmiyor, yani
   aşağıdaki 401 → yenile yolu onları kapsamıyor. Sunucu JWT ölünce hub'ı kendisi
