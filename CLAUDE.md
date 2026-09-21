@@ -16,7 +16,12 @@ kod çevirisi birebir kalsın diye).
 npx expo start                 # Metro + Expo Go QR
 npx expo start --android       # Android emülatörde aç
 npx expo export --platform android   # derleme sağlaması (cihazsız hata yakalama)
+npx expo export --platform ios       # iOS için aynı sağlama — Windows'ta ÇALIŞIR
+npx expo config --type introspect --json   # üretilecek Info.plist/manifest'i görmeden derleme
 ```
+
+⚠️ `npm run ios` (`expo run:ios`) **bu makinede çalışmaz** — Xcode yalnızca macOS'ta.
+iOS'un tek yolu bulut derlemesi; bkz. "iOS ve App Store".
 
 ### ⚠️ APK derlemesi bu yoldan ÇALIŞMAZ — 260 karakter sınırı
 
@@ -169,6 +174,118 @@ yeniden üretilse de aynı kalıyor, yani APK üstüne kurulum bozulmuyor (sha25
 Derleme logunda `env: export ...` satırları hangi değişkenlerin gömüldüğünü söyler —
 demo bayrağının orada OLMADIĞINI doğrula. (Paketin içinde demo metinleri yine görünür;
 Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
+
+---
+
+## iOS ve App Store
+
+### Ayrı depo YOK ve açılmayacak
+
+iOS ayrı bir proje değil, **aynı kod tabanının ikinci derleme hedefi**. Depo tek:
+`Vellhale/dersmate-mobil`. `/ios` ve `/android` ikisi de `.gitignore`'da (CNG) — native
+klasörleri EAS her derlemede prebuild ile üretiyor, yani iOS için depoya eklenecek
+hiçbir dosya yok. Yapılan iş tamamen `app.json` + `app.config.js` + `eas.json`.
+
+⛔ "iOS için ayrı repo açalım" bir kez gündeme geldi (2026-09-21) ve **reddedildi**.
+Ayırmak 1792 modüllük tek kaynağı ikiye bölerdi: her özellik iki kez yazılır, `api.js`
+yüzey pariteti (web ↔ mobil) üç ayaklı hâle gelir ve CLAUDE.md'deki "Web ile senkron
+tutma" disiplini ikinci bir baseline daha taşımak zorunda kalırdı. Platform farkları
+konfigürasyonda çözülüyor, depoda değil.
+
+### Bu makineden iOS: ne çalışır, ne çalışmaz
+
+| Çalışır (Windows) | Çalışmaz (Mac gerekir) |
+|---|---|
+| `npx expo export --platform ios` (JS paketi sağlaması) | `npx expo run:ios` / Xcode |
+| `npx expo config --type introspect` (Info.plist önizleme) | iOS Simulator |
+| `eas build --platform ios` (derleme BULUTTA, macOS işçide) | yerel `pod install` |
+
+Yani geliştirme akışı Android'den farksız: **development** profiliyle bulutta bir kez
+geliştirme istemcisi derlenir, iPhone'a kurulur, sonrası `npx expo start` ile canlıdır.
+
+### ⛔ Kilit: Apple Developer üyeliği
+
+Android'de EAS imza anahtarını kendisi üretebiliyor. **iOS'ta üretemez** — sertifika ve
+tedarik profili Apple'dan gelir. Üyelik ($99/yıl) olmadan `eas build --platform ios`
+**hiçbir profilde** çalışmaz. Bireysel hesap genelde aynı gün, kurumsal hesap D-U-N-S
+numarası istediği için haftalar alabilir. Sıradaki her iş buna bağlı.
+
+Üyelik açıldıktan sonra sıra: App Store Connect'te `com.dersmate.app` kaydı → `eas
+device:create` (test iPhone'unun UDID'si) → `eas build -p ios --profile development`.
+
+### ⚠️ ATS: Expo'nun varsayılanı Android'in TAM TERSİ
+
+Şifresiz trafik duvarı iOS'ta da var (App Transport Security) ama varsayılan ters yönde
+hatalı:
+
+- **Android**: Expo izni yalnızca debug manifest'ine koyar → release paketi kapalı gelir,
+  hata "çalışmıyor" diye görünür.
+- **iOS**: Expo şablonu Info.plist'e `NSAllowsArbitraryLoads: true` koyar → mağaza paketi
+  **tamamen açık** gider, hata **hiç görünmez**.
+
+Ölçüldü (2026-09-21, `expo config --type introspect`): `.env` `https://` iken bile
+üretilen Info.plist `NSAllowsArbitraryLoads: true` + localhost istisnası taşıyordu. Yani
+`app.config.js`'in Android için kurduğu "adres https olunca izin kendiliğinden kapanır"
+güvencesi iOS'ta **tutmuyordu** — koşul doğru çalışıp hiçbir şey eklemiyor, şablon zaten
+açık bırakıyordu.
+
+Bu yüzden `app.config.js` anahtarı **koşulun iki dalında da açıkça** yazıyor. İkisi de
+ölçüldü:
+
+```
+EXPO_PUBLIC_API_URL=https://...  →  { NSAllowsArbitraryLoads: false }
+EXPO_PUBLIC_API_URL=http://...   →  { NSAllowsArbitraryLoads: true, NSAllowsLocalNetworking: true }
+                                    + NSLocalNetworkUsageDescription
+```
+
+⛔ `false` dalını "gereksiz" sanıp silme — anahtarı hiç vermemek Expo'nun açık
+varsayılanına dönmektir.
+
+Geliştirmede ayrıca **iOS 14 Yerel Ağ izni** var: LAN'daki sunucuya ilk bağlantıda
+kullanıcıya istem çıkar. Reddedilirse belirti Android'deki sessiz hatanın aynısıdır
+(istek cihazdan çıkmaz, sunucu günlüğü boş). `NSLocalNetworkUsageDescription` bu yüzden
+veriliyor — metinsiz istem iOS'ta hiç gösterilmez.
+
+### Dağıtım: ad-hoc mu TestFlight mi
+
+iOS'ta `distribution: "internal"` Android'deki gibi serbest değil. Üretilen `.ipa`
+ad-hoc imzalıdır ve **yalnızca UDID'si kayıtlı cihazlara** kurulur (`eas device:create`,
+yılda 100 cihaz). Kayıtsız bir iPhone'a bağlantıyı açmak yetmez.
+
+- **development / preview / onizleme** → ad-hoc. Kendi cihazlarımız için.
+- **production + `eas submit`** → TestFlight. UDID kaydı gerekmez, e-posta davetiyle
+  dağıtılır. Dışarıdaki testçiye giden yol budur.
+
+⚠️ `preview` profili yerel arka uca (`http://192.168.1.111:5099`) bağlı olduğu için
+**TestFlight'a uygun değil** — LAN adresi ne Apple'ın incelemesinde ne de başkasının
+telefonunda çalışır.
+
+### App Review — zaten karşılanan ve karşılanmayan
+
+Bunlar kontrol edildi (2026-09-21), yeniden araştırma gerekmiyor:
+
+| Kural | Durum |
+|---|---|
+| 5.1.1(v) uygulama içinde hesap silme | ✅ var (`api.deleteAccount`, "Hesabımı sil" ekranı) |
+| 5.1.1 gizlilik metnine erişim | ✅ var (`MetinSayfasi.jsx`) |
+| 4.8 Sign in with Apple | ✅ **gerekmiyor** — üçüncü taraf sosyal giriş yok, kimlik e-posta+parola |
+| ATT (izleme izni) | ✅ **gerekmiyor** — ölçüm taşıyıcısı kurulu değil (`analytics.js`) |
+| Kullanılmayan izin metinleri | ✅ yok — `expo-image-picker` kamera/mikrofon `false`, yalnızca foto izni üretiliyor |
+| İkon alfa kanalı (App Store reddeder) | ✅ `assets/icon.png` 1024×1024, alfasız (colorType=2) |
+| Gizlilik "nutrition label" formu | ⬜ App Store Connect'te elle doldurulacak |
+| Ekran görüntüleri (6.7" ve 6.5") | ⬜ üretilecek — Android'inkiler kullanılamaz |
+
+`ios.infoPlist.ITSAppUsesNonExemptEncryption = false` app.json'a eklendi: uygulama
+yalnızca standart HTTPS kullanıyor ve ihracat muafiyetine giriyor. Anahtar olmasa her
+TestFlight yüklemesinde aynı soru elle yanıtlanır ve yanıtlanana kadar paket testçilere
+**dağıtılmaz**.
+
+### ⚠️ `SOZLESME_SURUMU` artık iki mağazaya birden bağlı
+
+Sürüm sabiti üç yerde (sunucu, web, mobil) — bkz. "Web ile senkron tutma". iOS yayına
+girdikten sonra bu **dört** yer gibi davranır: sürüm artarken Play'deki eski sürüm kadar
+App Store'daki eski sürüm de kendi eski sabitini gönderir. İki mağazanın inceleme süresi
+farklı olduğu için artış, **her iki yayının da geçtiği** ana planlanmalı.
 
 ---
 
