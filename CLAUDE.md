@@ -287,6 +287,42 @@ girdikten sonra bu **dört** yer gibi davranır: sürüm artarken Play'deki eski
 App Store'daki eski sürüm de kendi eski sabitini gönderir. İki mağazanın inceleme süresi
 farklı olduğu için artış, **her iki yayının da geçtiği** ana planlanmalı.
 
+#### İlk iOS yayınından önce ödenen borç (2026-09-21)
+
+Bu kural ilk kez iOS hazırlığında ısırdı ve ÖLÇÜLDÜ:
+
+```
+sunucu 2026-09-19 · web 2026-09-19 · MOBİL 2026-09-05
+```
+
+`Register.cs` eşitlik arıyor. Bu farkla çıkacak bir paketten **hiç kimse kayıt
+olamazdı** — uygulama da sunucu da çökmeden, ekranda yalnızca bir doğrulama hatasıyla.
+Web artışı "mobil mağazada henüz uygulama yokken" yapıldığı için o gün kimseyi
+kilitlemedi; borç ilk mağaza yayınına kadar açık kaldı ve orada ödendi.
+
+⚠️ Sayı tek başına yükseltilmedi, METİNLE BİRLİKTE taşındı (künye, §1'ler, imza).
+Sabit bir veri değil, "kullanıcıya hangi metni gösterdim" beyanı; metni taşımadan
+sayıyı yükseltmek sunucuya gösterilmemiş bir metnin kabul edildiğini bildirmek olurdu.
+
+**Mağazada uygulama VARKEN sıra tersine döner** (yasalMetinler.js'te de yazılı):
+önce mobil sürüm artar ve YAYINLANIR, sonra sunucu dağıtılır. Bu kez tersi yapılabildi
+çünkü mağazada henüz uygulama yoktu — bir daha o serbestlik olmayacak.
+
+### ⛔ App Store Connect gizlilik politikası ADRESİ istiyor — uygulama içi metin saymaz
+
+`app/gizlilik.jsx` mobil gerçeğe göre yazılmış durumda (canvas yerine `hwid.js`, çerez
+yerine uygulama depolaması, "analitik taşıyıcısı yok"). Ama App Store Connect zorunlu
+alan olarak **herkese açık bir URL** istiyor ve bugün verilebilecek tek adres
+`dersmate.com/gizlilik` — o da **web metnini** sunuyor: tarayıcı parmak izi, çerez
+kategorileri ve Google Analytics. Üçü de iOS uygulamasında YOK.
+
+Yani o adres verilirse, `gizlilik.jsx`'in başında yazılı kuralın tersi olur: *"web
+metnini birebir kopyalamak burada doğru metin değil, YANLIŞ BEYAN olurdu."* Apple
+formdaki beyanı, politikayı ve uygulamanın davranışını karşılaştırıyor.
+
+⬜ **Açık iş:** web deposunda mobil metni sunan ayrı bir sayfa (ör. `/gizlilik-uygulama`)
+ve App Store Connect'e o adres. Metin zaten yazılı; taşınması gerekiyor.
+
 ---
 
 ## Web projesiyle ilişki — tek yönlü çeviri
@@ -362,8 +398,12 @@ farklı olduğu için artış, **her iki yayının da geçtiği** ana planlanmal
   Oturum SecureStore'da TEK anahtarda ve yazımlar sıraya sokuluyor (`saveSession`).
   Yenileme token'ını ayrı anahtara bölme; gerekçe `storage.js`'te.
 
-  Sunucuda çıkış ucu yok: çıkış yalnızca yerel oturumu siliyor, yenileme token'ı
-  sunucuda 60 gün geçerli kalıyor (web'de de öyle).
+  ⚠️ "Sunucuda çıkış ucu yok" ARTIK DOĞRU DEĞİL — ama mobil hâlâ öyle davranıyor.
+  Web `03dc360` ile `/api/session/logout` ucunu ekledi (yenileme token'ını iptal ediyor).
+  Mobilin `logout`'u bu ucu ÇAĞIRMIYOR: çıkış yalnızca yerel oturumu siliyor ve iptal
+  edilmemiş yenileme token'ı sunucuda 60 gün geçerli kalıyor. Yani "çıkış yaptım"
+  diyen kullanıcının oturumu sunucu tarafında açık. Taşınmayı bekleyen iş; bkz.
+  "Web ile senkron tutma" → devreden borçlar.
 - **Arkadaşlar ekranının rotası `/eslesmeler` kaldı** (`app/eslesmeler.jsx`); web #31'de
   adres `/arkadaslar` oldu, yalnızca kullanıcıya görünen metinler taşındı. Dosyayı
   yeniden adlandırma: tur çıpası `eslesmeler`, `dersmate://eslesmeler` derin bağlantısı
@@ -463,6 +503,27 @@ cd C:/projeler/dersmate && git diff <baseline>..HEAD --stat -- frontend/src
 
 Son senkron baseline'ı: **`6aafac7`** (2026-09-10, web #33'ün birleşmesi). Bir sonraki
 senkronda buradaki değeri güncelle, yoksa aynı diff iki kez uygulanır.
+
+### ⚠️ BASELINE 2026-09-21'DE İLERLETİLMEDİ — tek commit SEÇİLEREK taşındı
+
+Normalde baseline taşınan son web commit'ine çekilir. Bu kez çekilmedi ve sebebi
+kayda değer: taşınan commit (`3d96b36`, künye + sözleşme sürümü) sıradaki EN YENİ iş
+değil, **ortadaki** bir iş. Ondan ÖNCE gelen iki commit hâlâ taşınmadı. Baseline
+`3d96b36`'ya çekilseydi o ikisi diff'ten düşer ve bir daha hiç görünmezdi — bu
+dosyanın aşağıda "ters yönü daha kötü" diye uyardığı durumun ta kendisi.
+
+`6aafac7..HEAD` aralığında `frontend/src`'ye dokunan altı commit var, durumları:
+
+| commit | iş | durum |
+|---|---|---|
+| `ac0a6bf` | analitik `page_path` GUID sızdırıyordu | ⬜ **incelenmedi** — mobilde GA yok ama `trackEvent` parametreleri kontrol edilmeli |
+| `03dc360` | sunucu tarafı çıkış ucu (`/api/session/logout`) | ⬜ **taşınmadı** — mobil `logout` hâlâ yalnızca yerel siliyor |
+| `8f35fb6` | localStorage yenileme token'ı + kayıt numaralandırma | ✅ web'de de ERTELENDİ, taşınacak bir şey yok |
+| `3d96b36` | künye + sözleşme sürümü 2026-09-19 | ✅ **taşındı** (2026-09-21) |
+| `8dfad75` | rol token + EXIF + analitik (web PR #34) | ⬜ **incelenmedi** — EXIF temizliği mobil yüklemeleri de ilgilendirebilir |
+| `284cccb` | main'in güvenlik dalına birleşmesi | — |
+
+Bu üç ⬜ kapanmadan baseline ilerletilmemeli.
 
 `b93422a..6aafac7` aralığında `frontend/src`'ye dokunan her PR ya taşındı ya da mobilde
 karşılığı yok: #21 → mobil PR #6 (`fe8e875`); #26, #29, #30, #31, #33 →
