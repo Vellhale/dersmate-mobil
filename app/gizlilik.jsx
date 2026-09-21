@@ -8,7 +8,8 @@ import {
   MetinSayfasi,
   Paragraf,
 } from '../src/components/MetinSayfasi'
-import { ILETISIM_EPOSTA, SOZLESME_TARIHI } from '../src/lib/yasalMetinler'
+import { ILETISIM_EPOSTA, ISLETMECI, ISLETMECI_ALAN_ADI, MARKA } from '../src/lib/kunye'
+import { SOZLESME_TARIHI } from '../src/lib/yasalMetinler'
 
 /*
   GİZLİLİK POLİTİKASI + KVKK AYDINLATMA METNİ — web'deki pages/Gizlilik.jsx'in portu.
@@ -90,12 +91,25 @@ export default function Gizlilik() {
       ozet="Hangi verini topluyoruz, neden topluyoruz, ne kadar saklıyoruz ve ne isteyebilirsin."
       sonGuncelleme={SOZLESME_TARIHI}
     >
-      <Bolum no="1" baslik="Kısaca">
+      {/*
+        ⚠️ BÖLÜM NUMARASI DEĞİŞMEDİ, YALNIZCA BAŞLIK (2026-09-21, web'le aynı).
+
+        Veri sorumlusu kimliği bir KVKK aydınlatma metninin İLK maddesidir, yani doğal
+        yeri yeni bir §1 açmaktı. AÇILMADI: §4, §5, §6, §7 ve §9'a hem bu metnin içinden
+        hem Koşullar'dan atıf var; hepsini bir kaydırmak, doğru metni yanlış yere işaret
+        eden atıflarla bırakırdı.
+      */}
+      <Bolum no="1" baslik="Kısaca ve veri sorumlusu">
         <Paragraf>
-          dersmate, öğrencilerin birbirine ders anlattığı bir platformdur. Verini reklam
-          için kullanmıyoruz, satmıyoruz ve üçüncü taraflara pazarlama amacıyla
-          aktarmıyoruz. Topladığımız her şey ya hesabını çalıştırmak ya da platformu
-          kötüye kullanımdan korumak için.
+          <Kalin>{MARKA}</Kalin>, öğrencilerin birbirine ders anlattığı bir platformdur ve{' '}
+          <Kalin>{ISLETMECI}</Kalin> ({ISLETMECI_ALAN_ADI}) tarafından işletilmektedir. Bu
+          metinde geçen “biz”, {ISLETMECI}’tir; verinle ilgili taleplerin muhatabı da odur.
+          İletişim bilgileri sayfanın altındaki künyededir.
+        </Paragraf>
+        <Paragraf>
+          Verini reklam için kullanmıyoruz, satmıyoruz ve üçüncü taraflara pazarlama
+          amacıyla aktarmıyoruz. Topladığımız her şey ya hesabını çalıştırmak ya da
+          platformu kötüye kullanımdan korumak için.
         </Paragraf>
       </Bolum>
 

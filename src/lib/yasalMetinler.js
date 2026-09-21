@@ -37,11 +37,44 @@
   Ters sırada, güncellemeyi almamış herkes kayıt ekranında takılır.
 */
 
+/*
+  ─── 2026-09-21: 2026-09-05 → 2026-09-19 (WEB VE SUNUCUYA YETİŞTİRİLDİ) ───────
+
+  Bu artış mobilde yeni bir ifşa DEĞİL; kapanmamış bir borcun kapanması. Sunucu
+  (LegalDocuments.cs) ve web 2026-09-19'da artırıldı, mobil kopya geride kaldı ve
+  ölçüldüğünde aradaki fark iki haftaydı:
+
+      sunucu 2026-09-19 · web 2026-09-19 · MOBİL 2026-09-05
+
+  Register.cs EŞİTLİK arıyor (`request.TermsVersion != LegalDocuments.CurrentVersion`
+  → ValidationFailed). Yani bu fark kapatılmadan yayınlanacak bir paketten HİÇ KİMSE
+  KAYIT OLAMAZDI. Web tarafındaki artış "mobil mağazada henüz uygulama yokken" yapıldığı
+  için o gün kimseyi kilitlemedi — ilk mağaza yayını bu borcu ödenmiş bulmalı.
+
+  ⚠️ SAYIYI TEK BAŞINA ARTIRMAK YANLIŞ OLURDU. Bu sabit bir veri değil, "kullanıcıya
+  HANGİ METNİ gösterdim" beyanı. Metni taşımadan sayıyı yükseltmek, gösterilmemiş bir
+  metnin kabul edildiğini sunucuya bildirmek olurdu. Bu yüzden artışla AYNI turda
+  taşındı: Gizlilik §1 ve Koşullar §1'e veri sorumlusu kimliği, MetinSayfasi'na künye
+  bloğu, Hakkımızda'ya imza satırı (bkz. src/lib/kunye.js).
+
+  Artışın web'deki gerekçesi İKİ değişikliği birleştiriyor:
+    1. Veri sorumlusu kimliği — metinler "biz" diyordu, kim olduğunu söylemiyordu.
+    2. Arkadaş sayısı + ortak arkadaşlar — Gizlilik §6'ya 2026-09-10'da eklenen ama
+       sürümü artırılamayan ifşa.
+  İkisi tek artışta birleştirildi çünkü ayrı ayrı artırmak mobilde İKİ AYRI MAĞAZA
+  YAYINI demekti ve her yayın mağaza incelemesi kadar gün yiyor.
+*/
+
 /** Sunucudaki LegalDocuments.CurrentVersion ile BİREBİR aynı olmalı. */
-export const SOZLESME_SURUMU = '2026-09-05'
+export const SOZLESME_SURUMU = '2026-09-19'
 
 /** Kullanıcıya gösterilen biçim. Sürümle aynı günü anlatır. */
-export const SOZLESME_TARIHI = '5 Eylül 2026'
+export const SOZLESME_TARIHI = '19 Eylül 2026'
 
-/** İletişim adresi — hem yasal metinlerin altbilgisinde hem KVKK talep satırında. */
-export const ILETISIM_EPOSTA = 'iletisim@dersmate.com'
+/*
+  ⚠️ ILETISIM_EPOSTA BURADAN KALDIRILDI (2026-09-21) → src/lib/kunye.js.
+  Web'de de aynı taşıma yapıldı. Sebep: adres artık bir altbilgi satırı değil, KVKK
+  m.11 başvuru adresi ve künyenin parçası; sözleşme sürümüyle aynı dosyada durması
+  birbirinden bağımsız iki şeyi ("hangi metni gösterdim" / "bana nereden ulaşılır")
+  aynı yere bağlıyordu. İçe aktarımı kunye.js'ten yap.
+*/

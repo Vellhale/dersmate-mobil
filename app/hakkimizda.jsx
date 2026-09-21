@@ -1,9 +1,10 @@
-import { Text, View } from 'react-native'
+import { Linking, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
+import { ISLETMECI, ISLETMECI_ADRESI, ISLETMECI_ALAN_ADI, MARKA } from '../src/lib/kunye'
 import { brand } from '../src/lib/theme'
 import { useAuth } from '../src/state/AuthContext'
 import { ArtanIkonu, KepIkonu, KisilerIkonu, KitapIkonu } from '../src/components/Ikonlar'
-import { MetinSayfasi } from '../src/components/MetinSayfasi'
+import { MetinBaglantisi, MetinSayfasi } from '../src/components/MetinSayfasi'
 import { Button, Card } from '../src/components/ui'
 
 /*
@@ -122,6 +123,9 @@ export default function Hakkimizda() {
         'İyi bildiğin konuyu anlatır, eksik olduğun konuda başka bir öğrenciden ders alırsın.'
       }
       taslak={false}
+      /* Yasal künye burada DEĞİL — gerekçe MetinSayfasi'ndaki `kunye` notunda.
+         Karşılığı sayfanın en altındaki tek cümlelik imza. */
+      kunye={false}
     >
       {DEGERLER.map(({ Ikon, baslik, metin }) => (
         <Card key={baslik}>
@@ -193,6 +197,28 @@ export default function Hakkimizda() {
       <Text className="text-center text-sm italic text-slate-600">
         Bir konuyu anlatabiliyorsan, onu gerçekten öğrenmişsindir.
       </Text>
+
+      {/*
+        İMZA (2026-09-21, web'le aynı). Kapanış cümlesinden SONRA ve küçük: burası
+        sayfanın tezi değil, imzası — imza sayfanın altına küçük atılır.
+
+        ⚠️ Bu yasal künye DEĞİL, tanıtım cümlesi. Tescil bilgileri (unvan, adres, MERSIS)
+        buraya EKLENMEZ; yerleri yasal metinlerin altındaki künye bloğu. İkisini
+        karıştırmak, yasal bilgiyi kimsenin aramadığı bir sayfaya gömmek olurdu.
+
+        Bağlantı satır dışında: 44px kuralı (bkz. MetinBaglantisi). Cümle işletmeciyi
+        adıyla söylediği için bağlantı hiç açılmasa da imza eksik kalmıyor.
+      */}
+      <View className="mt-8 items-center border-t border-slate-200 pt-6">
+        <Text className="text-center text-sm leading-relaxed text-slate-600">
+          {MARKA}’i <Text className="font-semibold text-slate-800">{ISLETMECI}</Text>{' '}
+          geliştiriyor ve işletiyor.
+        </Text>
+        <MetinBaglantisi
+          etiket={ISLETMECI_ALAN_ADI}
+          onPress={() => Linking.openURL(ISLETMECI_ADRESI)}
+        />
+      </View>
     </MetinSayfasi>
   )
 }
