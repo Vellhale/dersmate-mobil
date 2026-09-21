@@ -5,6 +5,7 @@ import {
   loadSession,
   onAuthExpired,
   onOturumYenilendi,
+  oturumuSonlandir,
   saveSession,
 } from '../lib/api'
 import { getHwidHash } from '../lib/hwid'
@@ -62,9 +63,26 @@ export function AuthProvider({ children }) {
     return result
   }, [])
 
+  /*
+    ÇIKIŞ: önce YEREL, sonra sunucu — ve sunucu BEKLENMEZ.
+
+    Sıra bilinçli. Yerel silme senkron ve kesin; kullanıcı düğmeye bastığı anda giriş
+    ekranına düşer. Sunucu iptali beklenseydi, ağ yokken ya da sunucu yavaşken çıkış
+    takılır ya da başarısız görünürdü — hâlbuki oturum cihazdan gitmiş olurdu.
+
+    Token silinmeden ÖNCE okunuyor: saveSession(null) sonrası okumaya çalışsaydık iptal
+    edilecek değer elimizde olmazdı ve çağrı sessizce boşa giderdi (api.js token yoksa
+    hiç ağa çıkmıyor) — hatanın kendisi de görünmezdi.
+
+    `onAuthExpired` yolunda BU ÇAĞRI YAPILMIYOR ve yapılmamalı: orada oturumu sunucu
+    zaten reddetti, yenileme token'ı ölü. İptal isteği en iyi ihtimalle no-op, en
+    kötüsünde başarısız bir istekten sonra yine aynı yere varırdı.
+  */
   const logout = useCallback(() => {
+    const refreshToken = loadSession()?.refreshToken
     saveSession(null)
     setSession(null)
+    oturumuSonlandir(refreshToken)
   }, [])
 
   const value = useMemo(
