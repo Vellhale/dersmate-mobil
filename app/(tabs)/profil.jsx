@@ -9,6 +9,7 @@ import { api } from '../../src/lib/api'
 import { useAsync } from '../../src/state/useAsync'
 import { useAuth } from '../../src/state/AuthContext'
 import { EkranBasligi } from '../../src/components/EkranBasligi'
+import { KunyeSatiri } from '../../src/components/Kunye'
 import { ProfilGorunumu } from '../../src/components/ProfilGorunumu'
 import { Button, ErrorBox, Field, Girdi, Loading, Modal, Notice } from '../../src/components/ui'
 import { RehberiTekrarIzle } from '../../src/components/UrunTuru'
@@ -179,6 +180,19 @@ export default function Profil() {
             <VeriTercihleriBaglantisi />
             <RehberiTekrarIzle />
           </View>
+
+          {/*
+            KÜNYE (2026-09-21). Web'de Layout altbilgisinde; burası onun karşılığı.
+
+            Şeridin İÇİNE konmadı, altına ayrı satır: künye bir gezinme bağlantısı değil,
+            kimlik beyanı. "Gizlilik" ve "Hesap silme"nin arasında eşit ağırlıkta bir
+            bağlantı gibi dururdu ve dar ekranda şerit sarıldığında ikisinin ortasında
+            kalırdı.
+
+            Yasal metinlerin altındaki KunyeBlogu'nun özeti sayılır: oraya girmeden de
+            ürünü kimin işlettiği görünsün diye.
+          */}
+          <KunyeSatiri className="mt-3" ortala />
 
           {/*
             HESABI SİL — Google Play, hesap açtıran uygulamalarda silmeyi UYGULAMA İÇİNDE

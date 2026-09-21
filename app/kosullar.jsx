@@ -8,6 +8,7 @@ import {
   MetinSayfasi,
   Paragraf,
 } from '../src/components/MetinSayfasi'
+import { ISLETMECI, ISLETMECI_ALAN_ADI, MARKA } from '../src/lib/kunye'
 import { SOZLESME_TARIHI } from '../src/lib/yasalMetinler'
 
 /*
@@ -50,10 +51,21 @@ export default function Kosullar() {
     >
       <Bolum no="1" baslik="dersmate nedir">
         <Paragraf>
-          dersmate, öğrencilerin birbirine ders anlattığı bir akran öğrenme platformudur.
+          {MARKA}, öğrencilerin birbirine ders anlattığı bir akran öğrenme platformudur.
           Burada öğretmen değil akran vardır: anlatan da öğrenen de öğrencidir. Platform,
           dersin içeriğinden veya kalitesinden sorumlu değildir; yalnızca insanları
           buluşturur ve kayıt tutar.
+        </Paragraf>
+        {/*
+          2026-09-21'de eklendi (web'le aynı). Kullanım koşulları İKİ TARAF arasındaki
+          sözleşmedir ve taraflardan biri buraya kadar isimsizdi: §7'deki sorumluluk
+          sınırı ve §6'daki yaptırım yetkisi, kimin adına kullanıldığı belli olmayan
+          haklardı.
+        */}
+        <Paragraf>
+          {MARKA}, <Kalin>{ISLETMECI}</Kalin> ({ISLETMECI_ALAN_ADI}) tarafından
+          işletilmektedir. Bu metindeki “biz” ve “{MARKA}” ifadeleri {ISLETMECI}’i anlatır.
+          Künye ve iletişim bilgileri sayfanın altındadır.
         </Paragraf>
       </Bolum>
 
