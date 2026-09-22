@@ -246,6 +246,88 @@ kullanıcıya istem çıkar. Reddedilirse belirti Android'deki sessiz hatanın a
 (istek cihazdan çıkmaz, sunucu günlüğü boş). `NSLocalNetworkUsageDescription` bu yüzden
 veriliyor — metinsiz istem iOS'ta hiç gösterilmez.
 
+### Privacy manifest (`PrivacyInfo.xcprivacy`)
+
+1 Mayıs 2024'ten beri zorunlu: uygulamanın "required reason API"lere neden dokunduğu
+önceden beyan edilir. `app.json` → `ios.privacyManifests` (2026-09-22'de eklendi).
+
+⛔ **Pod'ların kendi manifestosu YETMEZ.** node_modules'te 6 paket kendi
+`PrivacyInfo.xcprivacy`'sini taşıyor ama Expo/RN pod'ları STATİK kütüphane olarak
+uygulamanın ana ikilisine linkleniyor; Apple taraması sembolleri o ikilide bulup
+kullanımı UYGULAMAYA atfediyor. Expo da açıkça yazıyor: *"Apple does not correctly parse
+all the PrivacyInfo files included by static CocoaPods dependencies."*
+
+Beyan edilenler — dördü de ölçülerek seçildi:
+
+| Kategori | Kod | Nereden |
+|---|---|---|
+| FileTimestamp | `C617.1` | AsyncStorage, expo-application, expo-file-system, RN çekirdeği |
+| UserDefaults | `CA92.1` | expo-constants (kurulum kimliği), RN çekirdeği |
+| SystemBootTime | `35F9.1` | expo-device, RN `ReactCommon/react/timing` |
+| DiskSpace | `E174.1` | expo-file-system (derlemeye giriyor, çağrılmasa da) |
+
+⛔ **Bilerek DIŞARIDA bırakılanlar** — yanlış beyan, eksik beyandan daha kötü:
+
+- `0A2A.1` ve `C56D.1` — Apple metni birebir: *"This reason may only be declared by
+  third-party SDKs."* Uygulama hedefine yazmak, kendini üçüncü taraf SDK ilan etmektir.
+- `85F4.1` — "disk alanını KULLANICIYA GÖSTERMEK" için. Böyle bir ekran yok.
+- `3B52.1` — belge seçiciyle kalıcı erişim verilen dosya için. expo-image-picker metadata'yı
+  kullanıcının dosyasından değil, uygulamanın kendi `Caches` kopyasından okuyor → `C617.1`.
+- `1C8F.1` (App Group yok), `AC6B.1` (MDM yok), `B728.1` (sağlık araştırması değil).
+- `ActiveKeyboards` kategorisi — dokunan hiçbir şey yok.
+
+⚠️ **Pod birleştirmesi bu listeyi EZMEZ ama GENİŞLETİR.** RN'in `post_install` betiği
+(`privacy_manifest_utils.rb`) kurulu her pod'un beyanını uygulama manifestine EKLİYOR.
+Yani `0A2A.1`/`85F4.1` pakette yine görünecek — o pod'ların kendi beyanı olarak, bizim
+değil. Kapatmak mümkün (`expo-build-properties` → `ios.privacyManifestAggregationEnabled:
+false`) ama KAPATILMADI: o zaman yeni bir pod'un beyanı kendiliğinden gelmez ve eksik
+beyan riski bize döner. Fazla beyan pod'un sorumluluğu, eksik beyan bizim.
+
+`NSPrivacyCollectedDataTypes` yedi tür sayıyor (ad, e-posta, kullanıcı kimliği, cihaz
+kimliği, fotoğraf, mesaj, diğer kullanıcı içeriği). Hepsi `Linked: true`, `Tracking: false`.
+**Cihaz kimliği (`hwid.js`) beyan EDİLİYOR** — özetlenmiş olması muafiyet değil; ama
+Apple'ın *tracking* tanımına (üçüncü taraf verisiyle eşleştirme / veri simsarı) girmiyor,
+o yüzden ATT yine gerekmiyor.
+
+⚠️ **BAYATLAMA NÖBETİ.** API kategorileri kendiliğinden tazeleniyor (birleştirme açık).
+Bayatlayan kısım veri türleri: ölçüm/crash/reklam SDK'sı eklendiği gün
+`NSPrivacyCollectedDataTypes` ve `NSPrivacyTracking` ELLE güncellenmeli. `NSPrivacyTracking`
+yanlış `false` kalırsa sistem o alan adlarına giden istekleri izin alınmadan sessizce
+düşürür — derleme hatası değil, çalışma anında boş sunucu günlüğü.
+
+⚠️ **App Store Connect formu manifestin kopyası DEĞİL, süperkümesi.** Manifest yalnızca
+bizim topladığımızı anlatır; form üçüncü taraf SDK'ların topladığını da ister. Bugün SDK
+yok, ikisi aynı yedi türde buluşuyor — ama "formu manifestten kopyala" bir yöntem olarak
+yerleşirse ilk SDK eklendiği gün sessizce eksik beyan verilir.
+
+⚠️ **`.easignore` tuzağı.** CNG güvencesinin tamamı `.gitignore`'daki `/ios`, `/android`
+satırlarına bağlı. `.easignore` eklenirse `.gitignore` TAMAMEN devre dışı kalır; kökte
+fiziksel olarak duran `android/` klasörü yüklenir, EAS prebuild'i ATLAR ve eski manifest
+sessizce gönderilir. `.easignore` eklenecekse `/ios` ve `/android` oraya da yazılmalı.
+
+### ⚠️ Ders kanıtı yükleme iOS'ta ÇALIŞMIYORDU — HEIC (2026-09-22'de düzeltildi)
+
+`CompleteSession.cs` yalnızca `image/png`, `image/jpeg`, `image/webp` kabul ediyor.
+iPhone'un varsayılan kamera biçimi **HEIC** ve `expo-image-picker` onu DÖNÜŞTÜRMÜYOR:
+`quality < 1` olsa bile `ImageUtils.swift` HEIC/TIFF/AVIF dallarında ham baytı olduğu
+gibi döndürüyor, yalnızca JPEG dalı yeniden kodluyor. Yani galeriden seçilen her kamera
+fotoğrafı `image/heic` olarak gidip **"Yalnızca PNG/JPEG/WebP kabul edilir."** ile
+reddedilirdi — ders tamamlama iOS'ta hiç çalışmazdı.
+
+Android'de seçici JPEG verdiği için bu hata **hiç görünmedi**. İlk App Review'da
+incelemecinin ders tamamlamayı denemesiyle Guideline 2.1 reddi olarak çıkardı.
+
+Düzeltme: `app/dersler.jsx` → `fotoSec` artık avatar yolundaki deseni kullanıyor
+(`profil.jsx` → `fotografDegistir`): `ImageManipulator` yeniden kodluyor, çıktı her
+zaman JPEG. Yan kazanç: EXIF/GPS cihazdan hiç çıkmıyor (sunucu zaten temizliyordu, ama
+artık ağa da binmiyor) ve privacy manifest'e konum türü eklemek gerekmiyor.
+
+⚠️ Ölçek KOŞULLU (`a.width > 1920`): `resize({ width })` oranı korur ama küçük görseli
+BÜYÜTÜR de — ekran görüntüsü zaten dardaysa büyütmek dosyayı şişirir, ayrıntı katmaz.
+
+⛔ Dönüştürme başarısızsa ham dosyaya DÜŞÜLMÜYOR: iOS'ta o dosya büyük olasılıkla
+HEIC'tir ve sunucu reddeder — kullanıcı sebebini anlamadığı bir hata alırdı.
+
 ### Dağıtım: ad-hoc mu TestFlight mi
 
 iOS'ta `distribution: "internal"` Android'deki gibi serbest değil. Üretilen `.ipa`
@@ -272,7 +354,8 @@ Bunlar kontrol edildi (2026-09-21), yeniden araştırma gerekmiyor:
 | ATT (izleme izni) | ✅ **gerekmiyor** — ölçüm taşıyıcısı kurulu değil (`analytics.js`) |
 | Kullanılmayan izin metinleri | ✅ yok — `expo-image-picker` kamera/mikrofon `false`, yalnızca foto izni üretiliyor |
 | İkon alfa kanalı (App Store reddeder) | ✅ `assets/icon.png` 1024×1024, alfasız (colorType=2) |
-| Gizlilik "nutrition label" formu | ⬜ App Store Connect'te elle doldurulacak |
+| Privacy manifest (`PrivacyInfo.xcprivacy`) | ✅ `app.json` → `ios.privacyManifests` (2026-09-22) |
+| Gizlilik "nutrition label" formu | ⬜ App Store Connect'te elle doldurulacak — manifestteki 7 türle tutarlı olmalı |
 | Ekran görüntüleri (6.7" ve 6.5") | ⬜ üretilecek — Android'inkiler kullanılamaz |
 
 `ios.infoPlist.ITSAppUsesNonExemptEncryption = false` app.json'a eklendi: uygulama

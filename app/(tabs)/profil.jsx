@@ -302,7 +302,7 @@ function HesabiSilModali({ open, onClose, onDeleted }) {
         <View className="gap-1.5">
           <Text className="text-sm font-semibold text-slate-900">Silinecekler</Text>
           {[
-            'Adın, e-postan, telefonun ve profil fotoğrafın',
+            'Adın, e-postan ve profil fotoğrafın',
             'Biyografin, üniversite ve bölüm bilgin',
             'Açtığın ders ilanları',
             'Veri tercihlerin ve cihaz kaydın',
