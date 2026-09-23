@@ -1,9 +1,17 @@
-import { Linking, Pressable, ScrollView, Text, View } from 'react-native'
+import { Pressable, ScrollView, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { ILETISIM_EPOSTA } from '../lib/yasalMetinler'
+import { KunyeBlogu } from './Kunye'
 import { Logo } from './Logo'
+import { MetinBaglantisi } from './MetinBaglantisi'
 import { GeriDugmesi, Notice } from './ui'
+
+/*
+  MetinBaglantisi ARTIK BU DOSYADA TANIMLI DEĞİL (2026-09-21) — kendi modülüne taşındı,
+  gerekçesi orada (Kunye ile aralarındaki döngüsel içe aktarım). Yeniden dışa aktarılıyor
+  ki sayfaların `from '.../MetinSayfasi'` satırlarına dokunmak gerekmesin.
+*/
+export { MetinBaglantisi }
 
 /*
   UZUN METİN SAYFALARININ ORTAK KABUĞU — web'deki pages/MetinSayfasi.jsx'in portu.
@@ -28,7 +36,14 @@ import { GeriDugmesi, Notice } from './ui'
   • Cümle içi bağlantılar satır dışına alındı (MetinBaglantisi): 15px'lik bir metnin
     içindeki bağlantı 44px dokunma hedefi taşıyamaz. Bkz. bileşenin kendi yorumu.
 */
-export function MetinSayfasi({ baslik, ozet, sonGuncelleme, taslak = true, children }) {
+export function MetinSayfasi({
+  baslik,
+  ozet,
+  sonGuncelleme,
+  taslak = true,
+  kunye = true,
+  children,
+}) {
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
       <MetinUstSeridi />
@@ -70,13 +85,35 @@ export function MetinSayfasi({ baslik, ozet, sonGuncelleme, taslak = true, child
 
           <View className="mt-8 gap-8">{children}</View>
 
-          <View className="mt-12 border-t border-slate-200 pt-4">
-            <Text className="text-sm text-slate-600">Sorular ve talepler için:</Text>
-            <MetinBaglantisi
-              etiket={ILETISIM_EPOSTA}
-              onPress={() => Linking.openURL(`mailto:${ILETISIM_EPOSTA}`)}
-            />
-          </View>
+          {/*
+            KÜNYE BLOĞU (2026-09-21). Eskiden burada yalnızca "Sorular ve talepler için:"
+            + e-posta vardı. E-posta kaybolmadı — künyenin içinde ve artık ne olduğunu
+            söyleyerek basılıyor: KVKK m.11 başvuru adresi, yalnızca bir destek kutusu
+            değil.
+
+            KABUĞUN İÇİNDE, SAYFALARIN İÇİNDE DEĞİL: MetinSayfasi'nı kullanan her yasal
+            metin künyeyi kendiliğinden alır. Sayfalara tek tek eklenseydi, sonradan
+            yazılan bir metinde unutulur ve o metin veri sorumlusunu söylemeyen bir
+            aydınlatma metni olurdu.
+
+            ⚠️ kunye={false} YALNIZCA HAKKIMIZDA İÇİN. Web'de o sayfa bu kabuğu hiç
+            kullanmıyor (kendi düzeni var) ve künye yerine tek cümlelik bir İMZA taşıyor;
+            oradaki yorum sınırı açıkça çiziyor: "Yasal künye burada DEĞİL — bu bir
+            tanıtım cümlesi, tanıtıcı bilgi yükümlülüğünün karşılığı değil." Mobilde
+            Hakkımızda kabuğu paylaştığı için ayrım bir bayrakla yapılıyor. Tescil
+            bilgilerini kimsenin yasal metin diye okumadığı bir sayfaya gömmek, onları
+            aranacak yerden kaçırmak olurdu.
+
+            `taslak` ile BİRLEŞTİRİLMEDİ: ikisi bugün aynı sayfada kapanıyor ama aynı
+            şeyi söylemiyorlar — biri "bu metin hukukçu görmedi", diğeri "bu bir yasal
+            metin". Tek bayrağa bağlamak, metinler hukukçudan geçip taslak uyarısı
+            kalktığında künyeyi de sessizce düşürürdü.
+          */}
+          {kunye && (
+            <View className="mt-12 border-t border-slate-200 pt-6">
+              <KunyeBlogu />
+            </View>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -140,30 +177,3 @@ export function Madde({ children }) {
   )
 }
 
-/**
- * Metin içinden çıkarılmış bağlantı.
- *
- * WEB'DE CÜMLE İÇİNDEYDİ ("… talebini iletisim@dersmate.com adresine ilettiğinde…").
- * Mobilde cümle içi bağlantı iki kuralı birden çiğniyor: 15px'lik bir kelime 44px
- * dokunma hedefi taşıyamaz ve hitSlop komşu satırlarla çakışır. Bağlantı satır dışına
- * alındı — cümle bağlantının ne yaptığını anlatmaya devam ediyor, dokunulacak şey ise
- * tam boy bir satır.
- */
-export function MetinBaglantisi({ etiket, onPress }) {
-  return (
-    <Pressable
-      accessibilityRole="link"
-      onPress={onPress}
-      /* self-start: RN'de esnek çocuk varsayılan olarak satırı doldurur; bağlantı tüm
-         satır genişliğinde bir hedefe dönüşünce, etiketin sağındaki boşluğa dokunmak
-         da e-posta açardı. Yükseklik 44'te kalır, genişlik etiketi sarar. */
-      className="min-h-[44px] flex-row items-center gap-1.5 self-start active:opacity-60"
-    >
-      <Text className="text-[15px] font-medium text-brand-700 underline">{etiket}</Text>
-      {/* Ok dekoratif: etiketin kendisi zaten hedefi söylüyor. */}
-      <Text importantForAccessibility="no" accessibilityElementsHidden className="text-brand-700">
-        →
-      </Text>
-    </Pressable>
-  )
-}

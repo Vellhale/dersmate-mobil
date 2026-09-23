@@ -3,6 +3,7 @@ import { FlatList, Image, Platform, Pressable, Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import { api } from '../src/lib/api'
 import { useYetkiliGorsel } from '../src/components/YetkiliGorsel'
@@ -1068,11 +1069,38 @@ function OzetSatiri({ ad, deger, soluk = false }) {
 function CompleteModal({ session, onClose, onDone }) {
   const [code, setCode] = useState('')
   const [foto, setFoto] = useState(null) // { uri, name, type }
+  const [fotoHazirlaniyor, setFotoHazirlaniyor] = useState(false)
   const [error, setError] = useState(null)
 
   const [gonderiliyor, setGonderiliyor] = useState(false)
   const gonderimKilidi = useRef(false)
 
+  /*
+    SEÇİLEN GÖRSEL DOĞRUDAN GÖNDERİLEMEZ — iki ayrı sebep, ikisi de yalnızca iOS'ta
+    ortaya çıkıyor. Android'de seçici JPEG verdiği için ikisi de bugüne kadar hiç
+    görünmedi.
+
+    1. HEIC SUNUCUDA REDDEDİLİR. CompleteSession.cs yalnızca png/jpeg/webp kabul ediyor
+       ("Yalnızca PNG/JPEG/WebP kabul edilir."). iPhone'un varsayılan kamera biçimi
+       HEIC ve expo-image-picker onu DÖNÜŞTÜRMÜYOR: quality < 1 olsa bile ImageUtils
+       .swift HEIC/TIFF/AVIF dallarında ham baytı olduğu gibi döndürüyor, yalnızca JPEG
+       dalı yeniden kodluyor. Yani galeriden seçilen her kamera fotoğrafı image/heic
+       olarak gidip reddedilirdi — ders tamamlama iOS'ta hiç çalışmazdı.
+
+    2. EXIF CİHAZDAN ÇIKAR. Aynı ham-bayt yolu GPS EXIF'ini de koruyor. Sunucu bunu
+       depolamadan önce temizliyor (CompleteSession.cs → _temizleyici.TryTemizle), yani
+       kalıcı sızıntı yok; ama konumun ağa hiç çıkmaması daha iyi. Beyan yükünü de
+       kaldırıyor: aksi hâlde app.json'daki privacy manifest'e sekizinci tür olarak
+       NSPrivacyCollectedDataTypePreciseLocation eklemek gerekirdi.
+
+    Çözüm avatar yolundaki desenin aynısı (profil.jsx → fotografDegistir): manipulator
+    yeniden kodluyor, çıktı HER ZAMAN JPEG ve metadata düşüyor.
+
+    ⚠️ GENİŞLİK KOŞULLU. resize({ width }) tek değer verildiğinde oranı koruyor ama
+    küçük görseli BÜYÜTÜR de — ekran görüntüsü zaten 1920'nin altındaysa büyütmek
+    dosyayı şişirir, ayrıntı katmaz. Bu yüzden yalnızca daha genişse ölçekleniyor.
+    Yükseklik verilmiyor: kare zorlamak kanıtı kırpardı.
+  */
   async function fotoSec() {
     setError(null)
     const secim = await ImagePicker.launchImageLibraryAsync({
@@ -1080,8 +1108,22 @@ function CompleteModal({ session, onClose, onDone }) {
       quality: 0.9,
     })
     if (secim.canceled) return
+
     const a = secim.assets[0]
-    setFoto({ uri: a.uri, name: a.fileName ?? 'kanit.jpg', type: a.mimeType ?? 'image/jpeg' })
+    setFotoHazirlaniyor(true)
+    try {
+      const islem = ImageManipulator.manipulate(a.uri)
+      if (a.width > 1920) islem.resize({ width: 1920 })
+      const islenmis = await islem.renderAsync()
+      const jpeg = await islenmis.saveAsync({ compress: 0.8, format: SaveFormat.JPEG })
+      setFoto({ uri: jpeg.uri, name: 'kanit.jpg', type: 'image/jpeg' })
+    } catch {
+      /* Dönüştürme başarısızsa HAM DOSYAYA DÜŞÜLMÜYOR: iOS'ta o dosya büyük
+         olasılıkla HEIC'tir ve sunucu reddeder — kullanıcı anlamsız bir hata alırdı. */
+      setError(new Error('Görsel hazırlanamadı. Başka bir görsel seçmeyi dene.'))
+    } finally {
+      setFotoHazirlaniyor(false)
+    }
   }
 
   async function submit() {
@@ -1141,7 +1183,7 @@ function CompleteModal({ session, onClose, onDone }) {
           />
         </Field>
 
-        <Field label="Kanıt ekran görüntüsü" hint="PNG, JPEG veya WebP · en fazla 10 MB.">
+        <Field label="Kanıt ekran görüntüsü" hint="Seçtiğin görsel JPEG’e çevrilip yüklenir.">
           {foto ? (
             <View className="gap-2">
               <Image
@@ -1150,12 +1192,12 @@ function CompleteModal({ session, onClose, onDone }) {
                 className="h-48 w-full rounded-lg border border-slate-200 bg-slate-100"
                 resizeMode="contain"
               />
-              <Button variant="secondary" onPress={fotoSec}>
+              <Button variant="secondary" loading={fotoHazirlaniyor} onPress={fotoSec}>
                 Başka görsel seç
               </Button>
             </View>
           ) : (
-            <Button variant="secondary" onPress={fotoSec}>
+            <Button variant="secondary" loading={fotoHazirlaniyor} onPress={fotoSec}>
               Galeriden görsel seç
             </Button>
           )}

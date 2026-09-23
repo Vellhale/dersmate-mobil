@@ -181,6 +181,30 @@ export function onOturumYenilendi(dinleyici) {
 
 /* ---------- Axios istemcisi ---------- */
 
+/*
+  TLS SERTİFİKA SABİTLEME (certificate pinning) — DEĞERLENDİRİLDİ, BİLEREK ERTELENDİ.
+
+  ⚠️ "Eksik" sanıp körü körüne EKLEME — bu blok neden EKLENMEDİĞİNİ anlatır. Uygulama
+  sunucuya standart sistem güven zinciriyle (Android CA deposu) HTTPS üzerinden bağlanır;
+  ayrıca bir sertifika/anahtar sabitlemesi (pinning) YOKTUR.
+
+  NEDEN ERTELENDİ: Üretim API'si (api.dersmate.com) Let's Encrypt/certbot kullanıyor
+  (web deposu docs/SUNUCUYA-KURULUM.md) ve sertifika ~90 GÜNDE BİR yenileniyor. YAPRAK
+  (leaf) sertifikayı sabitlemek, her yenilemede uygulamayı KIRAR: mağazadaki sürüm
+  güncelleme almadıkça hiçbir kullanıcı bağlanamaz ve geri alınamaz. Yani yaprak-pinning
+  bir güvenlik önlemi değil, kendi kendini tetikleyen bir KESİNTİ kaynağı olur. SPKI
+  (açık anahtar) ya da ara CA sabitlemesi daha stabildir AMA yine operasyonel risk taşır
+  ve yayın disiplini ister; yanlış kurulursa aynı kesintiyi verir.
+
+  DOĞRU YOL (uygulanacaksa — bu düşük-bulgu temasının KAPSAMI DIŞINDA):
+    1. Yaprağı DEĞİL, iki SPKI pin'i sabitle: canlı anahtarınki + hazır bekleyen bir
+       YEDEK anahtarınki (rollover). Tek pin'le anahtar döndürülemez.
+    2. Sertifika yenileme prosedürünü pin rotasyonuyla eşitle: yeni pin'i eski uygulama
+       da tanısın diye ÖNCE yayınla, SONRA sunucuda anahtarı çevir.
+    3. Pin uyumsuzluğunda "güvenli bağlanılamadı" ekranı + güncelleme yönlendirmesi.
+  Küçük/güvenli düşük-bulgu kapsamına sığmayan, YAYIN disiplini gerektiren mimari bir
+  karar. Karar: ERTELENDİ (gerekçe burada; ilgili transport yapılandırması app.config.js).
+*/
 const client = axios.create({
   baseURL: API_BASE,
   timeout: 30000,
@@ -326,6 +350,53 @@ function oturumuYenile() {
   })
 
   return yenilemeSozu
+}
+
+const CIKIS_YOLU = '/api/v1/session/logout'
+
+/**
+ * SUNUCU TARAFLI ÇIKIŞ — yenileme token'ını sunucuda iptal eder.
+ *
+ * NEDEN VAR: çıkış bu güne kadar YALNIZCA istemci taraflıydı. SecureStore'daki oturum
+ * siliniyordu ama yenileme token'ı sunucuda 60 GÜN geçerli kalıyordu; silinen değer
+ * yeniden ele geçirilirse (cihaz yedeği, disk artığı, adli kopya) o süre boyunca taze
+ * erişim token'ı üretmeye devam ederdi. Yani "çıkış yaptım" diyen kullanıcının oturumu
+ * sunucu tarafında açıktı. Uç web'de `03dc360` ile eklendi, mobil çağırmıyordu.
+ *
+ * ⛔ api.request() DEĞİL, HAM AXIOS. İstemcinin 401 → yenile → tekrar dene zinciri
+ * çıkışta ZARARLI: tam da iptal etmeye çalıştığımız token'la yeni bir oturum tazelerdi.
+ * Web de aynı sebeple ham fetch kullanıyor.
+ *
+ * ⛔ ASLA FIRLATMAZ ve BEKLENMEZ. Çıkış, ağ olmadan da kesin sonuç vermeli: yerel oturum
+ * çağıran tarafta zaten silindi. Burada bir hata yüzeye çıksaydı kullanıcı "çıkış
+ * başarısız" görüp ekranda oturumlu kalırdı — hâlbuki oturum gitti.
+ *
+ * tumCihazlar=false BİLİNÇLİ: telefondan çıkmak web oturumunu düşürmemeli. Sunucu
+ * "her yerden çık" için ayrı bir bayrak taşıyor; buranın niyeti o değil.
+ *
+ * ⚠️ İKİ BİLİNEN SINIR (ikisi de web'de de var):
+ *  1. Erişim token'ı ömrü dolana kadar (≤2 saat) yaşar. Tek cihaz iptali damgayı ileri
+ *     almıyor — kısa erişim + iptal edilebilir yenileme tasarımının kabul edilmiş sınırı.
+ *  2. Çıkış anında bir yenileme UÇUŞTAYSA, sunucu eski token'ı Rotated işaretlemiş
+ *     olabilir. Sunucu zaten iptalli satıra DOKUNMUYOR (idempotent, LogoutHandler), yani
+ *     zarar yok — ama o turda üretilen YENİ token istemcide atıldığı hâlde sunucuda
+ *     canlı kalır. Dar bir pencere ve kapatılması sunucunun işi (çıkış, kullanıcının
+ *     tüm zincirini sebep=SignedOut ile kapatmalı).
+ */
+export function oturumuSonlandir(refreshToken) {
+  // Önizlemede sunucu yok; ağa çıkma.
+  if (ONIZLEME || !refreshToken) return Promise.resolve()
+
+  return axios
+    .post(
+      `${API_BASE}${CIKIS_YOLU}`,
+      { refreshToken, tumCihazlar: false },
+      { timeout: 15000 },
+    )
+    .then(
+      () => {},
+      () => {},
+    )
 }
 
 /*

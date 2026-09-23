@@ -38,8 +38,20 @@ const IZIN_ANAHTARI = 'peerlearn.izin'
  */
 export const IZIN_SURUMU = 'mobil-2026-08-29'
 
-/** Web'in yürürlükteki sürümü (frontend/src/lib/consent.js → CONSENT_VERSION). */
-const WEB_IZIN_SURUMU = '2026-08-24'
+/**
+ * Web'in yürürlükteki sürümü (frontend/src/lib/consent.js → CONSENT_VERSION).
+ *
+ * 2026-09-21'de '2026-08-24' → '2026-09-19' çekildi. Web'deki artışta çerez KAPSAMI
+ * değişmedi, kategoriler de aynı kaldı; değişen rızanın MUHATABI oldu (metin artık
+ * dersmate'i Corventech'in işlettiğini söylüyor). Web'in gerekçesi: muhatabı adsız
+ * bırakan bir metne verilmiş onay, kime verildiği belirsiz bir onaydır ve eski onayı
+ * geçerli kılmaz.
+ *
+ * Mobilde çerez yok, o metin buraya taşınmıyor — taşınan yalnızca bu sayı. Eskimiş
+ * kalsaydı zararı düşük olurdu (kullanıcı bildirimi bir kez fazladan görürdü) ama
+ * web'de onay vermiş biri mobilde gereksiz yere yeniden sorulurdu.
+ */
+const WEB_IZIN_SURUMU = '2026-09-19'
 
 /**
  * Mobilde GEÇERLİ sayılan sürümler.

@@ -9,9 +9,10 @@ const InboxContext = createContext(null)
  * Gelen kutusu için TEK kaynak: konuşma listesi + SignalR bağlantısı.
  * Web'deki InboxContext'in birebir portu.
  *
- * NEDEN UYGULAMA DÜZEYİNDE (tab kabuğunda): sunucu, mesaj alındığında alıcıya kişisel
- * bir "ConversationUpdated" olayı gönderiyor — kullanıcı Akış'ta ya da Keşfet'teyken de
- * Mesajlar sekmesindeki rozet güncellenebilsin. Hub yalnızca sohbet ekranında kurulsaydı
+ * NEDEN UYGULAMA DÜZEYİNDE (kök kabukta): sunucu, mesaj alındığında alıcıya kişisel
+ * bir "ConversationUpdated" olayı gönderiyor — kullanıcı Topluluk'ta ya da Keşfet'teyken
+ * de hamburgerdeki ve çekmecedeki rozet güncellenebilsin. Hub yalnızca sohbet ekranında
+ * kurulsaydı
  * olayı sadece zaten gelen kutusuna bakan kullanıcı duyardı.
  *
  * TEK BAĞLANTI: sohbet ekranı da kendi hub'ını kurmaz, buradakini kullanır. İki bağlantı

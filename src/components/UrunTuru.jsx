@@ -37,8 +37,8 @@ import { IZIN_KAPANMA_SURESI } from './IzinSayfasi'
  *   querySelector + getBoundingClientRect → ölçüm defteri (src/lib/tur.js): çıpalar
  *     kendini measureInWindow ile kaydeder.
  *   scrollIntoView + scroll/resize dinleyicileri → YOK. Web'de çıpalar uzun bir sol
- *     rayda ve sayfa kaydırmasına bağlıydı; mobilde tur, sekmeleri ve başlığı sabit
- *     olan Akış ekranında açılıyor — kaydırılacak bir şey yok. Ölçü tazeleme adım
+ *     rayda ve sayfa kaydırmasına bağlıydı; mobilde tur, başlığı sabit olan Topluluk
+ *     ya da Keşfet ekranında açılıyor — kaydırılacak bir şey yok. Ölçü tazeleme adım
  *     başına bir kez (turCipalariniTazele).
  *   box-shadow "delik" → react-native-svg maskesi. Dört kenar View'ı da olurdu ama
  *     ondalıklı ölçülerde komşu View'lar arasında saç teli kadar boşluk kalıyor;
@@ -69,9 +69,12 @@ import { IZIN_KAPANMA_SURESI } from './IzinSayfasi'
   istediği yeri elinden alamaz — her ekranda başlatıp kullanıcıyı çıpaların olduğu
   sayfaya sürüklemek, turu "geç"en birinin her tıklamasında turu geri getiriyordu.
 
-  Mobilde aynı kural ekran ADIYLA uygulanıyor: tur, Akış (kök) ya da Keşfet
-  görünürken açılır; başka bir sekmedeyse SESSİZCE BEKLER. Yönlendirme yapmıyoruz —
-  kullanıcıyı sekmesinden koparmak, web'de reddedilen davranışın aynısı.
+  Mobilde aynı kural ekran ADIYLA uygulanıyor: tur, Topluluk (kök) ya da Keşfet
+  görünürken açılır; başka bir ekrandaysa SESSİZCE BEKLER. Yönlendirme yapmıyoruz —
+  kullanıcıyı bulunduğu ekrandan koparmak, web'de reddedilen davranışın aynısı.
+
+  ⚠️ ADRESLER DÜZLEŞTİRMEDEN ETKİLENMEDİ: (tabs) bir grup klasörüydü ve URL
+  üretmiyordu, yani '/' ve '/kesfet' aynen geçerli.
 */
 const ACILIS_EKRANLARI = ['/', '/kesfet']
 
@@ -90,8 +93,8 @@ export function UrunTuru() {
   // Sunucu "bu kullanıcıya gösterilebilir" dedi mi? Ekran koşulundan AYRI tutuluyor:
   // biri veriden, diğeri o anki gezinmeden geliyor.
   const gosterilebilir = useRef(false)
-  // Kendiliğinden açılma uygulama ömrü boyunca BİR KEZ: kullanıcı sekmeler arasında
-  // gezindikçe tur her Akış dönüşünde yeniden açılamaz.
+  // Kendiliğinden açılma uygulama ömrü boyunca BİR KEZ: kullanıcı ekranlar arasında
+  // gezindikçe tur her ana ekran dönüşünde yeniden açılamaz.
   const kendiliginenAcildi = useRef(false)
   // Bitiş geri alınamaz bir yazma (saveOnboarding) tetikler; state bir sonraki
   // render'a kadar eski değeri gösterdiği için kilit ref'te.
@@ -433,8 +436,9 @@ export function UrunTuru() {
  * ayarlar yüzeyine konur.
  *
  * Kendiliğinden açılırken yönlendirme YAPILMIYOR ama burada yapılıyor: niyet
- * kullanıcının kendisinden geliyor ve çıpaların yaşadığı ekran Akış. navigate (push
- * değil): sekme değiştiriyoruz, yığına ikinci bir Akış koymuyoruz.
+ * kullanıcının kendisinden geliyor ve turun açılış ekranı '/' (Topluluk). navigate
+ * (push değil) + kök yığındaki `dangerouslySingular`: yığına ikinci bir kopya
+ * konmuyor, zaten açık olan ekran en üste taşınıyor.
  */
 export function RehberiTekrarIzle({ className = '' }) {
   const router = useRouter()

@@ -355,7 +355,7 @@ function BaskaKisiIslemleri({ kisi, onNotice }) {
                   İstek gönderildi
                 </Button>
               ) : (
-                /* ADI "Arkadaş isteği gönder": Akış, YKS ve Arkadaş Ekle kartlarındaki aynı isteğin
+                /* ADI "Arkadaş isteği gönder": Keşfet'in öneri, YKS ve Arkadaş Ekle kartlarındaki aynı isteğin
                    adı bu; profilde "Arkadaş ekle" diye ayrışıyordu. Burada ONAY SAYFASI YOK (kartlarda
                    var) ve bu bilinçli: onay sayfasının tek işi kimi eklediğini göstermek, profil
                    ekranının kendisi zaten o kişinin tam kimliği.

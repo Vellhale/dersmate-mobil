@@ -16,7 +16,35 @@ kod çevirisi birebir kalsın diye).
 npx expo start                 # Metro + Expo Go QR
 npx expo start --android       # Android emülatörde aç
 npx expo export --platform android   # derleme sağlaması (cihazsız hata yakalama)
+npx expo export --platform ios       # iOS için aynı sağlama — Windows'ta ÇALIŞIR
+npx expo config --type introspect --json   # üretilecek Info.plist/manifest'i görmeden derleme
 ```
+
+⚠️ `npm run ios` (`expo run:ios`) **bu makinede çalışmaz** — Xcode yalnızca macOS'ta.
+iOS'un tek yolu bulut derlemesi; bkz. "iOS ve App Store".
+
+### ⛔ `eas.json`'A YORUM YAZILAMAZ — her EAS komutunu kırar
+
+Dosya bir süre `"//"` anahtarlarıyla belgelenmişti. eas-cli bunları **reddediyor** ve
+hata tek bir komuta özgü değil: `eas config`, `eas device:list`, `eas build` — hepsi
+düşüyor:
+
+```
+eas.json is not valid.
+- "build.//" must be of type object
+- "build.preview.//" is not allowed
+    Error: config command failed.
+```
+
+Sebep şema: `@expo/eas-json` doğrulamayı `allowUnknown: false` ile yapıyor ve
+desteklenen bir açıklama alanı **yok** (JSON5/JSONC de değil, düz JSON).
+
+⚠️ Bu 2026-09-23'e kadar FARK EDİLMEDİ çünkü depoda hiç EAS derlemesi yapılmamıştı
+(ne `owner` ne `extra.eas.projectId` vardı; Android APK'ları yerelde Gradle ile
+derlenmişti). İlk iOS derlemesini tam olarak bu engelledi.
+
+Profillerin ne işe yaradığı ve her kararın gerekçesi **`docs/eas-profilleri.md`**'de.
+Yeni profil ya da karar eklenince açıklaması oraya yazılır; `eas.json` veri olarak kalır.
 
 ### ⚠️ APK derlemesi bu yoldan ÇALIŞMAZ — 260 karakter sınırı
 
@@ -172,6 +200,261 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
 
 ---
 
+## iOS ve App Store
+
+### Ayrı depo YOK ve açılmayacak
+
+iOS ayrı bir proje değil, **aynı kod tabanının ikinci derleme hedefi**. Depo tek:
+`Vellhale/dersmate-mobil`. `/ios` ve `/android` ikisi de `.gitignore`'da (CNG) — native
+klasörleri EAS her derlemede prebuild ile üretiyor, yani iOS için depoya eklenecek
+hiçbir dosya yok. Yapılan iş tamamen `app.json` + `app.config.js` + `eas.json`.
+
+⛔ "iOS için ayrı repo açalım" bir kez gündeme geldi (2026-09-21) ve **reddedildi**.
+Ayırmak 1792 modüllük tek kaynağı ikiye bölerdi: her özellik iki kez yazılır, `api.js`
+yüzey pariteti (web ↔ mobil) üç ayaklı hâle gelir ve CLAUDE.md'deki "Web ile senkron
+tutma" disiplini ikinci bir baseline daha taşımak zorunda kalırdı. Platform farkları
+konfigürasyonda çözülüyor, depoda değil.
+
+### Bu makineden iOS: ne çalışır, ne çalışmaz
+
+| Çalışır (Windows) | Çalışmaz (Mac gerekir) |
+|---|---|
+| `npx expo export --platform ios` (JS paketi sağlaması) | `npx expo run:ios` / Xcode |
+| `npx expo config --type introspect` (Info.plist önizleme) | iOS Simulator |
+| `eas build --platform ios` (derleme BULUTTA, macOS işçide) | yerel `pod install` |
+
+Yani geliştirme akışı Android'den farksız: **development** profiliyle bulutta bir kez
+geliştirme istemcisi derlenir, iPhone'a kurulur, sonrası `npx expo start` ile canlıdır.
+
+### ⛔ Kilit: Apple Developer üyeliği
+
+Android'de EAS imza anahtarını kendisi üretebiliyor. **iOS'ta üretemez** — sertifika ve
+tedarik profili Apple'dan gelir. Üyelik ($99/yıl) olmadan `eas build --platform ios`
+**hiçbir profilde** çalışmaz. Bireysel hesap genelde aynı gün, kurumsal hesap D-U-N-S
+numarası istediği için haftalar alabilir. Sıradaki her iş buna bağlı.
+
+Üyelik açıldıktan sonra sıra: App Store Connect'te `com.dersmate.app` kaydı → `eas
+device:create` (test iPhone'unun UDID'si) → `eas build -p ios --profile development`.
+
+### ⚠️ ATS: Expo'nun varsayılanı Android'in TAM TERSİ
+
+Şifresiz trafik duvarı iOS'ta da var (App Transport Security) ama varsayılan ters yönde
+hatalı:
+
+- **Android**: Expo izni yalnızca debug manifest'ine koyar → release paketi kapalı gelir,
+  hata "çalışmıyor" diye görünür.
+- **iOS**: Expo şablonu Info.plist'e `NSAllowsArbitraryLoads: true` koyar → mağaza paketi
+  **tamamen açık** gider, hata **hiç görünmez**.
+
+Ölçüldü (2026-09-21, `expo config --type introspect`): `.env` `https://` iken bile
+üretilen Info.plist `NSAllowsArbitraryLoads: true` + localhost istisnası taşıyordu. Yani
+`app.config.js`'in Android için kurduğu "adres https olunca izin kendiliğinden kapanır"
+güvencesi iOS'ta **tutmuyordu** — koşul doğru çalışıp hiçbir şey eklemiyor, şablon zaten
+açık bırakıyordu.
+
+Bu yüzden `app.config.js` anahtarı **koşulun iki dalında da açıkça** yazıyor. İkisi de
+ölçüldü:
+
+```
+EXPO_PUBLIC_API_URL=https://...  →  { NSAllowsArbitraryLoads: false }
+EXPO_PUBLIC_API_URL=http://...   →  { NSAllowsArbitraryLoads: true, NSAllowsLocalNetworking: true }
+                                    + NSLocalNetworkUsageDescription
+```
+
+⛔ `false` dalını "gereksiz" sanıp silme — anahtarı hiç vermemek Expo'nun açık
+varsayılanına dönmektir.
+
+Geliştirmede ayrıca **iOS 14 Yerel Ağ izni** var: LAN'daki sunucuya ilk bağlantıda
+kullanıcıya istem çıkar. Reddedilirse belirti Android'deki sessiz hatanın aynısıdır
+(istek cihazdan çıkmaz, sunucu günlüğü boş). `NSLocalNetworkUsageDescription` bu yüzden
+veriliyor — metinsiz istem iOS'ta hiç gösterilmez.
+
+### Privacy manifest (`PrivacyInfo.xcprivacy`)
+
+1 Mayıs 2024'ten beri zorunlu: uygulamanın "required reason API"lere neden dokunduğu
+önceden beyan edilir. `app.json` → `ios.privacyManifests` (2026-09-22'de eklendi).
+
+⛔ **Pod'ların kendi manifestosu YETMEZ.** node_modules'te 6 paket kendi
+`PrivacyInfo.xcprivacy`'sini taşıyor ama Expo/RN pod'ları STATİK kütüphane olarak
+uygulamanın ana ikilisine linkleniyor; Apple taraması sembolleri o ikilide bulup
+kullanımı UYGULAMAYA atfediyor. Expo da açıkça yazıyor: *"Apple does not correctly parse
+all the PrivacyInfo files included by static CocoaPods dependencies."*
+
+Beyan edilenler — dördü de ölçülerek seçildi:
+
+| Kategori | Kod | Nereden |
+|---|---|---|
+| FileTimestamp | `C617.1` | AsyncStorage, expo-application, expo-file-system, RN çekirdeği |
+| UserDefaults | `CA92.1` | expo-constants (kurulum kimliği), RN çekirdeği |
+| SystemBootTime | `35F9.1` | expo-device, RN `ReactCommon/react/timing` |
+| DiskSpace | `E174.1` | expo-file-system (derlemeye giriyor, çağrılmasa da) |
+
+⛔ **Bilerek DIŞARIDA bırakılanlar** — yanlış beyan, eksik beyandan daha kötü:
+
+- `0A2A.1` ve `C56D.1` — Apple metni birebir: *"This reason may only be declared by
+  third-party SDKs."* Uygulama hedefine yazmak, kendini üçüncü taraf SDK ilan etmektir.
+- `85F4.1` — "disk alanını KULLANICIYA GÖSTERMEK" için. Böyle bir ekran yok.
+- `3B52.1` — belge seçiciyle kalıcı erişim verilen dosya için. expo-image-picker metadata'yı
+  kullanıcının dosyasından değil, uygulamanın kendi `Caches` kopyasından okuyor → `C617.1`.
+- `1C8F.1` (App Group yok), `AC6B.1` (MDM yok), `B728.1` (sağlık araştırması değil).
+- `ActiveKeyboards` kategorisi — dokunan hiçbir şey yok.
+
+✅ **ÖLÇÜLDÜ (2026-09-23, ilk iOS derlemesinin .ipa'sı açılarak):** gönderilen
+`Payload/dersmate.app/PrivacyInfo.xcprivacy` tam olarak yukarıdaki dört kategoriyi ve
+yedi türü taşıyor, `NSPrivacyTracking: false`. **Fazladan hiçbir kod eklenmemiş.**
+
+Bu, önceki beklentiyi düzeltiyor: RN'in `post_install` betiğinin
+(`privacy_manifest_utils.rb`) pod beyanlarını uygulama manifestine ekleyip `0A2A.1` /
+`85F4.1` kodlarını geri getireceği düşünülmüştü. Getirmedi — her pod kendi ayrı
+`*_privacy.bundle/PrivacyInfo.xcprivacy` dosyasında duruyor (pakette 10 tane var:
+React-timing, ExpoConstants, ExpoApplication, ExpoDevice, RNCAsyncStorage, folly, glog,
+boost…). Uygulama manifesti yalnızca bizim yazdığımız.
+
+`expo-build-properties` → `ios.privacyManifestAggregationEnabled: false` anahtarına
+GEREK KALMADI; varsayılan davranış zaten istediğimiz sonucu veriyor.
+
+⚠️ Bu ölçüm `onizleme` profilinde yapıldı. `production` farklı pod kümesi derlemiyor,
+yani sonucun değişmesi beklenmiyor — ama mağazaya ilk gönderimden önce aynı kontrol
+tekrarlanabilir: .ipa bir zip, `Payload/<ad>.app/PrivacyInfo.xcprivacy` içinden okunur.
+
+`NSPrivacyCollectedDataTypes` yedi tür sayıyor (ad, e-posta, kullanıcı kimliği, cihaz
+kimliği, fotoğraf, mesaj, diğer kullanıcı içeriği). Hepsi `Linked: true`, `Tracking: false`.
+**Cihaz kimliği (`hwid.js`) beyan EDİLİYOR** — özetlenmiş olması muafiyet değil; ama
+Apple'ın *tracking* tanımına (üçüncü taraf verisiyle eşleştirme / veri simsarı) girmiyor,
+o yüzden ATT yine gerekmiyor.
+
+⚠️ **BAYATLAMA NÖBETİ.** API kategorileri kendiliğinden tazeleniyor (birleştirme açık).
+Bayatlayan kısım veri türleri: ölçüm/crash/reklam SDK'sı eklendiği gün
+`NSPrivacyCollectedDataTypes` ve `NSPrivacyTracking` ELLE güncellenmeli. `NSPrivacyTracking`
+yanlış `false` kalırsa sistem o alan adlarına giden istekleri izin alınmadan sessizce
+düşürür — derleme hatası değil, çalışma anında boş sunucu günlüğü.
+
+⚠️ **App Store Connect formu manifestin kopyası DEĞİL, süperkümesi.** Manifest yalnızca
+bizim topladığımızı anlatır; form üçüncü taraf SDK'ların topladığını da ister. Bugün SDK
+yok, ikisi aynı yedi türde buluşuyor — ama "formu manifestten kopyala" bir yöntem olarak
+yerleşirse ilk SDK eklendiği gün sessizce eksik beyan verilir.
+
+⚠️ **`.easignore` tuzağı.** CNG güvencesinin tamamı `.gitignore`'daki `/ios`, `/android`
+satırlarına bağlı. `.easignore` eklenirse `.gitignore` TAMAMEN devre dışı kalır; kökte
+fiziksel olarak duran `android/` klasörü yüklenir, EAS prebuild'i ATLAR ve eski manifest
+sessizce gönderilir. `.easignore` eklenecekse `/ios` ve `/android` oraya da yazılmalı.
+
+### ⚠️ Ders kanıtı yükleme iOS'ta ÇALIŞMIYORDU — HEIC (2026-09-22'de düzeltildi)
+
+`CompleteSession.cs` yalnızca `image/png`, `image/jpeg`, `image/webp` kabul ediyor.
+iPhone'un varsayılan kamera biçimi **HEIC** ve `expo-image-picker` onu DÖNÜŞTÜRMÜYOR:
+`quality < 1` olsa bile `ImageUtils.swift` HEIC/TIFF/AVIF dallarında ham baytı olduğu
+gibi döndürüyor, yalnızca JPEG dalı yeniden kodluyor. Yani galeriden seçilen her kamera
+fotoğrafı `image/heic` olarak gidip **"Yalnızca PNG/JPEG/WebP kabul edilir."** ile
+reddedilirdi — ders tamamlama iOS'ta hiç çalışmazdı.
+
+Android'de seçici JPEG verdiği için bu hata **hiç görünmedi**. İlk App Review'da
+incelemecinin ders tamamlamayı denemesiyle Guideline 2.1 reddi olarak çıkardı.
+
+Düzeltme: `app/dersler.jsx` → `fotoSec` artık avatar yolundaki deseni kullanıyor
+(`profil.jsx` → `fotografDegistir`): `ImageManipulator` yeniden kodluyor, çıktı her
+zaman JPEG. Yan kazanç: EXIF/GPS cihazdan hiç çıkmıyor (sunucu zaten temizliyordu, ama
+artık ağa da binmiyor) ve privacy manifest'e konum türü eklemek gerekmiyor.
+
+⚠️ Ölçek KOŞULLU (`a.width > 1920`): `resize({ width })` oranı korur ama küçük görseli
+BÜYÜTÜR de — ekran görüntüsü zaten dardaysa büyütmek dosyayı şişirir, ayrıntı katmaz.
+
+⛔ Dönüştürme başarısızsa ham dosyaya DÜŞÜLMÜYOR: iOS'ta o dosya büyük olasılıkla
+HEIC'tir ve sunucu reddeder — kullanıcı sebebini anlamadığı bir hata alırdı.
+
+### Dağıtım: ad-hoc mu TestFlight mi
+
+⚠️ **İLK KURULUMDA GELİŞTİRİCİ MODU** (ölçüldü 2026-09-23). iOS 16'dan beri ad-hoc /
+geliştirme imzalı uygulamalar, cihazda **Geliştirici Modu** açık olmadan AÇILMIYOR.
+Uygulama kuruluyor, ikon ana ekranda beliriyor, dokununca "geliştirici modu olmadan
+açılamaz" uyarısı çıkıyor — kurulum hatası sanılıyor, değil.
+
+Yol: **Ayarlar → Gizlilik ve Güvenlik → Geliştirici Modu** → aç → cihaz yeniden başlar →
+kilidi açınca onayla. Tek seferlik; cihaz başına bir kez.
+
+Menü satırı ancak cihaza geliştirme imzalı bir uygulama kurulduktan SONRA beliriyor,
+yani kurulumdan önce aramaya çalışma. TestFlight'tan gelen paketlerde bu gerekmiyor —
+yalnızca ad-hoc dağıtımda.
+
+
+iOS'ta `distribution: "internal"` Android'deki gibi serbest değil. Üretilen `.ipa`
+ad-hoc imzalıdır ve **yalnızca UDID'si kayıtlı cihazlara** kurulur (`eas device:create`,
+yılda 100 cihaz). Kayıtsız bir iPhone'a bağlantıyı açmak yetmez.
+
+- **development / preview / onizleme** → ad-hoc. Kendi cihazlarımız için.
+- **production + `eas submit`** → TestFlight. UDID kaydı gerekmez, e-posta davetiyle
+  dağıtılır. Dışarıdaki testçiye giden yol budur.
+
+⚠️ `preview` profili yerel arka uca (`http://192.168.1.111:5099`) bağlı olduğu için
+**TestFlight'a uygun değil** — LAN adresi ne Apple'ın incelemesinde ne de başkasının
+telefonunda çalışır.
+
+### App Review — zaten karşılanan ve karşılanmayan
+
+Bunlar kontrol edildi (2026-09-21), yeniden araştırma gerekmiyor:
+
+| Kural | Durum |
+|---|---|
+| 5.1.1(v) uygulama içinde hesap silme | ✅ var (`api.deleteAccount`, "Hesabımı sil" ekranı) |
+| 5.1.1 gizlilik metnine erişim | ✅ var (`MetinSayfasi.jsx`) |
+| 4.8 Sign in with Apple | ✅ **gerekmiyor** — üçüncü taraf sosyal giriş yok, kimlik e-posta+parola |
+| ATT (izleme izni) | ✅ **gerekmiyor** — ölçüm taşıyıcısı kurulu değil (`analytics.js`) |
+| Kullanılmayan izin metinleri | ✅ yok — `expo-image-picker` kamera/mikrofon `false`, yalnızca foto izni üretiliyor |
+| İkon alfa kanalı (App Store reddeder) | ✅ `assets/icon.png` 1024×1024, alfasız (colorType=2) |
+| Privacy manifest (`PrivacyInfo.xcprivacy`) | ✅ `app.json` → `ios.privacyManifests` (2026-09-22) |
+| Gizlilik "nutrition label" formu | ⬜ App Store Connect'te elle doldurulacak — manifestteki 7 türle tutarlı olmalı |
+| Ekran görüntüleri (6.7" ve 6.5") | ⬜ üretilecek — Android'inkiler kullanılamaz |
+
+`ios.infoPlist.ITSAppUsesNonExemptEncryption = false` app.json'a eklendi: uygulama
+yalnızca standart HTTPS kullanıyor ve ihracat muafiyetine giriyor. Anahtar olmasa her
+TestFlight yüklemesinde aynı soru elle yanıtlanır ve yanıtlanana kadar paket testçilere
+**dağıtılmaz**.
+
+### ⚠️ `SOZLESME_SURUMU` artık iki mağazaya birden bağlı
+
+Sürüm sabiti üç yerde (sunucu, web, mobil) — bkz. "Web ile senkron tutma". iOS yayına
+girdikten sonra bu **dört** yer gibi davranır: sürüm artarken Play'deki eski sürüm kadar
+App Store'daki eski sürüm de kendi eski sabitini gönderir. İki mağazanın inceleme süresi
+farklı olduğu için artış, **her iki yayının da geçtiği** ana planlanmalı.
+
+#### İlk iOS yayınından önce ödenen borç (2026-09-21)
+
+Bu kural ilk kez iOS hazırlığında ısırdı ve ÖLÇÜLDÜ:
+
+```
+sunucu 2026-09-19 · web 2026-09-19 · MOBİL 2026-09-05
+```
+
+`Register.cs` eşitlik arıyor. Bu farkla çıkacak bir paketten **hiç kimse kayıt
+olamazdı** — uygulama da sunucu da çökmeden, ekranda yalnızca bir doğrulama hatasıyla.
+Web artışı "mobil mağazada henüz uygulama yokken" yapıldığı için o gün kimseyi
+kilitlemedi; borç ilk mağaza yayınına kadar açık kaldı ve orada ödendi.
+
+⚠️ Sayı tek başına yükseltilmedi, METİNLE BİRLİKTE taşındı (künye, §1'ler, imza).
+Sabit bir veri değil, "kullanıcıya hangi metni gösterdim" beyanı; metni taşımadan
+sayıyı yükseltmek sunucuya gösterilmemiş bir metnin kabul edildiğini bildirmek olurdu.
+
+**Mağazada uygulama VARKEN sıra tersine döner** (yasalMetinler.js'te de yazılı):
+önce mobil sürüm artar ve YAYINLANIR, sonra sunucu dağıtılır. Bu kez tersi yapılabildi
+çünkü mağazada henüz uygulama yoktu — bir daha o serbestlik olmayacak.
+
+### ⛔ App Store Connect gizlilik politikası ADRESİ istiyor — uygulama içi metin saymaz
+
+`app/gizlilik.jsx` mobil gerçeğe göre yazılmış durumda (canvas yerine `hwid.js`, çerez
+yerine uygulama depolaması, "analitik taşıyıcısı yok"). Ama App Store Connect zorunlu
+alan olarak **herkese açık bir URL** istiyor ve bugün verilebilecek tek adres
+`dersmate.com/gizlilik` — o da **web metnini** sunuyor: tarayıcı parmak izi, çerez
+kategorileri ve Google Analytics. Üçü de iOS uygulamasında YOK.
+
+Yani o adres verilirse, `gizlilik.jsx`'in başında yazılı kuralın tersi olur: *"web
+metnini birebir kopyalamak burada doğru metin değil, YANLIŞ BEYAN olurdu."* Apple
+formdaki beyanı, politikayı ve uygulamanın davranışını karşılaştırıyor.
+
+⬜ **Açık iş:** web deposunda mobil metni sunan ayrı bir sayfa (ör. `/gizlilik-uygulama`)
+ve App Store Connect'e o adres. Metin zaten yazılı; taşınması gerekiyor.
+
+---
+
 ## Web projesiyle ilişki — tek yönlü çeviri
 
 - **`api.*` yüzeyi web'dekiyle AYNI tutulur** (`src/lib/api.js`). Web sayfası mobile
@@ -185,6 +468,56 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
   expo-application/device sinyallerinden gelir. Web'in `canvasSignal()` sabitleri web'de
   dokunulmazdır ve buraya TAŞINMAZ — HWID cihazı tanımlar, kullanıcıyı değil; aynı
   kullanıcının telefonu "başka bir cihaz"dır ve backend için sorun değildir.
+
+## Gezinme — çekmece, sekme çubuğu YOK (2026-09-23)
+
+Uygulamada **alt sekme çubuğu yok**; gezinmenin tek yolu sol üstteki hamburgerden açılan
+çekmece (`src/components/Cekmece.jsx`). Web'in sol rayının (`Layout.jsx` → NAV) birebir
+karşılığı: Keşfet · Ders Portföyü · Arkadaşlar · Sohbet · Derslerim · Topluluk
+(+ yöneticide Yönetim). **Listeden düşen hedef uygulamada ULAŞILAMAZ olur.**
+
+Ana ekran (`/`) **Topluluk** — burada web'den bilinçli olarak ayrılıyoruz (web `/kesfet`
+açıyor). Ürün kararı.
+
+### Düzleştirme: `(tabs)` grubu YOK
+
+Beş kabuk ekranı kök yığında: `app/index.jsx` (Topluluk), `kesfet`, `olustur`,
+`mesajlar`, `profil/index`. Grup klasörü URL üretmediği için **adresler değişmedi**.
+
+⛔ **`dangerouslySingular` ŞART** (`app/_layout.jsx`). expo-router'ın StackRouter'ı
+`navigate`de mevcut rotayı yalnızca hedef O ANKİ rotayla aynıysa yeniden kullanıyor;
+çekmeceden gezinme aksi hâlde her seferinde yeni ekran İTER (Topluluk→Keşfet→Mesajlar→
+Topluluk = dört ekran). Bayrak, StackRouter'ı "mevcut rotayı bul ve EN ÜSTE TAŞI"ya
+çeviriyor: yığın sınırlı kalıyor ve ekran SÖKÜLMÜYOR, yani Keşfet'in biriken sayfaları
+yaşıyor. Yeni bir kabuk/çekmece hedefi eklenirse ona da verilmeli.
+
+⚠️ Kökte **`anchor` YOK** ve bu ölçülmüş: kök layout'un rota adı boş olduğu için
+expo-router varsayılan anchor kurmuyor, React Navigation `routeNames[0]`e düşüyor ve
+guard'lar doğru ekranı bırakıyor. `anchor: 'index'` eklemek her derin bağlantının altına
+1900 satırlık Topluluk'u iterdi.
+
+`app/+not-found.jsx` web'in `path="*"` davranışını veriyor (bilinmeyen adres → Keşfet;
+oturumsuzsa → giriş). Sabit hedef veremez: korunan ekranlar guard kapalıyken rota
+ağacında hiç yok, koşulsuz `/kesfet` sonsuz döngü olurdu.
+
+### Tur çıpaları
+
+`rutbe`, `kesfet`, `portfoy`, `sohbet` çıpalarının TEK kaydı sekme düğmeleriydi; çubuk
+gidince dördü de düştü ve o adımlar **çıpasız** bırakıldı — `tur.js` bunu zaten KURAL
+sayıyor (çıpasız adım ortada kart). `menu`ya yığmak beş adımı aynı 44px kutuya
+işaret ettirirdi. Adım metinleri "sekmesinde" demekten "sol üstteki menüde"ye çevrildi.
+
+⛔ **Çekmecenin İÇİNE çıpa konulamaz:** RNModal ayrı pencere, kapalıyken satırlar takılı
+değil ve tur örtüsü açıkken kullanıcı çekmeceyi açamıyor.
+
+⚠️ `menu` çıpası **her kabuk ekranında** kayıtlı (hamburger her birinde ayrı örnek) ve
+kök yığın alttakini monte tutuyor. `tur.js`'in ölçüm defteri bu yüzden **sayaçlı**:
+sahiplerden biri sökülünce çıpa ölmüyor, son sahip çıkınca düşüyor.
+
+### Okunmamış rozeti
+
+Sekme çubuğundaki `tabBarBadge` gitti; rozet **hamburger düğmesinde**. Çekmeceye taşınsa
+yalnızca menü açılınca görünürdü — kullanıcı yeni mesajı fark edemezdi.
 
 ## Web'den bilinçli sapmalar
 
@@ -265,17 +598,32 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
   Oturum SecureStore'da TEK anahtarda ve yazımlar sıraya sokuluyor (`saveSession`).
   Yenileme token'ını ayrı anahtara bölme; gerekçe `storage.js`'te.
 
-  Sunucuda çıkış ucu yok: çıkış yalnızca yerel oturumu siliyor, yenileme token'ı
-  sunucuda 60 gün geçerli kalıyor (web'de de öyle).
+  **Çıkış artık sunucuya da işliyor** (2026-09-21, web `03dc360`'ın portu). Öncesinde
+  çıkış yalnızca istemci taraflıydı: SecureStore'daki oturum siliniyor ama yenileme
+  token'ı sunucuda 60 gün geçerli kalıyordu — silinen değer yeniden ele geçirilirse
+  (cihaz yedeği, disk artığı) o süre boyunca taze erişim token'ı üretebilirdi.
+
+  `AuthContext.logout` sırası: token'ı OKU → yereli sil → `oturumuSonlandir()` ile
+  sunucuda iptal et, **beklemeden**. Ağ yokken çıkış yine kesin sonuç verir.
+
+  ⛔ `oturumuSonlandir` HAM AXIOS kullanır, `request()` değil: istemcinin 401 → yenile
+  zinciri, tam da iptal edilmek istenen token'la oturumu tazelerdi.
+
+  ⚠️ İki bilinen sınır (web'de de var): erişim token'ı ömrü dolana kadar (≤2 saat)
+  yaşar (tek cihaz iptali damgayı ileri almıyor); ve çıkış anında bir yenileme
+  uçuştaysa o turda üretilen yeni token istemcide atıldığı hâlde sunucuda canlı kalır.
+  İkincisinin kapatılması sunucunun işi. `onAuthExpired` yolunda bu çağrı YAPILMAZ —
+  orada token zaten ölü.
 - **Arkadaşlar ekranının rotası `/eslesmeler` kaldı** (`app/eslesmeler.jsx`); web #31'de
   adres `/arkadaslar` oldu, yalnızca kullanıcıya görünen metinler taşındı. Dosyayı
-  yeniden adlandırma: tur çıpası `eslesmeler`, `dersmate://eslesmeler` derin bağlantısı
-  ve kök `Stack.Protected` listesi ona bağlı — listeye eklenmeyen yeni ad OTURUMSUZ da
-  açılır. Algoritma anlamındaki "eşleşme" ise "öneri" oldu ("Şimdilik öneri yok"), metin
+  yeniden adlandırma: çekmecedeki satır (`src/components/Cekmece.jsx` → OGELER),
+  `dersmate://eslesmeler` derin bağlantısı ve kök `Stack.Protected` listesi ona bağlı —
+  listeye eklenmeyen yeni ad OTURUMSUZ da açılır. (Tur çıpası artık `eslesmeler` DEĞİL:
+  2026-09-23'te `menu`ya taşındı, bkz. "Gezinme".) Algoritma anlamındaki "eşleşme" ise "öneri" oldu ("Şimdilik öneri yok"), metin
   eşleşmesi gibi teknik anlamlar olduğu gibi kaldı.
 - **Başka ekranda değişen veri ODAKTA tazelenir**, yeniden kurulumla değil. Web rota
   değişiminde sayfayı söküp yeniden kuruyor ve sorgular kendiliğinden baştan koşuyor.
-  Mobilde sekme ekranları ve üstüne yığın açılan ekranlar KURULU kalıyor, `useAsync` de
+  Mobilde kök yığındaki ekranlar (ve üstlerine açılanlar) KURULU kalıyor, `useAsync` de
   odak dinlemiyor. Tazelenmeyen ekran geri dönülünce eski veriyi gösterir; bu hata iki
   yerde yaşandı (profilde engellenen kişi Keşfet'te kaldı, Arkadaşlar ekranında kabul
   edilen istek profildeki sayıya yansımadı).
@@ -286,6 +634,14 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
     dönen kullanıcının biriktirdiği sayfaları silerdi. `blockUser`/`unblockUser` çağıran
     her yeni yer başarıdan sonra `engelDegisti()` çağırmalı. Sayaç api.js'e konamaz:
     önizleme api nesnesini `onizlemeApi` ile eziyor.
+  - Topluluk (ana ekran) YALNIZCA forum sürümü değiştiyse tazeleniyor
+    (`src/lib/forumSurumu.js`) — aynı desen, farklı olay. Verisini değiştiren tek dış
+    ekran Yönetim: `moderateForumContent` bir gönderiyi kaldırıyor ve Yönetim çekmeceden
+    iki dokunuş uzakta. Bu ekranda da liste `onEndReached` ile birikiyor, o yüzden
+    koşulsuz tazeleme yapılamaz.
+
+    ⚠️ Bu madde 2026-09-23'te EKLENDİ ve öncesinde kodda "bu ekranın verisini değiştiren
+    BAŞKA ekran yok" diye YANLIŞ bir gerekçe yazılıydı. Yanlıştı: Yönetim değiştiriyor.
   - İlk odak `useFocusEffect`'te de çalışır (ekran odaktayken kurulursa); ilk çekimi
     zaten yapan ekranda o çağrı atlanmalı. ⚠️ Kurulum efektinde indirilen `kuruluyor`
     bayrağı bunu YAPAMIYOR: expo-router'ın `useFocusEffect`'i ilk çağrıyı bir render
@@ -332,7 +688,7 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
    basılır (30 dk = 50, 60 dk = 100) ve harcanmaz; seviye unvanıdır.
 2. **Seviye/rozet hesabı SUNUCUDA.** `seviye.js` eşik taşımaz; `level`/`nextLevelAt`
    hazır gelir. Branş rozetleri (Öğretici 8 sa / Üstad 15 sa) de sunucudan.
-3. **SignalR tek bağlantı** — `InboxProvider` tab kabuğunda kurulur, sohbet ekranı kendi
+3. **SignalR tek bağlantı** — `InboxProvider` kök kabukta kurulur, sohbet ekranı kendi
    hub'ını AÇMAZ (iki bağlantı = bölünen gruplar, kaybolan mesajlar).
 
 ## Dokunma ve yüzey dili
@@ -383,8 +739,10 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
 ## Adım planı
 
 - **ADIM 1 (tamam):** iskelet, auth stack + tabs, tema, api/state katmanı.
-- **ADIM 2 (tamam):** AuthKabuk (bölünmüş tek ekran) + giriş/kayıt/doğrulama; Akış
-  (Instagram kartları — `api.suggestions`) + eşleşme isteği alt sayfası.
+- **ADIM 2 (tamam):** AuthKabuk (bölünmüş tek ekran) + giriş/kayıt/doğrulama; öneri
+  kartları (`api.suggestions`) + eşleşme isteği alt sayfası. (Öneriler bir süre ayrı bir
+  "Akış" sekmesindeydi; 2026-09-23'te web'deki yerine — Keşfet'in varsayılan kipine —
+  döndü, bkz. "Gezinme".)
 - **ADIM 3 (tamam):** Kompakt profil (ProfilGorunumu + SubjectBadges + değerlendirmeler),
   profil düzenleme + avatar (ImagePicker), `profil/[userId]`; SignalR sohbet
   (`mesajlar` listesi + `sohbet/[conversationId]` ters FlatList). Sağlayıcılar kökte
@@ -394,8 +752,8 @@ Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
   son basamak aranabilir); Derslerim (`app/dersler.jsx`: 5'erli infinite scroll geçmiş,
   rezervasyon + DateTimePicker, ImagePicker kanıt yükleme, onay→değerlendirme zinciri,
   şikayet/iptal, puan geçmişi); Eşleşmeler (`app/eslesmeler.jsx` — kabul/ret/sonlandır).
-  Derslerim ve Eşleşmeler tab DEĞİL: Akış başlığındaki ikonlardan ve Profil
-  kısayollarından açılan yığın ekranları.
+  Derslerim ve Eşleşmeler kabuk ekranı DEĞİL: çekmeceden ve Profil kısayollarından
+  açılan, kendi geri şeridini taşıyan yığın ekranları.
 - **ADIM 5 (tamam):** web'in `7f140a9` sonrası tüm işi mobile taşındı — Topluluk forumu
   (`app/topluluk.jsx`), yönetim kuyrukları (`app/yonetim.jsx`), yasal metinler
   (hakkimizda/gizlilik/kosullar + `yasalMetinler.js`), parola sıfırlama, kayıt onayı,
@@ -417,6 +775,29 @@ cd C:/projeler/dersmate && git diff <baseline>..HEAD --stat -- frontend/src
 Son senkron baseline'ı: **`6aafac7`** (2026-09-10, web #33'ün birleşmesi). Bir sonraki
 senkronda buradaki değeri güncelle, yoksa aynı diff iki kez uygulanır.
 
+### ⚠️ BASELINE 2026-09-21'DE İLERLETİLMEDİ — tek commit SEÇİLEREK taşındı
+
+Normalde baseline taşınan son web commit'ine çekilir. Bu kez çekilmedi ve sebebi
+kayda değer: taşınan commit (`3d96b36`, künye + sözleşme sürümü) sıradaki EN YENİ iş
+değil, **ortadaki** bir iş. Ondan ÖNCE gelen iki commit hâlâ taşınmadı. Baseline
+`3d96b36`'ya çekilseydi o ikisi diff'ten düşer ve bir daha hiç görünmezdi — bu
+dosyanın aşağıda "ters yönü daha kötü" diye uyardığı durumun ta kendisi.
+
+`6aafac7..HEAD` aralığında `frontend/src`'ye dokunan altı commit var, durumları:
+
+| commit | iş | durum |
+|---|---|---|
+| `ac0a6bf` | analitik `page_path` GUID sızdırıyordu | ⬜ **incelenmedi** — mobilde GA yok ama `trackEvent` parametreleri kontrol edilmeli |
+| `03dc360` | sunucu tarafı çıkış ucu (`/api/session/logout`) | ✅ **taşındı** (2026-09-21) — `oturumuSonlandir`, mobil yolu `/api/v1/session/logout` |
+| `8f35fb6` | localStorage yenileme token'ı + kayıt numaralandırma | ✅ web'de de ERTELENDİ, taşınacak bir şey yok |
+| `3d96b36` | künye + sözleşme sürümü 2026-09-19 | ✅ **taşındı** (2026-09-21) |
+| `8dfad75` | rol token + EXIF + analitik (web PR #34) | ⬜ **incelenmedi** — EXIF temizliği mobil yüklemeleri de ilgilendirebilir |
+| `284cccb` | main'in güvenlik dalına birleşmesi | — |
+
+Kalan iki ⬜ kapanmadan baseline ilerletilmemeli. (`03dc360` 2026-09-21'de kapandı;
+en eski açık iş artık `ac0a6bf`, yani baseline en fazla oraya kadar düşünülebilir —
+ama o da incelenmeden değil.)
+
 `b93422a..6aafac7` aralığında `frontend/src`'ye dokunan her PR ya taşındı ya da mobilde
 karşılığı yok: #21 → mobil PR #6 (`fe8e875`); #26, #29, #30, #31, #33 →
 `ozellik/web-esitleme-26-33` dalı; #24 ve #25 → aşağıdaki "bilerek taşınmayanlar".
@@ -436,7 +817,10 @@ baseline ileri kalırsa gerçek bir fark hiç görünmez.
   `fixed` şeridi altına yer ayırmıyordu (`CookieBanner.jsx`). Mobilde şerit yok; veri
   tercihleri alt sayfa modalında soruluyor.
 - Web #25 (`af0e531`), dar ekran menü çekmecesinin kendi perdesinin altında kalması:
-  web'in hamburger menüsü (`Layout.jsx`). Mobilde menü yok, gezinme sekme çubuğundan.
+  web'in hamburger menüsü (`Layout.jsx`). Mobilde çekmece RNModal — ayrı bir yerel
+  pencere, perde ve panel aynı ağaçta kardeş, yani o hata buraya taşınamaz.
+  ⚠️ Bu madde 2026-09-23'ten önce "Mobilde menü yok, gezinme sekme çubuğundan" diyordu;
+  artık tam tersi (bkz. "Gezinme").
 
 ⚠️ `api.js` yüzeyini karşılaştırmak için metot adlarını çıkarıp kümeleri karşılaştır.
 Bilinçli fark **4 web ↔ 6 mobil** (2026-09-11 ölçümü: web 78, mobil 80 metot):

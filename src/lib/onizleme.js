@@ -12,8 +12,36 @@
 
   Bayrak build anında gömülür (EXPO_PUBLIC_*): normal geliştirmede tanımsızdır ve
   bu modülün tamamı ölü koddur.
+
+  ⚠️ ÇALIŞMA-ZAMANI KAPISI — demo modu tek başına derleme-zamanı bayrağına bırakılmaz.
+  EXPO_PUBLIC_ONIZLEME bir üretim paketine kazara gömülürse (yanlış EAS profili, elle
+  set edilen ortam değişkeni) uygulama sessizce demoya düşer: sahte oturum açık başlar,
+  api.* gerçek uçların yerine temsili veriyle yanıtlanır ve kullanıcının yaptığı her
+  değişiklik hiçbir yere gitmeden kaybolur. Bunu önlemek için bayrağa EK bir kapı var:
+  demo YALNIZCA üretim-dışı bir API tabanına bağlıyken açılır.
+
+  Sinyal API adresinin ŞEMASI: bu projede üretim TEK ayırt edici olarak https kullanıyor
+  (eas.json → production / production-apk = https://api.dersmate.com), demo ve Expo Go
+  geliştirmesi ise http:// LAN adresine gider (preview profili http://…:5099; Expo Go
+  hostUri'si de http). Adres derleme anında gömülü (EXPO_PUBLIC_API_URL) ama okuması
+  çalışma anında olduğu için bu, bayraktan bağımsız ikinci bir denetimdir. Böylece
+  https bir taban görülürse demo DEVREYE GİRMEZ, gerçek istemci davranışı korunur ve
+  kullanıcı normal girişe yönlendirilir. Gerçek demo paketleri (onizleme profili)
+  http taban kullandığı için bu kapı onları hiç etkilemez.
 */
-export const ONIZLEME = process.env.EXPO_PUBLIC_ONIZLEME === '1'
+const ONIZLEME_BAYRAGI = process.env.EXPO_PUBLIC_ONIZLEME === '1'
+const uretimTabaniMi = (process.env.EXPO_PUBLIC_API_URL ?? '').startsWith('https://')
+
+export const ONIZLEME = ONIZLEME_BAYRAGI && !uretimTabaniMi
+
+if (ONIZLEME_BAYRAGI && uretimTabaniMi) {
+  // Bayrak set ama taban üretim: demo çalışma-zamanı kapısıyla etkisizleştirildi.
+  console.error(
+    '[onizleme] EXPO_PUBLIC_ONIZLEME açık ama EXPO_PUBLIC_API_URL üretim adresi (https://). ' +
+      'Demo modu DEVREYE ALINMADI: uygulama gerçek sunucuya bağlanıyor, sahte oturum/yazma ' +
+      'yolları kapalı. Demo istemek için http:// bir LAN adresi kullanın (bkz. eas.json).',
+  )
+}
 
 const gecikme = (veri) => new Promise((cozul) => setTimeout(() => cozul(veri), 250))
 
@@ -105,7 +133,7 @@ const PORTFOY = [
   },
 ]
 
-/* ── Akış önerileri ──────────────────────────────────────────────────────── */
+/* ── Keşfet önerileri (öneri kipi) ───────────────────────────────────────── */
 
 const ONERILER = [
   {

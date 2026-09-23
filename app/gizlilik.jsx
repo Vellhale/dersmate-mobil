@@ -8,7 +8,8 @@ import {
   MetinSayfasi,
   Paragraf,
 } from '../src/components/MetinSayfasi'
-import { ILETISIM_EPOSTA, SOZLESME_TARIHI } from '../src/lib/yasalMetinler'
+import { ILETISIM_EPOSTA, ISLETMECI, ISLETMECI_ALAN_ADI, MARKA } from '../src/lib/kunye'
+import { SOZLESME_TARIHI } from '../src/lib/yasalMetinler'
 
 /*
   GİZLİLİK POLİTİKASI + KVKK AYDINLATMA METNİ — web'deki pages/Gizlilik.jsx'in portu.
@@ -45,6 +46,27 @@ import { ILETISIM_EPOSTA, SOZLESME_TARIHI } from '../src/lib/yasalMetinler'
      gönderdiği veri orada Resend (e-posta) ve Google Drive (yedek) tarafından
      işleniyor. KVKK m.10 "kimlere aktarılabileceğini" soruyor ve cevap yalnızca
      istemci paketine bakarak verilemez. §6 artık sunucu tarafını da sayıyor.
+
+  ─── 2026-09-22'de DÜZELTİLEN YANLIŞ BEYAN: TELEFON NUMARASI ────────────────
+  §2 "isteğe bağlı profil bilgileri" arasında ve §6'da "telefon numaran" yazıyordu.
+  TOPLANMIYOR. Ölçüldü: Domain/Identity/User.cs'te PhoneNumber alanı VAR, ama sunucu
+  ağacında ona YAZAN tek satır DeleteAccount.cs:133 (`user.PhoneNumber = null`) —
+  yani yalnızca silinirken null'lanıyor. ProfileCommands telefona dokunmuyor, web
+  arayüzünde de tek bir referans yok (frontend/src taraması: sıfır). Alan şemada uyuyor.
+
+  Metnin toplamadığı bir veriyi "topluyoruz" demesi §7'deki hatanın aynası: biri
+  kullanıcıya yapabildiğini yapamıyor dedi, bu da vermediğini verdiğini söylüyordu.
+  İkisi de bir denetimde metni tümden şüpheli hâle getirir.
+  Aynı cümle profil.jsx'teki "Silinecekler" listesinden de çıkarıldı.
+
+  ⚠️ SOZLESME_SURUMU ARTIRILMADI ve artırılmamalıydı. Sürüm, kullanıcının KABUL ETTİĞİ
+  metni işaretler; bu değişiklik yeni bir ifşa DEĞİL, var olan bir fazlalığın
+  kaldırılması. Kullanıcı zaten daha geniş bir beyanı kabul etmişti, dar olanı yeniden
+  onaylatmak gerekmez. Ayrıca tek taraflı artırmak sunucuyla (2026-09-19) eşitliği
+  bozar ve kayıt ekranını kilitler — bkz. src/lib/yasalMetinler.js.
+
+  ⚠️ WEB'DE AYNI HATA DURUYOR. frontend/src/pages/Gizlilik.jsx de telefon numarasını
+  sayıyor; orası ayrı depo, bu değişiklikle kapanmadı.
 
   ─── 2026-09-05'te DÜZELTİLEN YANLIŞ BEYAN ─────────────────────────────────
   §7 "hesabını kendi başına silebileceğin bir düğme YOK, e-posta at" diyordu. Uç ve
@@ -90,12 +112,25 @@ export default function Gizlilik() {
       ozet="Hangi verini topluyoruz, neden topluyoruz, ne kadar saklıyoruz ve ne isteyebilirsin."
       sonGuncelleme={SOZLESME_TARIHI}
     >
-      <Bolum no="1" baslik="Kısaca">
+      {/*
+        ⚠️ BÖLÜM NUMARASI DEĞİŞMEDİ, YALNIZCA BAŞLIK (2026-09-21, web'le aynı).
+
+        Veri sorumlusu kimliği bir KVKK aydınlatma metninin İLK maddesidir, yani doğal
+        yeri yeni bir §1 açmaktı. AÇILMADI: §4, §5, §6, §7 ve §9'a hem bu metnin içinden
+        hem Koşullar'dan atıf var; hepsini bir kaydırmak, doğru metni yanlış yere işaret
+        eden atıflarla bırakırdı.
+      */}
+      <Bolum no="1" baslik="Kısaca ve veri sorumlusu">
         <Paragraf>
-          dersmate, öğrencilerin birbirine ders anlattığı bir platformdur. Verini reklam
-          için kullanmıyoruz, satmıyoruz ve üçüncü taraflara pazarlama amacıyla
-          aktarmıyoruz. Topladığımız her şey ya hesabını çalıştırmak ya da platformu
-          kötüye kullanımdan korumak için.
+          <Kalin>{MARKA}</Kalin>, öğrencilerin birbirine ders anlattığı bir platformdur ve{' '}
+          <Kalin>{ISLETMECI}</Kalin> ({ISLETMECI_ALAN_ADI}) tarafından işletilmektedir. Bu
+          metinde geçen “biz”, {ISLETMECI}’tir; verinle ilgili taleplerin muhatabı da odur.
+          İletişim bilgileri sayfanın altındaki künyededir.
+        </Paragraf>
+        <Paragraf>
+          Verini reklam için kullanmıyoruz, satmıyoruz ve üçüncü taraflara pazarlama
+          amacıyla aktarmıyoruz. Topladığımız her şey ya hesabını çalıştırmak ya da
+          platformu kötüye kullanımdan korumak için.
         </Paragraf>
       </Bolum>
 
@@ -106,8 +141,7 @@ export default function Gizlilik() {
         </Paragraf>
         <Paragraf>
           <Kalin>İsteğe bağlı profil bilgileri:</Kalin> profil fotoğrafın, kendini anlattığın
-          metin, okulun ve bölümün, telefon numaran. Bunların hiçbiri zorunlu değildir; boş
-          bırakabilirsin.
+          metin, okulun ve bölümün. Bunların hiçbiri zorunlu değildir; boş bırakabilirsin.
         </Paragraf>
         <Paragraf>
           <Kalin>Kullanım verileri:</Kalin> anlattığın ders sayısı ve süresi, kazandığın puan,
@@ -217,7 +251,7 @@ export default function Gizlilik() {
         <Paragraf>
           Profilinde <Kalin>senin girdiğin</Kalin> bilgiler (adın, fotoğrafın, okulun, kendini
           anlattığın metin, anlatabildiğin konular, aldığın değerlendirmeler) platformdaki
-          diğer kullanıcılara açıktır. E-posta adresin, telefon numaran ve cihaz kimliğin{' '}
+          diğer kullanıcılara açıktır. E-posta adresin ve cihaz kimliğin{' '}
           <Kalin>hiçbir kullanıcıya gösterilmez</Kalin>.
         </Paragraf>
         <Paragraf>
