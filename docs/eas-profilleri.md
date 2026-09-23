@@ -99,6 +99,35 @@ sonra `npx expo start` ile canlı geliştirme yapılır.
 iOS'ta da aynı işi görür ve **Windows'tan geliştirmenin çalışan yoludur**: kabuk bulutta
 derlenir, iPhone'a bir kez kurulur, sonrası Metro üzerinden canlıdır — Mac gerekmez.
 
+
+### ⚠️ `.env` EAS SUNUCUSUNA GİTMEZ — ATS kararını bu belirler
+
+`.env` `.gitignore`'da, yani EAS derleme sunucusuna **yüklenmiyor**. `app.config.js`
+ATS kararını `process.env.EXPO_PUBLIC_API_URL` ile veriyor ve o değişken sunucuda BOŞ.
+Sonuç (ölçüldü 2026-09-23): geliştirme istemcisi `NSAllowsArbitraryLoads: false` ile
+derleniyor — yani **şifresiz `http://` bağlantılar kapalı**.
+
+Bu bugün DOĞRU olan davranış: `.env` `https://api.dersmate.com` gösteriyor ve Metro
+üzerinden gelen JS o adresi kullanıyor. Yerel `.env` dev client'ta GEÇERLİ, çünkü JS'i
+bulut değil kendi makinendeki Metro paketliyor.
+
+⛔ **AMA yerel arka uca (`http://192.168.1.111:5099`) geliştirme yapmak istersen bu
+istemci ÇALIŞMAZ** ve belirti Android'dekiyle aynı sessiz hatadır: istek cihazdan
+çıkmaz, sunucu günlüğü boş kalır. Sebebi ATS ve düzeltmesi JS tarafında değil — native
+kabuk yeniden derlenmeli, `development` profiline açık `env` verilerek:
+
+```json
+"development": {
+  "developmentClient": true,
+  "distribution": "internal",
+  "env": { "EXPO_PUBLIC_API_URL": "http://192.168.1.111:5099" }
+}
+```
+
+ⓘ `NSLocalNetworkUsageDescription` dev client derlemelerinde ZATEN var ama bizim
+koşulumuzdan gelmiyor: `expo-dev-launcher` Metro'ya LAN üzerinden ulaşmak için kendisi
+ekliyor ve release derlemelerinde bir betikle siliyor (`withDevLauncher.js:62-64`).
+
 Ama bu da ad-hoc imzalıdır, yani cihazın UDID'si önce `eas device:create` ile
 kaydedilmeli. **Pratikte iOS tarafında atılacak ilk derleme budur**; mağaza paketi ondan
 sonra gelir.
