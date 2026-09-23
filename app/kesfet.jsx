@@ -19,7 +19,7 @@ import { EngellemeModali } from '../src/components/EngellemeModali'
 import { EkranBasligi } from '../src/components/EkranBasligi'
 import { HamburgerDugmesi } from '../src/components/Cekmece'
 import { KepIkonu, SaatIkonu, YildizIkonu } from '../src/components/Ikonlar'
-import { Badge, Button, Card, EmptyState, ErrorBox, Field, Girdi, Loading, Modal, Notice, Spinner } from '../src/components/ui'
+import { Badge, Button, Card, EmptyState, ErrorBox, Field, Girdi, Loading, Modal, Notice, Spinner, UstEtiket } from '../src/components/ui'
 import { amber, brand, slate } from '../src/lib/theme'
 
 /*
@@ -237,7 +237,9 @@ export default function Kesfet() {
   useEffect(() => {
     if (!istenenSekme) return
     if (SEKMELER.some((s) => s.key === istenenSekme)) setSekme(istenenSekme)
-    router.setParams({ sekme: '' })
+    // Bir sonraki tura ertelenir: ilk commit'teki setParams soğuk açılışta etkisiz (dersler.jsx ?rezerve= notu).
+    const zamanlayici = setTimeout(() => router.setParams({ sekme: '' }), 0)
+    return () => clearTimeout(zamanlayici)
   }, [istenenSekme, router])
   const [term, setTerm] = useState('')
   const [filters, setFilters] = useState(VARSAYILAN_FILTRELER)
@@ -346,8 +348,11 @@ export default function Kesfet() {
   )
   const engelSayisi = engellilerim.data?.length ?? 0
 
-  // Kişi gösteren iki sekmede kartlar ilişkiyi biliyor (bkz. lib/iliski.js).
-  const iliskiler = useIliskiler(universiteKipi || arkadasKipi)
+  /* Üç sekmede de kartlar ilişkiyi biliyor (bkz. lib/iliski.js): Üniversite ve Arkadaş Ekle
+     kişiyi, YKS ilan kartı KONUYU soruyor (konuDurumu). YKS eskiden hariçti ("kişi
+     göstermiyor"); oysa ilan bir kişinin konusu ve arkadaşlığı süren konuda "Arkadaş isteği
+     gönder" gösteriyordu. Bedeli YKS sekmesinde bir myMatches isteği. */
+  const iliskiler = useIliskiler()
 
   /*
     ENGEL BAŞKA EKRANDA DEĞİŞTİYSE ODAKTA TAZELE. Kartın profili kök yığında Keşfet'in
@@ -619,11 +624,21 @@ export default function Kesfet() {
         keyExtractor={(item) => (oneriKipi || !yksKipi ? item.userId : item.offerId)}
         renderItem={({ item }) =>
           oneriKipi ? (
-            /* Web'deki Suggestions kartının mobil karşılığı — Akış silinince buraya
-               döndü, kartın kendisi değişmedi. */
-            <IlanKarti kisi={item} onIstek={setHedef} />
+            /* Web'deki Suggestions kartının mobil karşılığı — Akış silinince buraya döndü.
+               Konu durumu Akış'taki gibi veriliyor: ilk yanıt gelmeden durum VERİLMİYOR
+               ("bilinmiyor", "kapsanan yok" değil), kart o arada varsayılan istek düğmesini
+               çiziyor ve yanıt gelince konuya göre değişiyor. */
+            <IlanKarti
+              kisi={item}
+              onIstek={setHedef}
+              konuDurumu={iliskiler.yukleniyor ? undefined : iliskiler.konuDurumu}
+            />
           ) : yksKipi ? (
-            <IlanSonucKarti offer={item} onIstek={setHedef} />
+            <IlanSonucKarti
+              offer={item}
+              onIstek={setHedef}
+              konuDurumu={iliskiler.yukleniyor ? undefined : iliskiler.konuDurumu}
+            />
           ) : (
             /* Arkadaş Ekle kartı YENİDEN YAZILMADI: iki listede gösterilen şey aynı, bir kişi
                (web kararı). Yalnızca istek metni değişiyor. */
@@ -637,6 +652,8 @@ export default function Kesfet() {
             />
           )
         }
+        // Veri dizisi değişmeden kart durumu değişiyor (istek gönderildi, ilişkiler geldi).
+        extraData={iliskiler.konuDurumu}
         contentContainerClassName="gap-3 p-4"
         /* Alt dolgu = güvenli alan (home indicator) + nefes payı. Eskiden buraya yüzen
            sekme çubuğunun yüksekliği de giriyordu (sekmeCubugu.js); çubuk kalktı, gezinme
@@ -677,9 +694,15 @@ export default function Kesfet() {
       <EslesmeIstegiModali
         person={hedef}
         myOffers={myOffers}
+        konuDurumu={iliskiler.yukleniyor ? undefined : iliskiler.konuDurumu}
+        // Hata da "bilinmiyor": boş harita herkesi arkadaş değil gösterirdi.
+        kisiIliskisi={iliskiler.yukleniyor || iliskiler.hata ? undefined : iliskiler.iliski}
         onClose={() => setHedef(null)}
-        onSent={(name) => {
+        onSent={(name, topicId) => {
+          const id = hedef.userId
           setHedef(null)
+          // Bildirim liste başında; kaydırılmış sonuçlarda geri bildirimin yeri dokunulan kart.
+          iliskiler.konuIstendi(id, topicId)
           setNotice(`${name} kişisine arkadaş isteği gönderildi. Kabul edilince sohbet açılacak.`)
           /* Sessiz tazeleme: istek gönderilen kişi öneri listesinden düşsün ama liste
              spinner’a dönmesin (web’deki suggestions.reload() kararının aynısı). */
@@ -750,9 +773,15 @@ export default function Kesfet() {
   hiyerarşisi; SEVİYE ROZETİ YOK (arama ucu ilanı döndürür, eğitmenin genel seviyesini
   değil — yer tutucu rozet olmayan veriyi uydururdu). Puanı olmayan eğitmende "Yeni"
   rozeti puanın yokluğunu söyler.
+
+  EYLEM İLANIN KONUSUNA GÖRE (bkz. lib/iliski.js → konuHaritasi): ilan tek konu taşıdığı için
+  Akış kartındaki "bir kısmı kapsandı" ara hâli burada yok. Arkadaşlığı süren konuda
+  rezervasyon, bekleyen istekte pasif düğme; aynı eğitmenin BAŞKA konudaki ilanı ise istek
+  düğmesini koruyor (Türev'de arkadaş olunan kişiden Limit istemek geçerli).
 */
-function IlanSonucKarti({ offer, onIstek }) {
+function IlanSonucKarti({ offer, onIstek, konuDurumu }) {
   const router = useRouter()
+  const d = konuDurumu?.(offer.tutorUserId, offer.topicId)
 
   return (
     <Card>
@@ -815,23 +844,37 @@ function IlanSonucKarti({ offer, onIstek }) {
       ) : null}
 
       <View className="mt-4">
-        <Button
-          onPress={() =>
-            /* Arama sonucunda konu ZATEN belli: istek modalına tek elemanlı
-               "anlatabilir" listesiyle girilir; uç, karşı tarafın öğrenmek
-               istediklerini dönmediği için takas listesi boş kalır (web kararı). */
-            onIstek({
-              userId: offer.tutorUserId,
-              displayName: offer.tutorDisplayName,
-              theyCanTeach: [
-                { topicId: offer.topicId, topicName: offer.topicName, subjectName: offer.subjectName },
-              ],
-              theyWantToLearn: [],
-            })
-          }
-        >
-          Arkadaş isteği gönder
-        </Button>
+        {d?.durum === 'aktif' ? (
+          <Button variant="secondary" onPress={() => router.push(`/dersler?rezerve=${d.matchId}`)}>
+            Ders rezerve et
+          </Button>
+        ) : d ? (
+          <Button
+            variant="secondary"
+            disabled
+            accessibilityLabel={`İstek gönderildi, ${offer.tutorDisplayName}`}
+          >
+            ✓ İstek gönderildi
+          </Button>
+        ) : (
+          <Button
+            onPress={() =>
+              /* Arama sonucunda konu ZATEN belli: istek modalına tek elemanlı
+                 "anlatabilir" listesiyle girilir; uç, karşı tarafın öğrenmek
+                 istediklerini dönmediği için takas listesi boş kalır (web kararı). */
+              onIstek({
+                userId: offer.tutorUserId,
+                displayName: offer.tutorDisplayName,
+                theyCanTeach: [
+                  { topicId: offer.topicId, topicName: offer.topicName, subjectName: offer.subjectName },
+                ],
+                theyWantToLearn: [],
+              })
+            }
+          >
+            Arkadaş isteği gönder
+          </Button>
+        )}
       </View>
     </Card>
   )
@@ -1195,10 +1238,12 @@ function EngellilerModali({ open, onClose, liste, onKaldir }) {
                 >
                   <View className={sutun ? 'self-stretch' : 'min-w-0 flex-1'}>
                     {/* İki satıra kadar: sabit 150 px düğme ad sütununu 320 dp'de 122 px'e indiriyor ve
-                        onaysız "Engeli kaldır" listesinde kimliği taşıyan tek şey olan ad kesiliyordu. */}
+                        onaysız "Engeli kaldır" listesinde kimliği taşıyan tek şey olan ad kesiliyordu.
+                        Engeli kalkan satır sönükleşiyor ama OKUNUR kalıyor (slate-500, 4.76:1): kullanıcı
+                        kimin engelini kaldırdığını tam bu anda kontrol ediyor. slate-400 2.56:1'di. */}
                     <Text
                       numberOfLines={2}
-                      className={`text-sm font-medium ${kaldirildi ? 'text-slate-400' : 'text-slate-800'}`}
+                      className={`text-sm font-medium ${kaldirildi ? 'text-slate-500' : 'text-slate-800'}`}
                     >
                       {kisi.displayName}
                     </Text>
@@ -1220,7 +1265,7 @@ function EngellilerModali({ open, onClose, liste, onKaldir }) {
                       accessibilityLabel={`${kisi.displayName} için engel kaldırıldı`}
                       className="min-h-[44px] w-[150px] items-center justify-center"
                     >
-                      <Text className="text-sm font-medium text-emerald-700">Kaldırıldı</Text>
+                      <Text className="text-sm font-medium text-brand-700">Kaldırıldı</Text>
                     </View>
                   ) : (
                     <Button
@@ -1294,9 +1339,9 @@ function Pill({ active, onPress, children }) {
 function FiltreBolumu({ baslik, children }) {
   return (
     <View>
-      <Text className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+      <UstEtiket className="mb-2 text-xs font-medium tracking-wide text-slate-500">
         {baslik}
-      </Text>
+      </UstEtiket>
       <View className="flex-row flex-wrap gap-2">{children}</View>
     </View>
   )

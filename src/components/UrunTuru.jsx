@@ -18,6 +18,8 @@ import {
   turuYenidenBaslat,
 } from '../lib/tur'
 import { useIzin } from '../state/IzinContext'
+// Tur, izin sayfası kapanırken üstüne binmesin (süre animasyona bağlı, orada tanımlı).
+import { IZIN_KAPANMA_SURESI } from './IzinSayfasi'
 
 /**
  * İnteraktif ürün rehberi — web'deki ProductTour.jsx'in mobil UYARLAMASI.
@@ -78,14 +80,6 @@ const ACILIS_EKRANLARI = ['/', '/kesfet']
 
 /** Çıpanın etrafında bırakılan nefes payı (web'deki padding=8 ile aynı). */
 const BOSLUK = 8
-
-/**
- * İzin sayfası kapandıktan sonra turun beklediği süre (ms).
- *
- * ui.jsx'teki alt sayfa `animationType="slide"` ile kapanıyor; beklemeseydik tur, sayfa
- * hâlâ aşağı süzülürken üstüne biner ve iki katman bir an için yine üst üste görünürdü.
- */
-const IZIN_KAPANMA_SURESI = 350
 
 export function UrunTuru() {
   const { mutlakaSor } = useIzin()
@@ -422,13 +416,14 @@ export function UrunTuru() {
           </View>
 
           {/* "Bir daha gösterme", "geç"ten AYRI: geçen kullanıcıya bir dahaki girişte
-              tekrar önerilebilir, ama açıkça istemeyene hiç sorulmamalı. */}
+              tekrar önerilebilir, ama açıkça istemeyene hiç sorulmamalı. Sönük ama okunur:
+              slate-400 2.56:1'di, slate-500 4.76:1; ikincilliği punto ve alt çizgi taşıyor. */}
           <Pressable
             accessibilityRole="button"
             onPress={() => bitir({ susturuldu: true })}
             className="mt-1 min-h-[44px] justify-center self-start"
           >
-            <Text className="text-xs text-slate-400 underline">Bir daha gösterme</Text>
+            <Text className="text-xs text-slate-500 underline">Bir daha gösterme</Text>
           </Pressable>
         </Card>
       </View>

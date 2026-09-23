@@ -6,7 +6,7 @@ import { formatDateTime } from '../src/lib/format'
 import { EkranBasligi } from '../src/components/EkranBasligi'
 import { HamburgerDugmesi } from '../src/components/Cekmece'
 import { Avatar } from '../src/components/Avatar'
-import { Badge, Button, EmptyState, ErrorBox, Loading } from '../src/components/ui'
+import { Badge, Button, EmptyState, ErrorBox, Loading, SayacRozeti } from '../src/components/ui'
 
 /*
   MESAJLAR — web'deki Chat.jsx'in LİSTE yarısı. Web ana-detay ızgarasını lg'de yan
@@ -109,7 +109,9 @@ function KonusmaSatiri({ konusma, router }) {
       </View>
 
       {konusma.isClosed && <Badge tone="neutral">Kapalı</Badge>}
-      {okunmamis && <Badge tone="brand">{konusma.unreadCount}</Badge>}
+      {/* Sayaç dili (rose), durum rozeti değil: mavi Badge başlıktaki "Canlı bağlantı" ile birebir
+          aynı görünüyordu. Sekme çubuğundaki okunmamış rozetiyle aynı. Sayı erisimEtiketi'nde. */}
+      {okunmamis && <SayacRozeti sayi={konusma.unreadCount} />}
     </Pressable>
   )
 }

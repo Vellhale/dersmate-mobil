@@ -521,6 +521,26 @@ yalnızca menü açılınca görünürdü — kullanıcı yeni mesajı fark edem
 
 ## Web'den bilinçli sapmalar
 
+- **Mobilde yeşil YOK** (kullanıcı kararı, A düzeni: yeşil marka paletinin dışındaydı). `Button`'da
+  `success` varyantı kalktı; "Kabul et / Onayla / Doğrula" gibi olumlu eylemler `primary`
+  (brand-600). Olumlu durum rozeti brand-100 + brand-800, başarı bildirimi (`Notice success`)
+  brand-50 + brand-200 kenar + brand-800 metin. Web hâlâ emerald kullanıyor — bilinçli fark;
+  web sayfası port edilirken emerald sınıfı taşınmaz, "Dokunma ve yüzey dili"ndeki rol tablosuna
+  çevrilir. `theme.js`'te `emerald` export'u da yok.
+- **Büyük harf `uppercase` sınıfıyla YAZILMAZ**: RN metni dil bilgisiz büyüttüğü için "SANA ANLATABILIR"
+  çıkıyordu. Yerine `UstEtiket` (ui.jsx) ya da `buyukHarf` (`src/lib/metin.js`, yalnızca mobil;
+  `format.js` web kopyası olduğu için ona eklenmedi). Web'de `lang="tr"` doğru çevirdiği için
+  `uppercase` kalıyor — port ederken sınıfı taşıma.
+- **Rezervasyon bağlamı adresten** (`/dersler?rezerve=<matchId>`) ve öğrencinin konusu TEK tanımdan
+  (`src/lib/iliski.js` → `ogrenciKonusu`): Arkadaşlar kartındaki "Ders rezerve et" yalnızca öğrenci
+  tarafta, konulu eşleşmede çıkar; anlatan tarafta bilgi satırı var. Web'de `Matches.jsx` düğme koşulu
+  ve `Sessions.jsx` ön seçimsiz — aynı çıkmaz orada duruyor.
+- **Köşe yarıçapı ve kart gölgesi** (2026-09-14): mobil `tailwind.config.js` yarıçapı px ve bir
+  basamak yumuşak (lg 12 · xl 16 · 2xl 20), web Tailwind varsayılanında (lg 8 · xl 12 · 2xl 16)
+  ve kartta `shadow-sm`. Sınıf adları aynı: port ederken `rounded-*` değiştirilmez, değer farkı
+  config'ten gelir (tek istisna küçük kareler, bkz. "Dokunma ve yüzey dili"). Paletteki "iki
+  dosya birden güncellenir" kuralı bu ayar için GEÇERLİ DEĞİL.
+
 - `localStorage` → oturum + HWID **SecureStore**'da, tercihler AsyncStorage'da
   (`src/lib/storage.js`). Oturum açılışta BİR KEZ okunur, sonrası bellekte —
   `getToken()` senkron kalmalı (axios interceptor; SignalR fabrikası `tazeTokenAl` de
@@ -623,7 +643,22 @@ yalnızca menü açılınca görünürdü — kullanıcı yeni mesajı fark edem
     ⚠️ Bu madde 2026-09-23'te EKLENDİ ve öncesinde kodda "bu ekranın verisini değiştiren
     BAŞKA ekran yok" diye YANLIŞ bir gerekçe yazılıydı. Yanlıştı: Yönetim değiştiriyor.
   - İlk odak `useFocusEffect`'te de çalışır (ekran odaktayken kurulursa); ilk çekimi
-    zaten yapan ekranda o çağrı atlanmalı.
+    zaten yapan ekranda o çağrı atlanmalı. ⚠️ Kurulum efektinde indirilen `kuruluyor`
+    bayrağı bunu YAPAMIYOR: expo-router'ın `useFocusEffect`'i ilk çağrıyı bir render
+    geciktiriyor (`useOptionalNavigation`) ve bayrağı inmiş buluyor. Yeni ekranlar
+    `src/state/useOnePlanaGelince.js`'i kullanmalı (kurulum anındaki `isFocused()`'a
+    bakıyor). `eslesmeler.jsx` ve `ArkadaslarBolumu` hâlâ eski kalıpta; önizlemede
+    açılışta `myMatches` / `userFriends` ikişer kez çağrılıyor (2026-09-14 ölçümü).
+- **Akış başlığında bekleyen iş sayaçları mobilde var, web'de yok.** Web `Layout.jsx`
+  yalnızca okunmamış mesaj rozeti taşıyor. Mobilde Arkadaşlar ikonu gelen istek sayısını
+  (`myMatches`), Derslerim ikonu kullanıcının kapatabileceği ders sayısını
+  (`mySessions(1, 1)`) gösteriyor; push olmadığı için 14 günde düşen isteği ve 48 saatte
+  otomatik onaylanan dersi kullanıcıya haber veren tek şey bunlar. "İşlem bekliyor"
+  tanımı TEK yerde (`src/lib/dersDurumu.js` → `eylemBekliyor`) ve Derslerim'in aksiyon
+  grubu da onu kullanıyor. Aynı turda Derslerim'de itirazdaki (`Disputed`) dersler aksiyon
+  grubundan "İtirazda, karar yönetimde" başlığına çıktı; web onları hâlâ aksiyonda
+  gösteriyor. Sayaçlar odakta VE ön plana dönüşte tazeleniyor
+  (`src/state/useOnePlanaGelince.js`): odak olayı uygulama arka plandan dönünce gelmiyor.
 - Avatar önbellek sayacı **diskte** (`KEYS.avatarSurumleri`). Fresco'nun disk önbelleği
   uygulama yeniden başlatmalarını aşıyor; sayaç bellekte kalırsa açılışta temel URI'ye
   dönülür ve eski görsel ağa hiç çıkmadan sunulur.
@@ -660,11 +695,46 @@ yalnızca menü açılınca görünürdü — kullanıcı yeni mesajı fark edem
 
 - Basılabilir her öğe **min 44px**; girdi puntosu **16px** (`text-base`). Web'de bu
   kurallar `lg` kırılımına bağlıydı; mobilde koşulsuz.
+
+  ⚠️ 44 px ile yazılır: `h-[44px]` / `min-h-[44px]`. Boşluk ve boy sınıfları rem ve NativeWind
+  cihazda rem'i **14** sayıyor (`inlineRem`): `h-11` telefonda 38.5dp, `h-9` 31.5, `p-1` 3.5.
+  Web önizlemesi rem 16 ile 44 gösterdiği için bu fark ancak cihazda görünür.
 - Yüzey dili `src/components/ui.jsx`'te tek yerde: kart = beyaz + `border-slate-100` +
   hafif gölge + `rounded-2xl`; sayfa zemini `bg-slate-50`. Sayfalar kendi yüzey dilini
-  icat etmez.
+  icat etmez: kart yüzeyi elle kurulmaz, bölünmüş dolgulu kart `<Card dolgu="p-0"
+  className="overflow-hidden">` ile yazılır. Card olamayan kart (basılabilir yüzey) gölgeyi
+  `KART_GOLGESI`'nden alır.
+- **Köşe yarıçapı px ve Tailwind'den BİR BASAMAK yumuşak** (kullanıcı kararı, 2026-09-14;
+  `tailwind.config.js` → `borderRadius`): sm 4 · DEFAULT 6 · md 8 · lg 12 (düğme, girdi,
+  uyarı) · xl 16 (iç kutu) · 2xl 20 (kart, alt sayfa) · 3xl 28 (AuthKabuk paneli) · full
+  değişmedi. px, çünkü rem cihazda 14'le çarpılıyordu (rounded-lg telefonda 7, önizlemede 8).
+  İç içe öğede iç yarıçap ≈ dış − dolgu (segment rayı lg + p-1 → sekme md). Boy hâlâ rem
+  olduğu için küçük karelerde yarıçap bir basamak düşürülür: 28dp ve altındaki kutuda lg ve
+  üstü daireye döner (`Avatar` tablosu web'den bir basamak aşağıda).
+- **Kart gölgesi `boxShadow: 0px 4px 16px rgba(15,23,42,0.06)`** — yayvan ve hafif, tek tanım
+  `KART_GOLGESI` (ui.jsx). Android 9 (API 28) altında RN dış `boxShadow` çizmiyor (minSdk 24),
+  orada eski `elevation: 1`'e düşülüyor; ikisi birlikte verilmez (API 28+'da çift gölge).
+  `overflow-hidden` gölgeyi kırpmıyor.
+- **Yığın ekranı başlığı**: geri düğmesi `GeriDugmesi` (ui.jsx; slate-100 daire içinde
+  `GeriIkonu` chevron-left). Elle Pressable ve "←" metin glifi YAZILMAZ. Şerit `flex-row
+  items-center gap-3 border-b border-slate-200 bg-white px-4 py-2`: px-4, sekme başlığı
+  (`EkranBasligi`) ve içeriğin `p-4` kenarıyla aynı hizada. Sohbet başlığı gap-2 (şeritte
+  dört-beş öğe var). Dönüş hedefi `onPress` ile verilir; nereye döndüğü önemliyse
+  `accessibilityLabel` ("Sohbet listesine dön").
 - Renk DEĞERİ gereken yerler (tab bar, SVG, StatusBar) `src/lib/theme.js`'ten okur —
   hex'i elle yazma, palet tek kaynaktan gelsin.
+- **Renk rolleri (A düzeni)** — renk anlam taşır, süs değildir:
+  - Birincil ve olumlu EYLEM: `bg-brand-600 active:bg-brand-700` + beyaz.
+  - Olumlu DURUM (Arkadaşın, Tamamlandı, Yayında, canlı bağlantı): rozet `bg-brand-100
+    text-brand-800`, düz metin `text-brand-700`, şerit/nokta `bg-brand-500`.
+  - BEKLEYEN / DİKKAT: YALNIZCA amber (rozet `bg-amber-100 text-amber-800`, kutu
+    `border-amber-200 bg-amber-50 text-amber-900`). Amber başka anlam için kullanılmaz.
+  - TEHLİKE (hata, itiraz, iptal, engel, yıkıcı eylem ve onun geri alınamaz sonucunu anlatan
+    uyarı: `Notice tone="danger"`) ve sayaç (`SayacRozeti`, okunmamış mesaj dahil): rose.
+  - Anlamsız etiket / kategori (yön, forum kategorisi): `bg-brand-50 text-brand-800` ile
+    `bg-slate-100 text-slate-700` sırayla.
+  - Yeşil, mor (violet) ve gök mavisi (sky) YOK — kategori ya da avatar rengi olarak da.
+  - İstisna, malzeme rengi: değerlendirme yıldızları ve madalya/rozet altın-bronzu amber kalır.
 
 ## Adım planı
 

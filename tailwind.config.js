@@ -23,6 +23,33 @@ module.exports = {
         mono: platformSelect({ android: 'monospace', ios: "'Courier New'", default: 'monospace' }),
       },
       /*
+        KÖŞE YARIÇAPI — Tailwind varsayılanından BİR BASAMAK yumuşak ve PX ile (kullanıcı kararı,
+        2026-09-14: "butonların kenarlarını bir tık yuvarlaklaştıralım, genel tasarımı biraz
+        yumuşatalım"). Sınıf adları aynı kaldığı için yumuşatma tek yerden bütün uygulamaya
+        yayılıyor: düğme, girdi ve uyarı (lg) 12 · iç kutu (xl) 16 · kart ve alt sayfa (2xl) 20 ·
+        AuthKabuk paneli (3xl) 28.
+
+        NEDEN PX: varsayılan değerler rem ve NativeWind cihazda rem'i 14 sayıyor (inlineRem);
+        rounded-lg telefonda 7px, web önizlemesinde 8px çiziliyordu. px ile ikisi aynı.
+        ⚠️ Yalnızca YARIÇAP px'e geçti: boşluk ve boy sınıfları (p-*, h-*, w-*) hâlâ rem, yani
+        cihazda h-11 = 38.5, p-1 = 3.5. 44px dokunma hedefi h-[44px] / min-h-[44px] ile yazılır.
+
+        İÇ İÇE YARIÇAP: dış kutu − iç boşluk = iç kutu. Segment rayı rounded-lg + p-1 (12 − 4)
+        içindeki seçili sekme rounded-md (8) bu yüzden; basamaklar bu farkı koruyacak seçildi.
+        KÜÇÜK KARELER: 28dp ve altındaki kutuda lg ve üstü daireye döner (bkz. Avatar boyutları).
+        Web tailwind.config.js varsayılanda kalıyor — bilinçli fark (CLAUDE.md, "Web'den
+        bilinçli sapmalar").
+      */
+      borderRadius: {
+        sm: '4px',
+        DEFAULT: '6px',
+        md: '8px',
+        lg: '12px',
+        xl: '16px',
+        '2xl': '20px',
+        '3xl': '28px',
+      },
+      /*
         MARKA SKALASI — web projesindeki frontend/tailwind.config.js'ten BİREBİR kopya.
 
         Tek kaynak web tarafında; buradaki liste onun mobil yansıması. Palet değişirse

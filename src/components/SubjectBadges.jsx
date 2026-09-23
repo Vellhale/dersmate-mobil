@@ -4,6 +4,7 @@ import Svg, { Circle, Path } from 'react-native-svg'
 import { api } from '../lib/api'
 import { amber, slate } from '../lib/theme'
 import { useAsync } from '../state/useAsync'
+import { Card } from './ui'
 
 /*
   BRANŞ ROZETLERİ — web'deki components/SubjectBadges.jsx'in portu (iş kuralı 2).
@@ -77,7 +78,7 @@ export function SubjectBadges({ userId, kendiProfilim = false }) {
   }
 
   return (
-    <View className="rounded-2xl border border-slate-100 bg-white p-5">
+    <Card>
       <View className="mb-4 flex-row items-center justify-between gap-3">
         <Text className="text-sm font-semibold text-slate-800">Branş rozetleri</Text>
         {rozetsiz.length > 0 && (
@@ -120,7 +121,9 @@ export function SubjectBadges({ userId, kendiProfilim = false }) {
                   {p.subject}
                 </Text>
                 <View className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
-                  <View className="h-full rounded-full bg-slate-300" style={{ width: `${oran}%` }} />
+                  {/* Dolgu brand-500: slate-300 dolgu slate-100 rayda 1.36:1'di ve ilerlemenin
+                      kendisi seçilmiyordu; brand-500 aynı rayda 3.55:1 (WCAG 1.4.11). */}
+                  <View className="h-full rounded-full bg-brand-500" style={{ width: `${oran}%` }} />
                 </View>
                 <Text className="shrink-0 text-xs text-slate-500" style={{ fontVariant: ['tabular-nums'] }}>
                   {p.hours}/{hedef ?? ESIKLER.at(-1)} sa
@@ -130,7 +133,7 @@ export function SubjectBadges({ userId, kendiProfilim = false }) {
           })}
         </View>
       )}
-    </View>
+    </Card>
   )
 }
 

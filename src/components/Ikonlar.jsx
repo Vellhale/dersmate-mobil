@@ -15,13 +15,13 @@ import { ink } from '../lib/theme'
   kararı).
 */
 
-function Cizgi({ children, renk = ink, boy = 24, kalinlik = 2 }) {
+function Cizgi({ children, renk = ink, boy = 24, kalinlik = 2, dolgu = 'none' }) {
   return (
     <Svg
       viewBox="0 0 24 24"
       width={boy}
       height={boy}
-      fill="none"
+      fill={dolgu}
       stroke={renk}
       strokeWidth={kalinlik}
       strokeLinecap="round"
@@ -42,6 +42,16 @@ export function EvIkonu(props) {
     <Cizgi {...props}>
       <Path d="M3 9.5 12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
       <Path d="M9 22v-8h6v8" />
+    </Cizgi>
+  )
+}
+
+/** Geri — ok değil OK UCU (Lucide `chevron-left`). Yığın ekranlarının başlığındaki GeriDugmesi
+    çiziyor; eski "←" metin glifi yazı tipine göre ince ve kayık çiziliyordu. */
+export function GeriIkonu(props) {
+  return (
+    <Cizgi {...props}>
+      <Path d="m15 18-6-6 6-6" />
     </Cizgi>
   )
 }

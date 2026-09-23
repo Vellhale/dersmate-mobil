@@ -1,4 +1,4 @@
-import { cloneElement, isValidElement, useEffect } from 'react'
+import { Children, cloneElement, isValidElement, useEffect, useState } from 'react'
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -13,6 +13,8 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { beyaz, brand, slate } from '../lib/theme'
+import { buyukHarf } from '../lib/metin'
+import { GeriIkonu } from './Ikonlar'
 
 /*
   YÜZEY DİLİ — web'deki components/ui.jsx'in RN portu. Kararlar aynen taşındı:
@@ -20,7 +22,8 @@ import { beyaz, brand, slate } from '../lib/theme'
     zemin  bg-slate-50 (sayfa)
     kart   beyaz + border-slate-100 + hafif gölge — derinlik kartın kendisinden değil,
            zeminden AYRILMASINDAN gelir (web'deki 2026-08-24 kararı)
-    köşe   rounded-2xl (16px): "kutu" değil "kart"
+    köşe   rounded-2xl (20px; mobil ölçek web'den bir basamak yumuşak, bkz. tailwind.config.js):
+           "kutu" değil "kart"
     buton  zemini brand-600 (beyaz metinle 4.90:1); brand-500 kimlik rengidir, zemin değil
 
   DOKUNMA HEDEFİ: her basılabilir öğe en az 44px yüksekliğinde. Web'de bu kural lg
@@ -32,7 +35,9 @@ const BUTON_VARYANT = {
   primary: { kutu: 'bg-brand-600 active:bg-brand-700', yazi: 'text-white' },
   secondary: { kutu: 'bg-white border border-slate-300 active:bg-slate-50', yazi: 'text-slate-700' },
   danger: { kutu: 'bg-rose-600 active:bg-rose-700', yazi: 'text-white' },
-  success: { kutu: 'bg-emerald-600 active:bg-emerald-700', yazi: 'text-white' },
+  // `success` varyantı YOK: "Kabul et", "Onayla", "Doğrula" gibi olumlu eylemler primary.
+  // Yeşil marka paletinin dışındaydı (kullanıcı kararı, A düzeni); bilinmeyen varyant
+  // aşağıdaki `?? primary` ile yine primary'ye düşer.
   ghost: { kutu: 'active:bg-slate-100', yazi: 'text-slate-600' },
 }
 
@@ -78,22 +83,65 @@ export function Button({
   )
 }
 
-export function Card({ className = '', children }) {
+/*
+  DOLGU AÇIK PROP, className'le EZİLMEZ. NativeWind sınıfları birleştirmiyor: `p-5 p-0`
+  yan yana gelince hangisinin kazanacağını yazılış sırası değil üretilen stil sırası
+  belirliyor ve genelde büyük değer kazanıyor. `className="p-0"` bu yüzden hiç işlemiyordu:
+  Oluştur'daki bölüm şeritleri kartın kenarına oturmak yerine 20px beyaz çerçeveli bir iç
+  kutu gibi duruyordu. Dolgusu farklı kart `dolgu="p-0"` / `dolgu="p-7"` verir; className
+  yerleşim ve kırpma içindir (items-center, overflow-hidden).
+*/
+export function Card({ className = '', dolgu = 'p-5', children }) {
   return (
-    <View
-      className={`rounded-2xl border border-slate-100 bg-white p-5 ${className}`}
-      // Gölge NativeWind sınıfıyla değil style ile: RN'de gölge platforma göre ayrışır
-      // (iOS shadow*, Android elevation) ve web'deki shadow-sm'in dengi bu ikili.
-      style={{
-        shadowColor: slate[900],
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        shadowOffset: { width: 0, height: 1 },
-        elevation: 1,
-      }}
-    >
+    <View className={`rounded-2xl border border-slate-100 bg-white ${dolgu} ${className}`} style={KART_GOLGESI}>
       {children}
     </View>
+  )
+}
+
+/*
+  KART GÖLGESİ — TEK TANIM. Card bunu kullanıyor; Card olamayan kart yüzeyleri (basılabilir
+  defter başlığı, perdelenmiş gönderi) de style olarak bunu verir. Elle yazılan kart gölgesiz
+  kalıyordu ve yayvan gölgeyle gölgeli/gölgesiz kartlar aynı ekranda yan yana belirginleşti.
+
+  Gölge sınıfla değil style ile ve boxShadow olarak: YAYVAN VE HAFİF (genel yumuşatma,
+  2026-09-14; renk slate-900). Eski ikili (shadowRadius 2 + Android elevation 1) kartın altına
+  sert bir çizgi çekiyordu; elevation'ın yayılımı da ayarlanamıyor. overflow-hidden gölgeyi
+  kırpmıyor (iOS ayrı kap görünümü kullanıyor, Android yalnızca çocukları kırpıyor).
+
+  ⚠️ ANDROID 9 (API 28) ALTINDA boxShadow ÇİZİLMİYOR: RN dış gölgeyi yalnızca
+  MIN_OUTSET_BOX_SHADOW_SDK_VERSION = 28 ve üstünde ekliyor (OutsetBoxShadowDrawable.kt), minSdk
+  ise 24. Orada eski elevation 1'e düşülüyor; yoksa kart zeminden yalnızca slate-100 kenarla
+  (~1.05:1) ayrılır, pratikte görünmezdi. İkisi BİRLİKTE verilmez: API 28+'da çift gölge çizilir.
+*/
+export const KART_GOLGESI =
+  Platform.OS === 'android' && Platform.Version < 28
+    ? { elevation: 1, shadowColor: slate[900] }
+    : { boxShadow: '0px 4px 16px rgba(15, 23, 42, 0.06)' }
+
+/**
+ * Yığın ekranı başlığındaki geri düğmesi — yumuşak gri daire içinde ok ucu.
+ *
+ * NEDEN BİLEŞEN: yedi başlıkta aynı Pressable elle kopyalanmıştı ve "←" metin glifi yazı
+ * tipine göre ince, soluk (slate-500) ve dikeyde kayık çiziliyordu. Daire 44px: dokunma
+ * hedefi görünen şeklin kendisi (hitSlop web önizlemesinde uygulanmıyor). Boy px ile
+ * yazılı: h-11 rem'dir ve cihazda 38.5dp çizilir (NativeWind rem = 14), yani kuralın altında
+ * kalırdı; web önizlemesi 44 gösterdiği için fark ancak cihazda görünür. Basılı zemin
+ * slate-200, yani basış gözle görülüyor.
+ *
+ * `onPress` çağıranda kalır: dönüş hedefi ekrana göre değişiyor (sohbet /mesajlar'a,
+ * diğerleri köke düşüyor). Erişim adı varsayılan "Geri"; nereye döndüğü önemliyse verilir.
+ */
+export function GeriDugmesi({ onPress, accessibilityLabel = 'Geri' }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      onPress={onPress}
+      className="h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full bg-slate-100 active:bg-slate-200"
+    >
+      <GeriIkonu renk={slate[800]} boy={22} kalinlik={2.25} />
+    </Pressable>
   )
 }
 
@@ -106,10 +154,41 @@ export function SectionTitle({ children, action }) {
   )
 }
 
+/*
+  ÜST ETİKET — küçük, büyük harfli bölüm etiketi ("SANA ANLATABİLİR", "GEÇMİŞ DERSLER").
+  Tailwind'in büyük harf sınıfının (textTransform) yerine geçer: o sınıf "i"yi platforma
+  göre "I" yapıyordu (gerekçe lib/metin.js'te). Stil tamamen çağıranın className'inden
+  gelir; bileşen yalnızca metni dönüştürür.
+
+  Erişim adı ÖZGÜN metin: büyük harfli dizeyi ekran okuyucu harf harf kodlama ya da
+  kısaltma gibi okuyabilir, "Sana anlatabilir" doğal cümle olarak okunur. Ad yalnızca
+  çocukların hepsi düz metin/sayıyken veriliyor; araya bir JSX öğesi girerse ad tahmin
+  edilmez (o öğe de büyütülmez) ve Text kendi içeriğini okutur.
+
+  Yeni üst etiket bu bileşenle yazılmalı. Büyük harf sınıfı uygulamada yalnızca
+  Derslerim'deki doğrulama kodu girdisinde kaldı ve orada doğru: kod alfabesinde "I" yok
+  (CodeGenerator.cs) ve sunucu ToUpperInvariant ile karşılaştırıyor (SessionRules.cs).
+  Sınıf o girdinin dışında yeniden görünürse "SANA ANLATABILIR" hatası geri gelmiş olur.
+*/
+export function UstEtiket({ className = '', children, ...props }) {
+  const parcalar = Children.toArray(children)
+  const duz = parcalar.every((c) => typeof c === 'string' || typeof c === 'number')
+  return (
+    <Text accessibilityLabel={duz ? parcalar.join('') : undefined} className={className} {...props}>
+      {Children.map(children, (c) => (typeof c === 'string' ? buyukHarf(c) : c))}
+    </Text>
+  )
+}
+
+/*
+  Rozet rolleri: success = olumlu durum (brand-800/brand-100 6.34:1), warning = YALNIZCA
+  bekleyen/dikkat, danger = tehlike. Olumlu durum marka mavisi: yeşil marka paletinin
+  dışındaydı (kullanıcı kararı, A düzeni). Anlamı olmayan etiket (kategori, yön) neutral.
+*/
 const ROZET_TONLARI = {
   neutral: { kutu: 'bg-slate-100', yazi: 'text-slate-700' },
   brand: { kutu: 'bg-brand-100', yazi: 'text-brand-700' },
-  success: { kutu: 'bg-emerald-100', yazi: 'text-emerald-700' },
+  success: { kutu: 'bg-brand-100', yazi: 'text-brand-800' },
   warning: { kutu: 'bg-amber-100', yazi: 'text-amber-800' },
   danger: { kutu: 'bg-rose-100', yazi: 'text-rose-700' },
 }
@@ -119,6 +198,38 @@ export function Badge({ tone = 'neutral', className = '', children }) {
   return (
     <View className={`self-start rounded-full px-2.5 py-0.5 ${t.kutu} ${className}`}>
       <Text className={`text-xs font-medium ${t.yazi}`}>{children}</Text>
+    </View>
+  )
+}
+
+/**
+ * Sayaç rozeti — "senden bekleyen iş var" işareti (gelen istek, işlem bekleyen ders).
+ * Badge'den ayrı: Badge durum ANLATIR ve her zaman görünür, bu yalnızca sayı taşır ve
+ * sayı 0 iken HİÇ çizilmez ("0" yazan kırmızı nokta kullanıcıyı boş bir ekrana çağırır).
+ * Tek renk (rose-600 + beyaz), Mesajlar sekmesindeki okunmamış rozetiyle aynı dil.
+ *
+ * EKRAN OKUYUCUDAN GİZLİ: sayı değiştiğinde kendi başına duyurulmuyor. Sayıyı ebeveyn
+ * düğmenin erişim adı taşımalı ("Derslerim, 2 ders işlem bekliyor"); rozet ayrıca
+ * okunsaydı düğme adından kopuk bir "2" durağı olurdu.
+ *
+ * 9'dan sonrası "9+": 44px'lik ikon düğmesinin köşesine iki haneden fazlası sığmıyor ve
+ * onuncu işten sonra kesin sayı karar değiştirmiyor. Konumu çağıran className ile verir
+ * (ikon düğmesinde `absolute`): dokunma alanının İÇİNDE kalmalı, tur çıpası ölçüsü değişmesin.
+ */
+export function SayacRozeti({ sayi, className = '' }) {
+  if (!(sayi > 0)) return null
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      className={`h-[18px] min-w-[18px] items-center justify-center rounded-full bg-rose-600 px-1 ${className}`}
+    >
+      <Text
+        className="text-[11px] font-semibold leading-[14px] text-white"
+        style={{ fontVariant: ['tabular-nums'] }}
+      >
+        {sayi > 9 ? '9+' : sayi}
+      </Text>
     </View>
   )
 }
@@ -202,22 +313,54 @@ export function Field({ label, hint, children }) {
  * Girdi — web'deki .input sınıfının karşılığı. 16px punto korunuyor: RN'de iOS'un
  * otomatik yakınlaştırma derdi yok ama 16px, dokunmatik okunabilirliğin alt sınırı
  * olarak bilinçli bir tasarım eşiğiydi; py ile birlikte ~44px yükseklik veriyor.
+ *
+ * Placeholder slate-500 (beyazda 4.76:1); slate-400 2.56:1'di ve birçok alanda ne
+ * yazılacağını ("Örn. ...") yalnızca placeholder anlatıyor. Koyulaşan placeholder girilmiş
+ * bir değer gibi okunabilir: çıplak değer yazma ("000000", hazır doğrulama kodu). Örnek
+ * gerekiyorsa "Örn." ile başlat, değilse ne yazılacağını söyleyen cümle yaz.
+ *
+ * KENAR slate-500 (beyazda 4.76:1, slate-50 zeminde 4.55:1). slate-200 kenar 1.23:1'di:
+ * Keşfet'in arama kutusu ve sohbetin mesaj kutusu zeminden seçilmiyor, kutunun nerede
+ * başladığını yalnızca placeholder ele veriyordu. WCAG 1.4.11 bileşen sınırı için 3:1
+ * istiyor; slate-400 (2.56:1) eşiği geçmediği için geçen en açık ton 500.
+ *
+ * ODAK 2px brand-600. RN'de outline/ring yok, odağı gösterecek tek şey kenar; ama kenar
+ * kalınlaşınca içerik 1px kayar ve yazılan metin odakla birlikte zıplardı. Dolgu aynı
+ * oranda 1px azalıyor (px-3 → 11px, py-2.5 → 9px): kenar + dolgu toplamı iki durumda da
+ * aynı. Çağıranın onFocus/onBlur'u ezilmesin diye zincirleniyor. Girdi'ye kenar ya da
+ * dolgu sınıfı veren çağıran yok; verilirse NativeWind birleştirmediği için bu hesap bozulur.
  */
-export function Girdi({ className = '', ...props }) {
+export function Girdi({ className = '', onFocus, onBlur, ...props }) {
+  const [odak, setOdak] = useState(false)
   return (
     <TextInput
-      placeholderTextColor={slate[400]}
-      className={`min-h-[44px] w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5
-                  text-base text-slate-900 ${className}`}
+      placeholderTextColor={slate[500]}
+      onFocus={(e) => {
+        setOdak(true)
+        onFocus?.(e)
+      }}
+      onBlur={(e) => {
+        setOdak(false)
+        onBlur?.(e)
+      }}
+      className={`min-h-[44px] w-full rounded-lg bg-white text-base text-slate-900
+                  ${odak ? 'border-2 border-brand-600 px-[11px] py-[9px]' : 'border border-slate-500 px-3 py-2.5'}
+                  ${className}`}
       {...props}
     />
   )
 }
 
+/* Başarı bildirimi marka mavisi (brand-800/brand-50 7.16:1): yeşil marka paletinin dışındaydı
+   (kullanıcı kararı, A düzeni). info ile aynı görünüm; ayrı anahtar çağıranın niyetini taşıyor.
+   warning YALNIZCA bekleyen/dikkat. Yıkıcı ya da geri alınamaz eylemin SONUCUNU anlatan uyarı
+   (hesap silme, itiraz) danger: amber'de kalınca yönetimdeki ban ve arkadaşlık sonlandırma
+   onaylarından hafif okunuyordu. ErrorBox ile aynı kutu (rose-800/rose-50 7.30:1). */
 const NOTICE_TONLARI = {
-  success: { kutu: 'border-emerald-200 bg-emerald-50', yazi: 'text-emerald-800' },
+  success: { kutu: 'border-brand-200 bg-brand-50', yazi: 'text-brand-800' },
   info: { kutu: 'border-brand-200 bg-brand-50', yazi: 'text-brand-800' },
   warning: { kutu: 'border-amber-200 bg-amber-50', yazi: 'text-amber-900' },
+  danger: { kutu: 'border-rose-200 bg-rose-50', yazi: 'text-rose-800' },
 }
 
 /** Kısa süreli bilgi/başarı bildirimi (sayfa üstünde) — web Notice'in portu. */
@@ -330,7 +473,8 @@ export function Modal({ open, title, onClose, children, footer, kapatilabilir = 
                 hitSlop={12}
                 className="min-h-[32px] min-w-[32px] items-center justify-center"
               >
-                <Text className="text-lg text-slate-400">✕</Text>
+                {/* slate-500: ✕ sayfanın tek görünür çıkışı, süs değil; slate-400 2.56:1'di. */}
+                <Text className="text-lg text-slate-500">✕</Text>
               </Pressable>
             )}
           </View>

@@ -7,7 +7,8 @@ import { useAsync } from '../src/state/useAsync'
 import { useInbox } from '../src/state/InboxContext'
 import { formatDateTime } from '../src/lib/format'
 import { Avatar } from '../src/components/Avatar'
-import { Badge, Button, EmptyState, ErrorBox, Loading, Notice } from '../src/components/ui'
+import { Badge, Button, Card, EmptyState, ErrorBox, GeriDugmesi, Loading, Notice, SayacRozeti } from '../src/components/ui'
+import { ogrenciKonusu } from '../src/lib/iliski'
 
 /*
   ARKADAŞLAR — web'deki pages/Matches.jsx'in portu. Kök yığın ekranı (ÇEKMECEDEN ve
@@ -25,11 +26,16 @@ import { Badge, Button, EmptyState, ErrorBox, Loading, Notice } from '../src/com
   • Üç sekme kısa adla (Gelen/Giden/Arkadaş): dar ekranda uzun ad iki satıra kırılıp
     şeridi tırtıklıyordu; sayaç kalır, uzun ad düşer. "Arkadaşlar" sayaçla birlikte
     sığmadığı için kısa ad "Arkadaş" (web'de 375px'te ölçüldü).
-  • Konusuz eşleşme = üniversite ağı isteği: requestedTopicName null gelir ve kart
-    "Sohbet isteği" der — boş bir "Almak istediğin:" satırı basılmaz.
+  • Konusuz eşleşme (üniversite ağı ya da Arkadaş Ekle isteği): requestedTopicName null
+    gelir ve kart "Arkadaşlık · ders içermez" der — boş bir "Almak istediğin:" satırı
+    basılmaz. Eskiden "Üniversite ağı · Sohbet isteği" diyordu; ama Arkadaş Ekle'den gelen
+    istek de konusuz ve kabul edilmiş arkadaşlıkta "istek" sözü yanlıştı. Kartın asıl
+    söylemesi gereken, bu ilişkiden ders rezerve edilemeyeceği.
   • Sonlandırma tek taraflı ve geri alınamaz — tek tıkla olmaz, satır içi onay kutusu.
-  • Üniversite ağı eşleşmesinden ders REZERVE EDİLEMEZ (sunucu da reddeder): konusuz
-    eşleşmede "Ders rezerve et" düğmesi hiç çizilmez.
+  • "Ders rezerve et" yalnızca bu eşleşmede ÖĞRENCİ olduğum bir konu varsa çizilir
+    (lib/iliski.js → ogrenciKonusu; Derslerim'in rezervasyon listesiyle aynı tanım).
+    Konusuz eşleşmeden ders rezerve edilemez (sunucu da reddeder). Takassız ve anlatanın
+    ben olduğum eşleşmede de yok: rezervasyonu dersi alan taraf yapar.
 */
 
 const TABS = [
@@ -72,32 +78,28 @@ export default function Eslesmeler() {
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
-      <View className="flex-row items-center gap-2 border-b border-slate-200 bg-white px-2 py-2">
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Geri"
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-          className="h-11 w-11 items-center justify-center rounded-lg"
-        >
-          <Text className="text-xl text-slate-500">←</Text>
-        </Pressable>
-        {/* min-w-0 flex-1: satırda geri düğmesi var ve düz View daralmadığı için alt başlık
-            ekranın sağından taşıp kırpılıyordu (yonetim.jsx'teki başlıkla aynı kalıp). */}
-        <View className="min-w-0 flex-1">
-          <Text className="text-lg font-bold text-slate-900">Arkadaşlar</Text>
-          <Text className="text-xs text-slate-500">
-            İstek kabul edilince sohbet açılır; ders de oradan planlanır.
-          </Text>
-        </View>
+      <View className="flex-row items-center gap-3 border-b border-slate-200 bg-white px-4 py-2">
+        <GeriDugmesi onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
+        <Text className="min-w-0 flex-1 text-lg font-bold text-slate-900">Arkadaşlar</Text>
       </View>
 
-      <View className="m-4 mb-0 flex-row rounded-lg bg-slate-100 p-1">
+      {/* Açıklama cümlesi başlık şeridinde değil içeriğin başında (Derslerim ve Topluluk'la aynı
+          yer). Şeritte 390 dp'de iki satıra kırılıyordu: şerit öteki yığın başlıklarından 16px
+          uzuyor ve geri düğmesi ekranlar arasında geçerken 8px zıplıyordu (ölçüldü). */}
+      <Text className="mx-4 mt-4 text-sm text-slate-600">
+        İstek kabul edilince sohbet açılır; ders de oradan planlanır.
+      </Text>
+
+      <View className="mx-4 mt-3 flex-row rounded-lg bg-slate-100 p-1">
         {TABS.map((item) => {
           const sayi = lists[item.key]?.length ?? 0
           return (
             <Pressable
               key={item.key}
               accessibilityRole="tab"
+              // Sayı adın içinde: Gelen'deki rozet ekran okuyucudan gizli (SayacRozeti), yani
+              // ad vermeseydik o sekme sayısız okunurdu. Üç sekme aynı biçimde adlanıyor.
+              accessibilityLabel={sayi > 0 ? `${item.label}, ${sayi}` : item.label}
               accessibilityState={{ selected: tab === item.key }}
               onPress={() => setTab(item.key)}
               className={`min-h-[44px] flex-1 flex-row items-center justify-center gap-1 rounded-md ${
@@ -111,7 +113,18 @@ export default function Eslesmeler() {
               >
                 {item.label}
               </Text>
-              {sayi > 0 && <Text className="text-xs text-slate-400">({sayi})</Text>}
+              {/* Gelen, Akış başlığındaki sayaçla aynı rozeti taşıyor: kullanıcıyı buraya o
+                  rozet çağırdı ve iş burada. Giden ile Arkadaş iş değil bilgi, nötr parantez
+                  kalıyor. Rengi slate-600: slate-400 beyaz zeminde bile 2.56:1'di (WCAG 1.4.3). */}
+              {item.key === 'incoming' ? (
+                <SayacRozeti sayi={sayi} />
+              ) : (
+                sayi > 0 && (
+                  <Text className="text-xs text-slate-600" style={{ fontVariant: ['tabular-nums'] }}>
+                    ({sayi})
+                  </Text>
+                )
+              )}
             </Pressable>
           )
         })}
@@ -239,7 +252,7 @@ function MatchKarti({ match, tab, router, onChanged }) {
   }
 
   return (
-    <View className="rounded-2xl border border-slate-100 bg-white p-5">
+    <Card>
       <Pressable
         accessibilityRole="link"
         accessibilityLabel={`${match.otherDisplayName} profilini aç`}
@@ -265,7 +278,7 @@ function MatchKarti({ match, tab, router, onChanged }) {
         </Text>
       ) : (
         <Text className="mt-3 text-sm text-slate-600">
-          Üniversite ağı · <Text className="font-semibold text-slate-800">Sohbet isteği</Text>
+          Arkadaşlık · <Text className="font-semibold text-slate-800">ders içermez</Text>
         </Text>
       )}
 
@@ -282,7 +295,7 @@ function MatchKarti({ match, tab, router, onChanged }) {
             {/* Etiketlerde ad: kart başına aynı "Kabul et / Reddet" ekran okuyucuda kimin isteği
                 olduğunu söylemiyordu. Görünen metinle başlıyor (WCAG 2.5.3). */}
             <Button
-              variant="success"
+              variant="primary"
               className="flex-1"
               loading={busy === 'accept'}
               accessibilityLabel={`Kabul et, ${match.otherDisplayName}`}
@@ -321,8 +334,21 @@ function MatchKarti({ match, tab, router, onChanged }) {
             {/* min-w-[45%]: flex-1'in tabanı 0 olduğu için satır hiç sarmıyordu; Sonlandır 94 px'ini
                 alıyor, iki birincil eylem kalan alana sıkışıp varsayılan boyutta harf ortasından
                 bölünüyordu ("Sohb/et"). Artık Sonlandır gerekirse alt satıra iniyor. */}
-            {match.requestedTopicName && (
-              <Button variant="secondary" className="min-w-[45%] flex-1" onPress={() => router.push('/dersler')}>
+            {/*
+              KOŞUL `requestedTopicName` DEĞİL, öğrenci konusu. Eski koşul, karşı tarafın benden
+              takassız ders istediği arkadaşlıkta da düğmeyi çiziyordu: rezervasyon listesinde o
+              arkadaş hiç yok (anlatan benim) ve düğme "sana anlatılacak konu yok" diyen boş bir
+              sayfaya çıkıyordu. Adres de parametresizdi; kullanıcı Derslerim'de "+ Rezerve et"e
+              yeniden basıp arkadaşını listeden yeniden seçiyordu. ?rezerve= sayfayı bu arkadaş
+              seçili açar (app/dersler.jsx).
+            */}
+            {ogrenciKonusu(match) && (
+              <Button
+                variant="secondary"
+                className="min-w-[45%] flex-1"
+                accessibilityLabel={`Ders rezerve et, ${match.otherDisplayName}`}
+                onPress={() => router.push(`/dersler?rezerve=${match.matchId}`)}
+              >
                 Ders rezerve et
               </Button>
             )}
@@ -333,13 +359,23 @@ function MatchKarti({ match, tab, router, onChanged }) {
             >
               Sonlandır
             </Button>
+            {/* Düğmenin yokluğu tek başına bir şey anlatmıyor: ders konusu olan arkadaşlıkta
+                kullanıcı "neden rezerve edemiyorum?" diye kalıyordu. w-full satırı kırar. */}
+            {!ogrenciKonusu(match) && match.requestedTopicName ? (
+              <Text className="w-full text-xs text-slate-600">
+                Bu derste anlatan sensin; rezervasyonu {match.otherDisplayName} yapar. Saati sohbette
+                kararlaştırın.
+              </Text>
+            ) : null}
           </>
         )}
       </View>
 
+      {/* Sonlandırma geri alınamaz: yıkıcı eylem onayı rose (A düzeni). Amber yalnızca
+          bekleyen durumu anlatır; yönetimdeki ban onayıyla aynı kutu. */}
       {confirmClose && (
-        <View className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-          <Text className="text-sm text-amber-900">
+        <View className="mt-3 rounded-lg border border-rose-200 bg-rose-50 p-3">
+          <Text className="text-sm text-rose-800">
             <Text className="font-semibold">{match.otherDisplayName}</Text> ile arkadaşlığın
             sonlandırılsın mı? Sohbet geçmişin durur ama yeni mesaj yazamazsın ve bu arkadaşlıktan
             ders rezerve edilemez. Geri alınamaz.
@@ -360,6 +396,6 @@ function MatchKarti({ match, tab, router, onChanged }) {
           <ErrorBox error={error} />
         </View>
       )}
-    </View>
+    </Card>
   )
 }

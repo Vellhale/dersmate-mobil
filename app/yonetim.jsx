@@ -13,15 +13,18 @@ import { DISPUTE_REASON_LABELS, REPORT_REASON_LABELS, formatDateTime } from '../
 import {
   Badge,
   Button,
+  Card,
   EmptyState,
   ErrorBox,
   Field,
+  GeriDugmesi,
   Girdi,
   Loading,
   Modal,
   Notice,
   SectionTitle,
   Spinner,
+  UstEtiket,
 } from '../src/components/ui'
 
 /*
@@ -89,15 +92,8 @@ export default function Yonetim() {
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
-      <View className="flex-row items-center gap-2 border-b border-slate-200 bg-white px-2 py-2">
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Geri"
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-          className="h-11 w-11 items-center justify-center rounded-lg"
-        >
-          <Text className="text-xl text-slate-500">←</Text>
-        </Pressable>
+      <View className="flex-row items-center gap-3 border-b border-slate-200 bg-white px-4 py-2">
+        <GeriDugmesi onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
         <View className="min-w-0 flex-1">
           <Text className="text-lg font-bold text-slate-900">Yönetim</Text>
           <Text className="text-xs text-slate-500">
@@ -134,9 +130,12 @@ export default function Yonetim() {
                   >
                     {item.label}
                   </Text>
+                  {/* rose-600 (beyazla 4.70:1); rose-500 3.67:1'di ve 10px metin AA'nın büyük metin
+                      muafiyetine giremeyecek kadar küçüktü, punto da 11px'e çıktı. SayacRozeti
+                      DEĞİL: o 9'dan sonra "9+" yazıyor, yönetim kuyruğunda gerçek sayı iş yükü. */}
                   {sayi > 0 && (
-                    <View className="rounded-full bg-rose-500 px-1.5 py-0.5">
-                      <Text className="text-[10px] font-bold leading-none text-white">{sayi}</Text>
+                    <View className="rounded-full bg-rose-600 px-1.5 py-0.5">
+                      <Text className="text-[11px] font-semibold leading-none text-white">{sayi}</Text>
                     </View>
                   )}
                 </Pressable>
@@ -183,14 +182,14 @@ export default function Yonetim() {
 */
 function KuyrukKarti({ children, aksiyonlar }) {
   return (
-    <View className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
+    <Card dolgu="p-0" className="overflow-hidden">
       <View className="gap-2 p-5">{children}</View>
       {aksiyonlar && (
         <View className="flex-row flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-5 py-3.5">
           {aksiyonlar}
         </View>
       )}
-    </View>
+    </Card>
   )
 }
 
@@ -863,7 +862,7 @@ const ADAY_DURUMU = {
 const ADAY_KARARLARI = {
   Verify: {
     label: 'Doğrula',
-    variant: 'success',
+    variant: 'primary',
     title: 'Beyanı doğrula',
     hint: 'Profilde "Doğrulandı" rozeti görünür. Gerekçeye hangi belgeyi gördüğünü yaz — sistemde belge kaydı yok, bu not tek dayanak.',
     ornek: 'Örn: Öğrenci belgesi e-posta ile gönderildi, 2026 bahar dönemi.',
@@ -1073,7 +1072,7 @@ function AdayKarti({ row, onKarar }) {
       aksiyonlar={
         <>
           {row.reviewStatus !== 'Verified' && (
-            <Button variant="success" onPress={() => onKarar({ row, karar: 'Verify' })}>
+            <Button variant="primary" onPress={() => onKarar({ row, karar: 'Verify' })}>
               Doğrula
             </Button>
           )}
@@ -1128,7 +1127,7 @@ function AdayKarti({ row, onKarar }) {
         {/* Davranışsal sinyal: beyanı fiilen kullanıyor mu? */}
         <Text
           className={`text-xs ${
-            row.completedVolunteerSessions > 0 ? 'font-medium text-emerald-700' : 'text-slate-600'
+            row.completedVolunteerSessions > 0 ? 'font-medium text-brand-700' : 'text-slate-600'
           }`}
         >
           Gönüllü ders: {row.completedVolunteerSessions} tamamlandı · {row.volunteerOfferCount} açık
@@ -1302,7 +1301,7 @@ const KARARLAR = [
     value: 'ForTutor',
     label: 'Eğitmen haklı — puanı bas',
     hint: 'Ders tamamlanmış sayılır ve eğitmene süreye göre puan yazılır.',
-    variant: 'success',
+    variant: 'primary',
   },
   {
     value: 'Dismissed',
@@ -1563,17 +1562,17 @@ function IncelemeSayfasi({ disputeId, onClose, onKarara }) {
           {/* İKİ TARAFIN BEYANI. Eğitmen yanıtı yoksa bu da hakem için bir veridir. */}
           <View className="gap-2">
             <View className="rounded-xl border border-rose-200 bg-rose-50 p-3">
-              <Text className="text-xs font-medium uppercase tracking-wide text-rose-700">
+              <UstEtiket className="text-xs font-medium tracking-wide text-rose-700">
                 Öğrencinin iddiası · {formatDateTime(d.createdAtUtc)}
-              </Text>
+              </UstEtiket>
               <Text className="mt-1 text-sm leading-relaxed text-slate-700">{d.description}</Text>
             </View>
 
             <View className="rounded-xl border border-slate-200 bg-white p-3">
-              <Text className="text-xs font-medium uppercase tracking-wide text-slate-500">
+              <UstEtiket className="text-xs font-medium tracking-wide text-slate-500">
                 Eğitmenin savunması
                 {d.tutorStatementAtUtc ? ` · ${formatDateTime(d.tutorStatementAtUtc)}` : ''}
-              </Text>
+              </UstEtiket>
               {d.tutorStatement ? (
                 <Text className="mt-1 text-sm leading-relaxed text-slate-700">
                   {d.tutorStatement}
@@ -1638,7 +1637,7 @@ function TarafKarti({ baslik, taraf, onBan, pasif }) {
     <View className="rounded-xl border border-slate-200 p-3">
       <View className="flex-row items-start justify-between gap-2">
         <View className="min-w-0 flex-1">
-          <Text className="text-xs uppercase tracking-wide text-slate-600">{baslik}</Text>
+          <UstEtiket className="text-xs tracking-wide text-slate-600">{baslik}</UstEtiket>
           <Text numberOfLines={1} className="font-medium text-slate-800">
             {taraf.displayName}
           </Text>

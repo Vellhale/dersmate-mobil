@@ -13,7 +13,12 @@
   döndürüyor. Sunucu değişmiyor, api.js yüzeyi web ile aynı kalıyor.
 
   ⚠️ Web'de de aynı boşluk var (Profile.jsx ve Discover.jsx myMatches okumuyor); bu
-  düzeltme mobilde doğdu, web'e taşınmalı.
+  düzeltme mobilde doğdu, web'e taşınmalı. `ogrenciKonusu` ve `konuHaritasi` (Akış ve
+  YKS kartlarının konu durumu) da web'de yok, onlar da taşınacaklar listesinde.
+  `ogrenciKonusu`nun iki tüketicisi daha web'de eksik: Matches.jsx "Ders rezerve et"i hâlâ
+  `requestedTopicName`e bakarak çiziyor (anlatanın ben olduğum takassız arkadaşlıkta da
+  çıkıyor ve boş rezervasyon sayfasına götürüyor), Sessions.jsx de `?rezerve=` ön seçimini
+  bilmiyor (mobil: app/eslesmeler.jsx, app/dersler.jsx).
 */
 
 /** Kimlikler iki kaynaktan geliyor (adres, liste yanıtı); harf büyüklüğü farkı eşleşmeyi ıskalatmasın. */
@@ -53,5 +58,57 @@ export function iliskiHaritasi(eslesmeler) {
   ekle(eslesmeler.active, ILISKI.arkadas)
   ekle(eslesmeler.incoming, ILISKI.gelen)
   ekle(eslesmeler.outgoing, ILISKI.giden)
+  return harita
+}
+
+/**
+ * Eşleşmede oturum sahibinin ÖĞRENCİ olduğu konu — karşı tarafın bana anlattığı.
+ * İsteği ben başlattıysam istediğim konu, karşı taraf başlattıysa bana teklif ettiği konu.
+ * Konusuz (üniversite ağı) eşleşmede ya da teklifsiz gelen istekte null: o eşleşmede
+ * öğrenci olduğum bir konu yok.
+ */
+export function ogrenciKonusu(m) {
+  /* Tür tanımı SUNUCUDA: RequestedTopicId null olan eşleşme konusuz (üniversite ağı) eşleşmedir ve
+     BookSession.cs rezervasyonu 409 ile reddeder. Konusuz dal OfferedTopicId'yi doğrulamadığı için
+     elle çağrılan uçla offered dolu bir konusuz eşleşme doğabiliyor; bu kontrol olmadan kart hem
+     "ders içermez" hem "Ders rezerve et" gösteriyordu. */
+  if (!m.requestedTopicId) return null
+  const topicId = m.iAmInitiator ? m.requestedTopicId : m.offeredTopicId
+  if (!topicId) return null
+  return { topicId, topicName: m.iAmInitiator ? m.requestedTopicName : m.offeredTopicName }
+}
+
+/** Konu haritasının anahtarı: aynı kişiyle her konu ayrı bir istek. Haritayı okuyan da iyimser
+    işareti yazan da bunu kullanır; iki yerde elle kurulan dize ayrışıp ıskalardı. */
+export const konuAnahtari = (userId, topicId) => `${kimlikAnahtari(userId)}|${topicId}`
+
+/**
+ * KONU HARİTASI — "bu kişiden şu konuyu almak için aramızda ne var?"
+ *
+ * NEDEN KİŞİ HARİTASI YETMİYOR: ders istekleri KONU başına. Sunucu (MatchRequests.cs)
+ * yalnızca aynı kişiye AYNI KONUDA bekleyen isteği reddediyor; Türev'de arkadaş olunan
+ * kişiye Limit için istek atmak geçerli. Kartı kişi başına pasifleştirmek bu ikinci isteği
+ * engellerdi, hiç bakmamak da aynı konuya ikinci basışı 409'a gönderiyordu.
+ *
+ * Anahtar `userId|topicId`, değer `{ durum: 'aktif' | 'bekliyor', matchId }`. Aktif önce
+ * yazılır ve bekleyen onu ezmez: arkadaşlığı süren konuda "istek bekliyor" demek rezervasyon
+ * yolunu gizlerdi. Gelen istekler haritada YOK: onlarda öğrenci olduğum konu karşı tarafın
+ * teklifi, bana gönderilecek bir isteği kapatmıyor.
+ *
+ * @param eslesmeler `api.myMatches()` yanıtı (`{ incoming, outgoing, active }`) ya da null
+ */
+export function konuHaritasi(eslesmeler) {
+  const harita = new Map()
+  if (!eslesmeler) return harita
+
+  for (const m of eslesmeler.active ?? []) {
+    const konu = ogrenciKonusu(m)
+    if (konu) harita.set(konuAnahtari(m.otherUserId, konu.topicId), { durum: 'aktif', matchId: m.matchId })
+  }
+  for (const m of eslesmeler.outgoing ?? []) {
+    if (!m.requestedTopicId) continue
+    const anahtar = konuAnahtari(m.otherUserId, m.requestedTopicId)
+    if (!harita.has(anahtar)) harita.set(anahtar, { durum: 'bekliyor', matchId: m.matchId })
+  }
   return harita
 }

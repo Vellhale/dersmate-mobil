@@ -16,7 +16,7 @@ import { useAuth } from '../../src/state/AuthContext'
 import { useInbox } from '../../src/state/InboxContext'
 import { parseHubError } from '../../src/hooks/useChatHub'
 import { formatTime } from '../../src/lib/format'
-import { Badge, Button, ErrorBox, Field, Girdi, Loading, Modal, Notice } from '../../src/components/ui'
+import { Badge, Button, ErrorBox, Field, GeriDugmesi, Girdi, Loading, Modal, Notice } from '../../src/components/ui'
 
 /*
   KONUŞMA EKRANI — web'deki Chat.jsx'in KONUŞMA yarısının portu. Web'in tüm sıralama
@@ -114,7 +114,7 @@ export default function Konusma() {
 
     Bağlantı koptuğu sırada karşı tarafın yazdığı mesajlar canlı olarak gelemiyor;
     yeniden bağlanınca da yalnızca gruba KATILINIYOR, geçmiş yeniden okunmuyordu.
-    Sonuç: başlıktaki nokta yeşile dönüp "Canlı bağlantı" yazıyor — yani kullanıcı her
+    Sonuç: başlıktaki nokta maviye dönüp "Canlı bağlantı" yazıyor — yani kullanıcı her
     şeyin yolunda olduğunu sanıyor — ama kopukluk sırasındaki mesajlar sohbette hiç
     görünmüyor. Ancak ekran kapatılıp yeniden açılırsa ortaya çıkıyorlardı.
 
@@ -176,16 +176,11 @@ export default function Konusma() {
       <Stack.Screen options={{ headerShown: false }} />
 
       <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        {/* Başlık: geri + kişi (profile götürür) + durum. */}
-        <View className="flex-row items-center gap-2 border-b border-slate-200 bg-white px-2 py-2">
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Sohbet listesine dön"
-            onPress={() => (router.canGoBack() ? router.back() : router.replace('/mesajlar'))}
-            className="h-11 w-11 items-center justify-center rounded-lg"
-          >
-            <Text className="text-xl text-slate-500">←</Text>
-          </Pressable>
+        {/* Başlık: geri + kişi (profile götürür) + durum. Kenar px-4 (diğer yığın başlıkları gibi,
+            daire mesaj listesinin p-4 kenarına oturuyor) ama aralık gap-2: şeritte dört-beş öğe
+            var ve gap-3 isim sütunundan 12px daha götürüp alt başlığı erken kırpıyordu. */}
+        <View className="flex-row items-center gap-2 border-b border-slate-200 bg-white px-4 py-2">
+          <GeriDugmesi accessibilityLabel="Sohbet listesine dön" onPress={() => (router.canGoBack() ? router.back() : router.replace('/mesajlar'))} />
 
           <Pressable
             accessibilityRole="link"
@@ -233,7 +228,7 @@ export default function Konusma() {
         </View>
 
         {sikayetBildirimi && (
-          <View className="px-3 pt-3">
+          <View className="px-4 pt-3">
             <Notice tone="success" onDismiss={() => setSikayetBildirimi(null)}>
               {sikayetBildirimi}
             </Notice>
@@ -270,13 +265,14 @@ export default function Konusma() {
         )}
 
         {active?.isClosed ? (
-          <View className="border-t border-slate-200 bg-white p-3">
+          <View className="border-t border-slate-200 bg-white px-4 py-3">
             <Text className="text-center text-sm text-slate-500">
               Bu arkadaşlık sonlandırıldı. Geçmişi okuyabilirsin ama yeni mesaj gönderemezsin.
             </Text>
           </View>
         ) : (
-          <View className="border-t border-slate-200 bg-white p-3">
+          <View className="border-t border-slate-200 bg-white px-4 py-3">
+            {/* px-4: başlık şeridi ve mesaj balonlarıyla aynı sol kenar (GeriDugmesi turunda şerit px-4 oldu). */}
             {sendError && <Text className="mb-2 text-sm text-rose-600">{sendError.message}</Text>}
             <View className="flex-row items-end gap-2">
               <Girdi
@@ -497,9 +493,12 @@ function LinkliMetin({ metin, className, linkClassName }) {
   Bağlantı durumu — web'deki ConnectionBadge'in dar-ekran hâli: başlıkta metinli rozet
   yerine renkli NOKTA (yer yok), metin accessibilityLabel'da. Liste ekranındaki tam
   rozet zaten durumu kelimeyle söylüyor.
+
+  Olumlu durum marka mavisi: yeşil marka paletinin dışındaydı (kullanıcı kararı, A düzeni).
+  brand-500 beyaz başlıkta 3.9:1, grafik nesne eşiğini (3:1) geçiyor.
 */
 const NOKTA_RENK = {
-  connected: 'bg-emerald-500',
+  connected: 'bg-brand-500',
   connecting: 'bg-amber-400',
   reconnecting: 'bg-amber-400',
   disconnected: 'bg-rose-500',

@@ -156,11 +156,13 @@ export default function Hakkimizda() {
                 Web'de OnayIkonu (emerald tik) vardı; mobilde o çizim yok. Tik yerine
                 glif kullanılıyor ve ekran okuyucudan GİZLENİYOR: "onay işareti Akran
                 öğrenmesi" diye okunması, listeyi anlatmak yerine gürültü olurdu.
+                Tik marka mavisi (brand-700, beyazda 6.25:1): yeşil marka paletinin
+                dışındaydı (kullanıcı kararı, A düzeni).
               */}
               <Text
                 importantForAccessibility="no"
                 accessibilityElementsHidden
-                className="text-sm text-emerald-600"
+                className="text-sm text-brand-700"
               >
                 ✓
               </Text>
