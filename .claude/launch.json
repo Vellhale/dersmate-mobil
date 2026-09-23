@@ -6,6 +6,21 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "web:onizleme"],
       "port": 8090
+    },
+    {
+      "name": "onizleme-demo",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "cross-env",
+        "EXPO_PUBLIC_ONIZLEME=1",
+        "EXPO_PUBLIC_API_URL=http://127.0.0.1:5099",
+        "expo",
+        "start",
+        "--web",
+        "--port",
+        "8091"
+      ],
+      "port": 8091
     }
   ]
 }

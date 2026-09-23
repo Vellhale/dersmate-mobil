@@ -2,31 +2,36 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AccessibilityInfo, FlatList, Pressable, Text, View, useWindowDimensions } from 'react-native'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { sekmeAltDolgusu } from '../../src/lib/sekmeCubugu'
-import { api } from '../../src/lib/api'
-import { engelDegisti, engelSurumu } from '../../src/lib/engelSurumu'
-import { ILISKI } from '../../src/lib/iliski'
-import { useIliskiler } from '../../src/state/useIliskiler'
-import { formatDate } from '../../src/lib/format'
-import { seviyeEtiketi, seviyeHesapla } from '../../src/lib/seviye'
-import { useAsync } from '../../src/state/useAsync'
-import { useDebounced } from '../../src/hooks/useDebounced'
-import { Avatar } from '../../src/components/Avatar'
-import { SeviyeRozeti } from '../../src/components/SeviyeRozeti'
-import { YonetimRozeti } from '../../src/components/YonetimRozeti'
-import { EslesmeIstegiModali } from '../../src/components/EslesmeIstegiModali'
-import { EngellemeModali } from '../../src/components/EngellemeModali'
-import { EkranBasligi } from '../../src/components/EkranBasligi'
-import { KepIkonu, SaatIkonu, YildizIkonu } from '../../src/components/Ikonlar'
-import { Badge, Button, Card, EmptyState, ErrorBox, Field, Girdi, Loading, Modal, Notice, Spinner } from '../../src/components/ui'
-import { amber, brand, slate } from '../../src/lib/theme'
+import { api } from '../src/lib/api'
+import { engelDegisti, engelSurumu } from '../src/lib/engelSurumu'
+import { ILISKI } from '../src/lib/iliski'
+import { useIliskiler } from '../src/state/useIliskiler'
+import { formatDate } from '../src/lib/format'
+import { seviyeEtiketi, seviyeHesapla } from '../src/lib/seviye'
+import { useAsync } from '../src/state/useAsync'
+import { useDebounced } from '../src/hooks/useDebounced'
+import { Avatar } from '../src/components/Avatar'
+import { SeviyeRozeti } from '../src/components/SeviyeRozeti'
+import { YonetimRozeti } from '../src/components/YonetimRozeti'
+import { EslesmeIstegiModali } from '../src/components/EslesmeIstegiModali'
+import { IlanKarti } from '../src/components/IlanKarti'
+import { EngellemeModali } from '../src/components/EngellemeModali'
+import { EkranBasligi } from '../src/components/EkranBasligi'
+import { HamburgerDugmesi } from '../src/components/Cekmece'
+import { KepIkonu, SaatIkonu, YildizIkonu } from '../src/components/Ikonlar'
+import { Badge, Button, Card, EmptyState, ErrorBox, Field, Girdi, Loading, Modal, Notice, Spinner } from '../src/components/ui'
+import { amber, brand, slate } from '../src/lib/theme'
 
 /*
   KEŞFET — web'deki pages/Discover.jsx'in portu, İKİ FARKLA:
 
-  1. ÖNERİ MODU BURADA YOK: kişiselleştirilmiş öneriler Akış sekmesinde yaşıyor
-     (Instagram düzeninin gereği). Keşfet saf arama/filtre ekranı — web'de "arama
-     kutusuna dokununca girilen" mod, burada varsayılan.
+  1. ÖNERİ MODU VARSAYILAN — web'deki gibi. (Bir süre öyle değildi: öneriler ayrı bir
+     Akış sekmesinde yaşıyordu ve burada yalnızca arama/filtre vardı. O ayrım
+     2026-09-23'te KALDIRILDI; gerekçe web'in kendi yorumunda yazılı
+     (Discover.jsx:96-98): öneriler için ayrı sekme açmak hem gezinmeyi şişiriyor hem
+     de kullanıcıyı "önerilerde mi arıyorum, katalogda mı" ikilemine sokuyor. Mobil
+     tam da o ayrı sekmeyi açmıştı; sekme çubuğu kalkınca ayrımın taşıyıcısı da
+     kalmadı.)
   2. SAYFALAMA DEĞİL SONSUZ KAYDIRMA: web önceki/sonraki düğmeleri kullanıyordu;
      mobil listede sayfa değiştirme düğmesi başparmağa ters — FlatList onEndReached
      sayfaları BİRİKTİRİR. Filtre/arama değişince liste sıfırdan kurulur.
@@ -260,9 +265,23 @@ export default function Kesfet() {
   const searchMode = debouncedTerm.trim().length > 0 || filtersTouched
 
   const categories = useAsync(() => api.categories(), [])
-  // Arkadaş isteği modalındaki takas teklifi listesi için (Akış'takiyle aynı ihtiyaç).
+  // Arkadaş isteği modalındaki takas teklifi listesi ve öneri kipindeki portföy uyarısı için.
   const portfolio = useAsync(() => api.myPortfolio(), [])
   const myOffers = portfolio.data?.filter((e) => e.direction === 'Offer') ?? []
+  const mySeekCount = portfolio.data?.filter((e) => e.direction === 'Seek').length ?? 0
+
+  /*
+    ÖNERİ KİPİ — web'in Discover varsayılanı (Discover.jsx:92). Arama kutusuna
+    yazılınca ya da filtreye dokununca katalog sonuçlarına geçiliyor, temizlenince
+    önerilere dönülüyor: web'deki davranışın aynısı (searchMode zaten bu ayrımı
+    taşıyordu, yalnızca boş dalı bir yer tutucu metindi).
+
+    KOŞULSUZ YÜKLENİYOR (web de öyle): YKS, Keşfet'in açılış kipi — istek ilk
+    render'da zaten gerekli. Kipe bağlanmış bir useAsync, sekme değiştirip dönen
+    kullanıcıya her seferinde yeniden istek attırırdı.
+  */
+  const oneriler = useAsync(() => api.suggestions(20), [])
+  const oneriKipi = yksKipi && !searchMode
 
   const yks = useBirikenListe(
     yksKipi && searchMode,
@@ -378,6 +397,18 @@ export default function Kesfet() {
 
   const baslikBolumu = (
     <View className="gap-3 pb-3">
+      {/* ÖNERİ KİPİNİN kendi hata kutusu ve portföy uyarısı. Katalog aramasının hata
+          kutusu aşağıda ayrı duruyor: ikisi farklı istekler, biri düşerken öteki
+          çalışıyor olabilir. */}
+      {oneriKipi && <ErrorBox error={oneriler.error} onRetry={() => oneriler.reload()} />}
+      {/* Hata hâlinde bilgi kutusu ÇIKMAZ: portföy çekilemediyse mySeekCount=0 veri
+          değil bilinmezliktir — "konu ekle" demek yanlış yönlendirirdi. */}
+      {oneriKipi && !portfolio.loading && !portfolio.error && mySeekCount === 0 && (
+        <Notice tone="info">
+          Öneriler, “Almak istediğim konular” listenden üretilir. Soldaki menüden “Ders
+          Portföyü”ne en az bir konu ekleyerek başla.
+        </Notice>
+      )}
       {/* Sekme şeridi — üç sekme EŞİT GENİŞLİKTE (Arkadaşlar ekranındaki kalıp). Eski
           self-start şerit üç sekmeyle 360 dp ve 1.3 yazı ölçeğinde ~346 dp tutuyor,
           kullanılabilir genişlik 328 dp: son sekme ekran dışına düşüp dokunulamaz olurdu.
@@ -409,7 +440,7 @@ export default function Kesfet() {
           ? 'Adını bildiğin birini bul ve arkadaş isteği gönder. Ders ilanı vermemiş, profilini doldurmamış kişiler de burada çıkar.'
           : universiteKipi
             ? 'Aynı üniversiteden ya da okumak istediğin bölümden öğrencileri bul.'
-            : 'Katalogdaki tüm ders ilanlarında ara; önerilerin Akış sekmesinde.'}
+            : 'Almak istediğin konulara göre seçilmiş öneriler aşağıda. Katalogda aramak için yaz ya da filtrele.'}
       </Text>
 
       {notice && (
@@ -559,22 +590,39 @@ export default function Kesfet() {
         </Button>
       }
     />
-  ) : (
+  ) : oneriler.loading ? (
+    <Loading />
+  ) : oneriler.error ? null : (
+    /* Hata kutusu başlıkta çiziliyor; burada ikinci kez bildirmek aynı olayı iki kez
+       söylerdi. */
     <EmptyState
-      title="Aramaya başla"
-      description="Konu, ders ya da eğitmen adı yaz — ya da filtreyle TYT/AYT kataloğunu süz."
+      title="Şimdilik öneri yok"
+      description="Ders Portföyü’ndeki “Almak istediğim konular” listeni genişlet ya da yukarıdan konu, ders veya eğitmen adı arat."
     />
   )
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
-      <EkranBasligi baslik="Keşfet" />
+      <EkranBasligi baslik="Keşfet" sol={<HamburgerDugmesi />} />
 
       <FlatList
-        data={arkadasKipi && (isimKisa || isimBekliyor || !sonucGuncel) ? [] : liste.items}
-        keyExtractor={(item) => (yksKipi ? item.offerId : item.userId)}
+        data={
+          oneriKipi
+            ? oneriler.data ?? []
+            : arkadasKipi && (isimKisa || isimBekliyor || !sonucGuncel)
+              ? []
+              : liste.items
+        }
+        /* Öneri kipinde öğeler KİŞİ, katalogda İLAN: anahtar alanı da onunla değişiyor.
+           Tek alana bağlansaydı kip geçişinde anahtarlar çakışır ve FlatList kartları
+           yanlış yeniden kullanırdı. */
+        keyExtractor={(item) => (oneriKipi || !yksKipi ? item.userId : item.offerId)}
         renderItem={({ item }) =>
-          yksKipi ? (
+          oneriKipi ? (
+            /* Web'deki Suggestions kartının mobil karşılığı — Akış silinince buraya
+               döndü, kartın kendisi değişmedi. */
+            <IlanKarti kisi={item} onIstek={setHedef} />
+          ) : yksKipi ? (
             <IlanSonucKarti offer={item} onIstek={setHedef} />
           ) : (
             /* Arkadaş Ekle kartı YENİDEN YAZILMADI: iki listede gösterilen şey aynı, bir kişi
@@ -590,15 +638,22 @@ export default function Kesfet() {
           )
         }
         contentContainerClassName="gap-3 p-4"
-        /* Yüzen sekme çubuğu içeriğin ÜSTÜNDE duruyor; alt dolgu olmadan son öğe onun
-           altında kalır (bkz. src/lib/sekmeCubugu.js). */
-        contentContainerStyle={{ paddingBottom: sekmeAltDolgusu(guvenli.bottom) }}
+        /* Alt dolgu = güvenli alan (home indicator) + nefes payı. Eskiden buraya yüzen
+           sekme çubuğunun yüksekliği de giriyordu (sekmeCubugu.js); çubuk kalktı, gezinme
+           artık soldaki çekmeceden ve içeriğin üstünde duran bir katman yok. */
+        contentContainerStyle={{ paddingBottom: guvenli.bottom + 16 }}
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={baslikBolumu}
         ListEmptyComponent={bosDurum}
         /* Liste gizliyken (yazılan sorguya yetişilmedi) bağlanmıyor: boş veride
            VirtualizedList onEndReached'i tetikliyor ve ESKİ sorgunun sonraki sayfası isteniyordu. */
-        onEndReached={arkadasKipi && (isimKisa || isimBekliyor || !sonucGuncel) ? undefined : liste.dahaGetir}
+        /* Öneri kipi SAYFALANMIYOR: api.suggestions sabit 20 kayıt döndürüyor, sonraki
+           sayfa diye bir şey yok — bağlansaydı liste sonunda boşa istek koşardı. */
+        onEndReached={
+          oneriKipi || (arkadasKipi && (isimKisa || isimBekliyor || !sonucGuncel))
+            ? undefined
+            : liste.dahaGetir
+        }
         onEndReachedThreshold={0.4}
         ListFooterComponent={
           liste.ekYukleme ? (
@@ -626,6 +681,9 @@ export default function Kesfet() {
         onSent={(name) => {
           setHedef(null)
           setNotice(`${name} kişisine arkadaş isteği gönderildi. Kabul edilince sohbet açılacak.`)
+          /* Sessiz tazeleme: istek gönderilen kişi öneri listesinden düşsün ama liste
+             spinner’a dönmesin (web’deki suggestions.reload() kararının aynısı). */
+          oneriler.reload({ silent: true })
         }}
       />
 

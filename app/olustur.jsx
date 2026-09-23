@@ -1,15 +1,15 @@
 import { useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { sekmeAltDolgusu } from '../../src/lib/sekmeCubugu'
-import { api } from '../../src/lib/api'
-import { useAsync } from '../../src/state/useAsync'
-import { EkranBasligi } from '../../src/components/EkranBasligi'
-import { KonuSecici } from '../../src/components/KonuSecici'
-import { Badge, Button, Card, ErrorBox, Field, Girdi, Loading, Modal, Notice } from '../../src/components/ui'
+import { api } from '../src/lib/api'
+import { useAsync } from '../src/state/useAsync'
+import { EkranBasligi } from '../src/components/EkranBasligi'
+import { HamburgerDugmesi } from '../src/components/Cekmece'
+import { KonuSecici } from '../src/components/KonuSecici'
+import { Badge, Button, Card, ErrorBox, Field, Girdi, Loading, Modal, Notice } from '../src/components/ui'
 
 /*
-  DERS İLANI OLUŞTUR — web'deki pages/Portfolio.jsx'in portu (➕ sekmesi).
+  DERS İLANI OLUŞTUR — web'deki pages/Portfolio.jsx'in portu. Çekmecede "Ders Portföyü".
 
   Dinamik portföy (Modül 1.1): iki yönlü profil.
     Offer = "Verebileceğim konular"   → PUAN KAZANDIRIR (ders onaylandığında basılır)
@@ -38,12 +38,13 @@ export default function Olustur() {
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
-      <EkranBasligi baslik="Ders Portföyü" />
+      <EkranBasligi baslik="Ders Portföyü" sol={<HamburgerDugmesi />} />
 
       <ScrollView contentContainerClassName="gap-3 p-4"
-        /* Yüzen sekme çubuğu içeriğin ÜSTÜNDE duruyor; alt dolgu olmadan son öğe onun
-           altında kalır (bkz. src/lib/sekmeCubugu.js). */
-        contentContainerStyle={{ paddingBottom: sekmeAltDolgusu(guvenli.bottom) }}
+        /* Alt dolgu = güvenli alan (home indicator) + nefes payı. Eskiden buraya yüzen
+           sekme çubuğunun yüksekliği de giriyordu (sekmeCubugu.js); çubuk kalktı, gezinme
+           artık soldaki çekmeceden ve içeriğin üstünde duran bir katman yok. */
+        contentContainerStyle={{ paddingBottom: guvenli.bottom + 16 }}
       >
         <Text className="text-sm leading-relaxed text-slate-600">
           Anlatabildiğin konular puan kazandırır; almak istediklerin ücretsizdir. İkisini de

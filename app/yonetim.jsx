@@ -3,6 +3,7 @@ import { FlatList, Image, Pressable, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { api } from '../src/lib/api'
+import { forumDegisti } from '../src/lib/forumSurumu'
 import { useYetkiliGorsel } from '../src/components/YetkiliGorsel'
 import { rose } from '../src/lib/theme'
 import { useAsync } from '../src/state/useAsync'
@@ -774,6 +775,11 @@ function IcerikKarariSayfasi({ hedef, onClose, onUygulandi }) {
         remove: !kaldirilmis,
         reason: gerekce.trim(),
       })
+
+      /* Topluluk ekranı kök yığında KURULU kalıyor ve bu işlem tam onun verisini
+         değiştirdi. Sayaç artmasaydı moderatör geri döndüğünde kaldırdığı gönderiyi
+         hâlâ görürdü (gerekçe: src/lib/forumSurumu.js). */
+      forumDegisti()
 
       const ad = gonderi ? 'Gönderi' : 'Yorum'
       onUygulandi(

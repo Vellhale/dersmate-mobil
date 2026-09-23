@@ -1,4 +1,4 @@
-import Svg, { Circle, Path } from 'react-native-svg'
+import Svg, { Circle, Path, Rect } from 'react-native-svg'
 import { ink } from '../lib/theme'
 
 /*
@@ -10,8 +10,9 @@ import { ink } from '../lib/theme'
   çizgileri react-native-svg ile çiziliyor.
 
   RN FARKI: currentColor yok — renk, kullanıldığı yerden `renk` prop'u ile gelir
-  (tab bar zaten aktif/pasif rengi parametre olarak veriyor). `kalinlik` web'deki
-  strokeWidth; aktif sekme kalın çizgiyle vurgulanır (web'deki Layout kararı).
+  (çekmece aktif/pasif rengi parametre olarak veriyor). `kalinlik` web'deki
+  strokeWidth; çekmecede aktif satır kalın çizgiyle vurgulanır (web'deki Layout
+  kararı).
 */
 
 function Cizgi({ children, renk = ink, boy = 24, kalinlik = 2 }) {
@@ -290,6 +291,63 @@ export function TakvimIkonu(props) {
       <Path d="M16 2v4" />
       <Path d="M3 6h18v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
       <Path d="M3 10h18" />
+    </Cizgi>
+  )
+}
+
+/*
+  ── SOSYAL HESAP İKONLARI ─────────────────────────────────────────────────────
+  Web'deki üçünün birebir portu (Layout.jsx → SOSYAL, çekmecenin alt kümesi).
+  Marka ikonlarının RESMÎ logoları kullanılmıyor: setin geri kalanıyla tek dilde
+  kalsınlar diye aynı 24'lük ızgarada, tek çizgiyle yeniden çizildiler (web kararı).
+*/
+
+/** Instagram: yuvarlatılmış kare + mercek + sağ üstte dolu nokta. */
+export function InstagramIkonu(props) {
+  /* Nokta DOLGULU çizilmeli; web'de `fill="currentColor"` yapıyordu. RN'de
+     currentColor yok, o yüzden çağıranın rengi doğrudan alınıyor. Cizgi
+     sarmalayıcısı Svg'ye fill="none" veriyor, çocuk onu ezebiliyor. */
+  const dolgu = props.renk ?? ink
+  return (
+    <Cizgi {...props}>
+      <Rect x="2" y="2" width="20" height="20" rx="5" />
+      <Circle cx="12" cy="12" r="4" />
+      <Circle cx="17.5" cy="6.5" r="0.5" fill={dolgu} />
+    </Cizgi>
+  )
+}
+
+/** TikTok: nota gövdesi + sağ üstten çıkan yay. */
+export function TiktokIkonu(props) {
+  return (
+    <Cizgi {...props}>
+      <Path d="M14 3v9.6a3.4 3.4 0 1 1-2.4-3.3" />
+      <Path d="M14 3a5.6 5.6 0 0 0 5.6 5.6" />
+    </Cizgi>
+  )
+}
+
+/** X: iki çapraz. */
+export function XIkonu(props) {
+  return (
+    <Cizgi {...props}>
+      <Path d="M4 4l16 16" />
+      <Path d="M20 4 4 20" />
+    </Cizgi>
+  )
+}
+
+/**
+ * Menü (hamburger) — web'deki MenuIkonu'nun portu (Ikonlar.jsx:30-36, üç yatay çizgi).
+ * Çekmeceyi açan düğmede kullanılır. Web'de iki ayrı hamburger var (dar ekranda
+ * çekmeceyi açan, geniş ekranda rayı daraltan); mobilde tek iş yapar: çekmeceyi açar.
+ */
+export function MenuIkonu(props) {
+  return (
+    <Cizgi {...props}>
+      <Path d="M4 6h16" />
+      <Path d="M4 12h16" />
+      <Path d="M4 18h16" />
     </Cizgi>
   )
 }
