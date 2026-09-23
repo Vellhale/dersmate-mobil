@@ -16,9 +16,9 @@ sunucudan okunur.
 
 Aşağıdaki görüntüler **demo modunda** alınmıştır (temsili veriler, sunucu bağlantısı yok).
 
-| Akış | Keşfet | Konu seçici |
+| Topluluk | Keşfet | Konu seçici |
 |---|---|---|
-| ![Akış](docs/ekranlar/akis.png) | ![Keşfet](docs/ekranlar/kesfet.png) | ![Konu seçici](docs/ekranlar/konu-secici.png) |
+| ![Topluluk](docs/ekranlar/akis.png) | ![Keşfet](docs/ekranlar/kesfet.png) | ![Konu seçici](docs/ekranlar/konu-secici.png) |
 | Instagram düzeninde öneri kartları | Arama + TYT/AYT filtreleri | Sınav → TYT/AYT → Ders → Konu |
 
 | Sohbet | Profil | Derslerim |
@@ -150,11 +150,17 @@ npx eas-cli build --profile onizleme --platform android
 ```
 app/                      expo-router rotaları
   (auth)/                 giriş · kayıt · e-posta doğrulama
-  (tabs)/                 alt sekmeler: akış · keşfet · oluştur · mesajlar · profil
-  dersler.jsx             Derslerim (yığın ekranı)
-  eslesmeler.jsx          Arkadaşlar (yığın ekranı; rota adı bilerek eski)
+  index.jsx               Topluluk — ana ekran
+  kesfet.jsx              Keşfet (varsayılan kip: öneriler)
+  olustur.jsx             Ders Portföyü
+  mesajlar.jsx            Sohbet listesi
+  profil/index.jsx        Profilim
+  dersler.jsx             Derslerim (kendi geri şeridi var)
+  eslesmeler.jsx          Arkadaşlar (rota adı bilerek eski)
+  yonetim.jsx             moderasyon kuyrukları
   profil/[userId].jsx     başkasının profili
   sohbet/[conversationId].jsx   konuşma ekranı
+  +not-found.jsx          bilinmeyen adres → Keşfet (web'in path="*" karşılığı)
 src/
   components/             yüzey dili (ui.jsx), kartlar, modallar, ikonlar
   lib/                    api · tema · depolama · biçimlendirme · HWID · demo verisi
@@ -162,9 +168,14 @@ src/
   hooks/                  useChatHub · useDebounced
 ```
 
-Gezinme **Instagram düzenindedir**: beş sekmeli alt bar (Akış · Keşfet · ➕ · Mesajlar ·
-Profil). Derslerim ve Arkadaşlar sekme değildir — Akış başlığındaki ikonlardan ve profil
-kısayollarından açılan yığın ekranlarıdır.
+Gezinme **soldaki çekmecededir** — alt sekme çubuğu yoktur. Sol üstteki hamburgere
+dokununca web'in sol rayının birebir karşılığı açılır: Keşfet · Ders Portföyü ·
+Arkadaşlar · Sohbet · Derslerim · Topluluk (yöneticide ayrıca Yönetim). Okunmamış mesaj
+sayısı hamburgerin üstünde rozet olarak durur.
+
+Ana ekran **Topluluk**'tur. Ekranların hepsi kök yığındadır ve `dangerouslySingular`
+taşır: çekmeceden gezinmek yığını büyütmez, açık olan ekranı en üste taşır — biriken
+sayfalar ve kaydırma yeri korunur.
 
 ---
 

@@ -10,13 +10,13 @@ import { Avatar } from './Avatar'
 import {
   AramaIkonu,
   BilgiIkonu,
-  EvIkonu,
   KalkanIkonu,
   KepIkonu,
   KisilerIkonu,
   KitapIkonu,
   MenuIkonu,
   MesajIkonu,
+  ToplulukIkonu,
 } from './Ikonlar'
 
 /*
@@ -37,13 +37,14 @@ import {
      sayfası (IzinSayfasi, app/_layout.jsx'te kökte) bir Modal — hamburger onun
      arkasında kalırdı. Topluluk'un üç alt sayfası da aynı durumda.
 
-  3. SEKME MAKİNESİNİ YIKARDI. (tabs)/_layout.jsx'i Drawer'a çevirmek yüzen hapı,
-     AktifIsik göstergesini, sekmeCubugu.js geometrisini ve DÖRT tur çıpasını birden
-     götürürdü.
+  3. SEKME MAKİNESİNİ YIKARDI — bu gerekçe 2026-09-23'te GEÇERSİZ KALDI: sekme çubuğu
+     zaten kaldırıldı (gezinmenin tek yolu bu çekmece). Kayıtta duruyor çünkü kararın
+     o günkü maliyet hesabını açıklıyor; bugün Drawer'a geçmenin önündeki engel
+     yalnızca 1 ve 2.
 
   Bu yüzden çekmece, uygulamanın zaten her yerde kullandığı RNModal ilkelinden kuruldu.
   Kazanç: yeni native bağımlılık yok, YENİDEN DERLEME YOK (saf JS — Metro üzerinden
-  anında görünür) ve sekme çubuğu olduğu gibi kalıyor.
+  anında görünür).
 
   ─── GÖRSEL DİL WEB'DEN ─────────────────────────────────────────────────────────
   Zemin slate-900 (`ink`), vurgu `brand-300`. Bu seçim web'de ÖLÇÜLMÜŞ: brand-300 koyu
@@ -54,20 +55,23 @@ import {
   ⚠️ Öğe yüksekliği min 44px — CLAUDE.md'nin koşulsuz dokunma kuralı.
 */
 
-/* Web'deki NAV dizisinin (Layout.jsx:58-90) birebir sırası. Rota adları mobilde
-   farklı ve bu FARK BİLİNÇLİ: /portfolio→/olustur, /arkadaslar→/eslesmeler (yeniden
-   adlandırma CLAUDE.md'de yasak — tur çıpası ve derin bağlantı ona bağlı),
-   /sohbet→/mesajlar. Etiketler web'dekiyle aynı tutuldu. */
+/* Web'deki NAV dizisinin (Layout.jsx:58-90) birebir sırası ve birebir etiketleri.
+   Rota adları mobilde farklı ve bu FARK BİLİNÇLİ: /portfolio→/olustur,
+   /arkadaslar→/eslesmeler (yeniden adlandırma CLAUDE.md'de yasak — tur çıpası ve
+   derin bağlantı ona bağlı), /sohbet→/mesajlar, /topluluk→/ (ana ekran).
+
+   ⚠️ SEKME ÇUBUĞU YOK (2026-09-23): gezinmenin TEK yolu burası. Listeden düşen bir
+   hedef, uygulamada ulaşılamaz hâle gelir — web'de sol raydan düşürmekle aynı şey. */
 const OGELER = [
   { yol: '/kesfet', etiket: 'Keşfet', Ikon: AramaIkonu },
   { yol: '/olustur', etiket: 'Ders Portföyü', Ikon: KitapIkonu },
   { yol: '/eslesmeler', etiket: 'Arkadaşlar', Ikon: KisilerIkonu },
   { yol: '/mesajlar', etiket: 'Sohbet', Ikon: MesajIkonu, rozet: true },
   { yol: '/dersler', etiket: 'Derslerim', Ikon: KepIkonu },
-  /* Topluluk ARTIK ANA SEKME ('/'), çekmecede ayrı satırı yok — sekme çubuğundan
-     zaten bir dokunuş uzakta. Yerine Akış geldi: ana sekmeden indi ve tek girişi
-     burası. */
-  { yol: '/akis', etiket: 'Akış', Ikon: EvIkonu },
+  /* Web sol rayının son satırı Topluluk (Layout.jsx:89) — çekmece artık o rayın
+     BİREBİR karşılığı. Yol '/akis' değil '/': Topluluk aynı zamanda ana ekran, ayrı
+     bir /topluluk adresine gitmek aynı ekranı yığına ikinci kez iterdi. */
+  { yol: '/', etiket: 'Topluluk', Ikon: ToplulukIkonu },
 ]
 
 function Oge({ Ikon, etiket, aktif, rozet, onPress }) {
@@ -133,9 +137,11 @@ export function Cekmece({ acik, onKapat, aktifYol }) {
 
   function git(yol) {
     onKapat()
-    /* push DEĞİL replace DEĞİL — navigate: aynı rotaya tekrar basınca yığına kopya
-       eklemesin, zaten açık olan ekrana dönsün. Web'de de öğeye basınca çekmece
-       kapanıyor (Layout.jsx:439). */
+    /* `navigate` TEK BAŞINA kopyayı engellemiyor: expo-router'ın StackRouter'ı mevcut
+       rotayı yalnızca hedef O ANKİ rotayla aynıysa yeniden kullanıyor, yığında daha
+       aşağıda duran bir ekrana basınca KOPYA itiyor. Kopyayı engelleyen şey kök
+       yığındaki `dangerouslySingular` (app/_layout.jsx) — gerekçesi orada.
+       Web'de de öğeye basınca çekmece kapanıyor (Layout.jsx:439). */
     router.navigate(yol)
   }
 
@@ -230,13 +236,13 @@ export function Cekmece({ acik, onKapat, aktifYol }) {
 /*
   SAĞLAYICI — çekmece durumu tek yerde.
 
-  Beş sekme ekranının her birine ayrı `acik` durumu koymak, ekran değiştirince menünün
-  kapanmasına ya da iki ekranda birden açık kalmasına yol açardı. Durum sekme kabuğunda
-  ((tabs)/_layout.jsx) yaşıyor ve Modal da orada çiziliyor.
+  Her ekrana ayrı `acik` durumu koymak, ekran değiştirince menünün kapanmasına ya da
+  iki ekranda birden açık kalmasına yol açardı. Durum KÖKTE yaşıyor (app/_layout.jsx,
+  InboxProvider'ın içinde) ve Modal da orada çiziliyor.
 
-  ⚠️ Modal SEKME KABUĞUNDA çiziliyor, ekranların içinde değil: RNModal ayrı bir yerel
+  ⚠️ Modal KÖK KABUKTA çiziliyor, ekranların içinde değil: RNModal ayrı bir yerel
   pencere ve hangi ekranda açıldığından bağımsız olarak tam ekran kaplar. Ekran başına
-  bir Modal olsaydı sekme geçişinde takılı kalan kopyalar doğardı.
+  bir Modal olsaydı geçişte takılı kalan kopyalar doğardı.
 */
 const CekmeceBaglami = createContext(null)
 
@@ -271,20 +277,41 @@ export function useCekmece() {
  */
 export function HamburgerDugmesi() {
   const { ac } = useCekmece()
-  /* TUR ÇIPASI: 'eslesmeler' ve 'dersler' adımları eskiden Akış başlığındaki iki
-     ikona ışık tutuyordu. O ikonlar kalktı (hedefleri çekmeceye taşındı), çıpa da
-     buraya geldi. İki adım da aynı öğeyi gösteriyor ve bu doğru: ikisinin de yolu
-     menüden geçiyor. */
+  const { unreadTotal } = useInbox()
+  /* TUR ÇIPASI: 'matches' ve 'sessions' adımları eskiden Akış başlığındaki iki ikona
+     ışık tutuyordu. O ikonlar kalktı (hedefleri çekmeceye taşındı), çıpa da buraya
+     geldi. İki adım da aynı öğeyi gösteriyor ve bu doğru: ikisinin de yolu menüden
+     geçiyor.
+
+     ⚠️ AYNI ÇIPA ADI BEŞ EKRANDA BİRDEN kayıtlı: bu düğme her kabuk ekranında ayrı
+     bir örnek ve kök yığın alttakini monte tutuyor. tur.js'in defteri bu yüzden
+     sayaçlı — biri sökülünce çıpa ölmesin (gerekçe turCipasiSil'de). */
   const cipa = useTurCipasi('menu')
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Menüyü aç"
+      accessibilityLabel={unreadTotal > 0 ? `Menüyü aç, ${unreadTotal} okunmamış mesaj` : 'Menüyü aç'}
       onPress={ac}
       className="-ml-2 h-11 w-11 items-center justify-center rounded-lg active:bg-slate-100"
       {...cipa}
     >
       <MenuIkonu renk={slate[700]} boy={24} />
+      {/*
+        OKUNMAMIŞ ROZETİ — sekme çubuğundaki tabBarBadge'in yerini alıyor (2026-09-23).
+        Çubuk kalkınca okunmamış sayısı YALNIZCA çekmece açılınca görünür olacaktı:
+        kullanıcı yeni mesajı olduğunu fark edemezdi. Hamburger artık her kabuk
+        ekranında duran tek kalıcı gezinme işareti, rozetin yeri burası.
+
+        Rakam rozetin içinde ama erişilebilir ad cümleyi taşıyor (yukarıda): çıplak
+        bir sayı ekran okuyucuda bağlamsız kalırdı — sekme çubuğundaki kuralın aynısı.
+      */}
+      {unreadTotal > 0 ? (
+        <View className="absolute right-0.5 top-0.5 min-w-[18px] items-center rounded-full bg-rose-600 px-1 py-px">
+          <Text className="text-[10px] font-bold text-white">
+            {unreadTotal > 99 ? '99+' : unreadTotal}
+          </Text>
+        </View>
+      ) : null}
     </Pressable>
   )
 }

@@ -469,6 +469,56 @@ ve App Store Connect'e o adres. Metin zaten yazılı; taşınması gerekiyor.
   dokunulmazdır ve buraya TAŞINMAZ — HWID cihazı tanımlar, kullanıcıyı değil; aynı
   kullanıcının telefonu "başka bir cihaz"dır ve backend için sorun değildir.
 
+## Gezinme — çekmece, sekme çubuğu YOK (2026-09-23)
+
+Uygulamada **alt sekme çubuğu yok**; gezinmenin tek yolu sol üstteki hamburgerden açılan
+çekmece (`src/components/Cekmece.jsx`). Web'in sol rayının (`Layout.jsx` → NAV) birebir
+karşılığı: Keşfet · Ders Portföyü · Arkadaşlar · Sohbet · Derslerim · Topluluk
+(+ yöneticide Yönetim). **Listeden düşen hedef uygulamada ULAŞILAMAZ olur.**
+
+Ana ekran (`/`) **Topluluk** — burada web'den bilinçli olarak ayrılıyoruz (web `/kesfet`
+açıyor). Ürün kararı.
+
+### Düzleştirme: `(tabs)` grubu YOK
+
+Beş kabuk ekranı kök yığında: `app/index.jsx` (Topluluk), `kesfet`, `olustur`,
+`mesajlar`, `profil/index`. Grup klasörü URL üretmediği için **adresler değişmedi**.
+
+⛔ **`dangerouslySingular` ŞART** (`app/_layout.jsx`). expo-router'ın StackRouter'ı
+`navigate`de mevcut rotayı yalnızca hedef O ANKİ rotayla aynıysa yeniden kullanıyor;
+çekmeceden gezinme aksi hâlde her seferinde yeni ekran İTER (Topluluk→Keşfet→Mesajlar→
+Topluluk = dört ekran). Bayrak, StackRouter'ı "mevcut rotayı bul ve EN ÜSTE TAŞI"ya
+çeviriyor: yığın sınırlı kalıyor ve ekran SÖKÜLMÜYOR, yani Keşfet'in biriken sayfaları
+yaşıyor. Yeni bir kabuk/çekmece hedefi eklenirse ona da verilmeli.
+
+⚠️ Kökte **`anchor` YOK** ve bu ölçülmüş: kök layout'un rota adı boş olduğu için
+expo-router varsayılan anchor kurmuyor, React Navigation `routeNames[0]`e düşüyor ve
+guard'lar doğru ekranı bırakıyor. `anchor: 'index'` eklemek her derin bağlantının altına
+1900 satırlık Topluluk'u iterdi.
+
+`app/+not-found.jsx` web'in `path="*"` davranışını veriyor (bilinmeyen adres → Keşfet;
+oturumsuzsa → giriş). Sabit hedef veremez: korunan ekranlar guard kapalıyken rota
+ağacında hiç yok, koşulsuz `/kesfet` sonsuz döngü olurdu.
+
+### Tur çıpaları
+
+`rutbe`, `kesfet`, `portfoy`, `sohbet` çıpalarının TEK kaydı sekme düğmeleriydi; çubuk
+gidince dördü de düştü ve o adımlar **çıpasız** bırakıldı — `tur.js` bunu zaten KURAL
+sayıyor (çıpasız adım ortada kart). `menu`ya yığmak beş adımı aynı 44px kutuya
+işaret ettirirdi. Adım metinleri "sekmesinde" demekten "sol üstteki menüde"ye çevrildi.
+
+⛔ **Çekmecenin İÇİNE çıpa konulamaz:** RNModal ayrı pencere, kapalıyken satırlar takılı
+değil ve tur örtüsü açıkken kullanıcı çekmeceyi açamıyor.
+
+⚠️ `menu` çıpası **her kabuk ekranında** kayıtlı (hamburger her birinde ayrı örnek) ve
+kök yığın alttakini monte tutuyor. `tur.js`'in ölçüm defteri bu yüzden **sayaçlı**:
+sahiplerden biri sökülünce çıpa ölmüyor, son sahip çıkınca düşüyor.
+
+### Okunmamış rozeti
+
+Sekme çubuğundaki `tabBarBadge` gitti; rozet **hamburger düğmesinde**. Çekmeceye taşınsa
+yalnızca menü açılınca görünürdü — kullanıcı yeni mesajı fark edemezdi.
+
 ## Web'den bilinçli sapmalar
 
 - `localStorage` → oturum + HWID **SecureStore**'da, tercihler AsyncStorage'da
@@ -546,13 +596,14 @@ ve App Store Connect'e o adres. Metin zaten yazılı; taşınması gerekiyor.
   orada token zaten ölü.
 - **Arkadaşlar ekranının rotası `/eslesmeler` kaldı** (`app/eslesmeler.jsx`); web #31'de
   adres `/arkadaslar` oldu, yalnızca kullanıcıya görünen metinler taşındı. Dosyayı
-  yeniden adlandırma: tur çıpası `eslesmeler`, `dersmate://eslesmeler` derin bağlantısı
-  ve kök `Stack.Protected` listesi ona bağlı — listeye eklenmeyen yeni ad OTURUMSUZ da
-  açılır. Algoritma anlamındaki "eşleşme" ise "öneri" oldu ("Şimdilik öneri yok"), metin
+  yeniden adlandırma: çekmecedeki satır (`src/components/Cekmece.jsx` → OGELER),
+  `dersmate://eslesmeler` derin bağlantısı ve kök `Stack.Protected` listesi ona bağlı —
+  listeye eklenmeyen yeni ad OTURUMSUZ da açılır. (Tur çıpası artık `eslesmeler` DEĞİL:
+  2026-09-23'te `menu`ya taşındı, bkz. "Gezinme".) Algoritma anlamındaki "eşleşme" ise "öneri" oldu ("Şimdilik öneri yok"), metin
   eşleşmesi gibi teknik anlamlar olduğu gibi kaldı.
 - **Başka ekranda değişen veri ODAKTA tazelenir**, yeniden kurulumla değil. Web rota
   değişiminde sayfayı söküp yeniden kuruyor ve sorgular kendiliğinden baştan koşuyor.
-  Mobilde sekme ekranları ve üstüne yığın açılan ekranlar KURULU kalıyor, `useAsync` de
+  Mobilde kök yığındaki ekranlar (ve üstlerine açılanlar) KURULU kalıyor, `useAsync` de
   odak dinlemiyor. Tazelenmeyen ekran geri dönülünce eski veriyi gösterir; bu hata iki
   yerde yaşandı (profilde engellenen kişi Keşfet'te kaldı, Arkadaşlar ekranında kabul
   edilen istek profildeki sayıya yansımadı).
@@ -563,6 +614,14 @@ ve App Store Connect'e o adres. Metin zaten yazılı; taşınması gerekiyor.
     dönen kullanıcının biriktirdiği sayfaları silerdi. `blockUser`/`unblockUser` çağıran
     her yeni yer başarıdan sonra `engelDegisti()` çağırmalı. Sayaç api.js'e konamaz:
     önizleme api nesnesini `onizlemeApi` ile eziyor.
+  - Topluluk (ana ekran) YALNIZCA forum sürümü değiştiyse tazeleniyor
+    (`src/lib/forumSurumu.js`) — aynı desen, farklı olay. Verisini değiştiren tek dış
+    ekran Yönetim: `moderateForumContent` bir gönderiyi kaldırıyor ve Yönetim çekmeceden
+    iki dokunuş uzakta. Bu ekranda da liste `onEndReached` ile birikiyor, o yüzden
+    koşulsuz tazeleme yapılamaz.
+
+    ⚠️ Bu madde 2026-09-23'te EKLENDİ ve öncesinde kodda "bu ekranın verisini değiştiren
+    BAŞKA ekran yok" diye YANLIŞ bir gerekçe yazılıydı. Yanlıştı: Yönetim değiştiriyor.
   - İlk odak `useFocusEffect`'te de çalışır (ekran odaktayken kurulursa); ilk çekimi
     zaten yapan ekranda o çağrı atlanmalı.
 - Avatar önbellek sayacı **diskte** (`KEYS.avatarSurumleri`). Fresco'nun disk önbelleği
@@ -594,7 +653,7 @@ ve App Store Connect'e o adres. Metin zaten yazılı; taşınması gerekiyor.
    basılır (30 dk = 50, 60 dk = 100) ve harcanmaz; seviye unvanıdır.
 2. **Seviye/rozet hesabı SUNUCUDA.** `seviye.js` eşik taşımaz; `level`/`nextLevelAt`
    hazır gelir. Branş rozetleri (Öğretici 8 sa / Üstad 15 sa) de sunucudan.
-3. **SignalR tek bağlantı** — `InboxProvider` tab kabuğunda kurulur, sohbet ekranı kendi
+3. **SignalR tek bağlantı** — `InboxProvider` kök kabukta kurulur, sohbet ekranı kendi
    hub'ını AÇMAZ (iki bağlantı = bölünen gruplar, kaybolan mesajlar).
 
 ## Dokunma ve yüzey dili
@@ -610,8 +669,10 @@ ve App Store Connect'e o adres. Metin zaten yazılı; taşınması gerekiyor.
 ## Adım planı
 
 - **ADIM 1 (tamam):** iskelet, auth stack + tabs, tema, api/state katmanı.
-- **ADIM 2 (tamam):** AuthKabuk (bölünmüş tek ekran) + giriş/kayıt/doğrulama; Akış
-  (Instagram kartları — `api.suggestions`) + eşleşme isteği alt sayfası.
+- **ADIM 2 (tamam):** AuthKabuk (bölünmüş tek ekran) + giriş/kayıt/doğrulama; öneri
+  kartları (`api.suggestions`) + eşleşme isteği alt sayfası. (Öneriler bir süre ayrı bir
+  "Akış" sekmesindeydi; 2026-09-23'te web'deki yerine — Keşfet'in varsayılan kipine —
+  döndü, bkz. "Gezinme".)
 - **ADIM 3 (tamam):** Kompakt profil (ProfilGorunumu + SubjectBadges + değerlendirmeler),
   profil düzenleme + avatar (ImagePicker), `profil/[userId]`; SignalR sohbet
   (`mesajlar` listesi + `sohbet/[conversationId]` ters FlatList). Sağlayıcılar kökte
@@ -621,8 +682,8 @@ ve App Store Connect'e o adres. Metin zaten yazılı; taşınması gerekiyor.
   son basamak aranabilir); Derslerim (`app/dersler.jsx`: 5'erli infinite scroll geçmiş,
   rezervasyon + DateTimePicker, ImagePicker kanıt yükleme, onay→değerlendirme zinciri,
   şikayet/iptal, puan geçmişi); Eşleşmeler (`app/eslesmeler.jsx` — kabul/ret/sonlandır).
-  Derslerim ve Eşleşmeler tab DEĞİL: Akış başlığındaki ikonlardan ve Profil
-  kısayollarından açılan yığın ekranları.
+  Derslerim ve Eşleşmeler kabuk ekranı DEĞİL: çekmeceden ve Profil kısayollarından
+  açılan, kendi geri şeridini taşıyan yığın ekranları.
 - **ADIM 5 (tamam):** web'in `7f140a9` sonrası tüm işi mobile taşındı — Topluluk forumu
   (`app/topluluk.jsx`), yönetim kuyrukları (`app/yonetim.jsx`), yasal metinler
   (hakkimizda/gizlilik/kosullar + `yasalMetinler.js`), parola sıfırlama, kayıt onayı,
@@ -686,7 +747,10 @@ baseline ileri kalırsa gerçek bir fark hiç görünmez.
   `fixed` şeridi altına yer ayırmıyordu (`CookieBanner.jsx`). Mobilde şerit yok; veri
   tercihleri alt sayfa modalında soruluyor.
 - Web #25 (`af0e531`), dar ekran menü çekmecesinin kendi perdesinin altında kalması:
-  web'in hamburger menüsü (`Layout.jsx`). Mobilde menü yok, gezinme sekme çubuğundan.
+  web'in hamburger menüsü (`Layout.jsx`). Mobilde çekmece RNModal — ayrı bir yerel
+  pencere, perde ve panel aynı ağaçta kardeş, yani o hata buraya taşınamaz.
+  ⚠️ Bu madde 2026-09-23'ten önce "Mobilde menü yok, gezinme sekme çubuğundan" diyordu;
+  artık tam tersi (bkz. "Gezinme").
 
 ⚠️ `api.js` yüzeyini karşılaştırmak için metot adlarını çıkarıp kümeleri karşılaştır.
 Bilinçli fark **4 web ↔ 6 mobil** (2026-09-11 ölçümü: web 78, mobil 80 metot):

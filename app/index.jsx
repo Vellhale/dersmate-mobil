@@ -1,16 +1,17 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useFocusEffect } from 'expo-router'
 import { FlatList, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { sekmeAltDolgusu } from '../../src/lib/sekmeCubugu'
-import { EkranBasligi } from '../../src/components/EkranBasligi'
-import { HamburgerDugmesi } from '../../src/components/Cekmece'
-import { api } from '../../src/lib/api'
-import { useAuth } from '../../src/state/AuthContext'
-import { amber, brand, rose, slate } from '../../src/lib/theme'
-import { Avatar } from '../../src/components/Avatar'
-import { SeviyeRozeti } from '../../src/components/SeviyeRozeti'
-import { BayrakIkonu, MesajIkonu, OyOkuIkonu, UyariIkonu } from '../../src/components/Ikonlar'
-import { YonetimRozeti } from '../../src/components/YonetimRozeti'
+import { EkranBasligi } from '../src/components/EkranBasligi'
+import { HamburgerDugmesi } from '../src/components/Cekmece'
+import { api } from '../src/lib/api'
+import { forumSurumu } from '../src/lib/forumSurumu'
+import { useAuth } from '../src/state/AuthContext'
+import { amber, brand, rose, slate } from '../src/lib/theme'
+import { Avatar } from '../src/components/Avatar'
+import { SeviyeRozeti } from '../src/components/SeviyeRozeti'
+import { BayrakIkonu, MesajIkonu, OyOkuIkonu, UyariIkonu } from '../src/components/Ikonlar'
+import { YonetimRozeti } from '../src/components/YonetimRozeti'
 import {
   Badge,
   Button,
@@ -22,7 +23,7 @@ import {
   Modal,
   Notice,
   Spinner,
-} from '../../src/components/ui'
+} from '../src/components/ui'
 
 /*
   ══════════════════════════════════════════════════════════════════════════════
@@ -511,6 +512,34 @@ export default function Topluluk() {
   const [yenilemeSayaci, setYenilemeSayaci] = useState(0)
   const yenile = () => setYenilemeSayaci((n) => n + 1)
 
+  /*
+    ODAKTA TAZELEME — HER ODAKTA DEĞİL, yalnızca forum sürümü değiştiyse.
+
+    Bu ekran kök yığında KURULU kalıyor, yani odak dönüşünde hiçbir şey kendiliğinden
+    yenilenmiyor. Verisini değiştiren tek DIŞ ekran Yönetim: moderatör bir gönderiyi
+    ya da yorumu kaldırdığında (api.moderateForumContent) akıştaki kopya bayatlıyor —
+    ve Yönetim çekmeceden iki dokunuş uzakta.
+
+    Koşulsuz tazeleme YANLIŞ OLURDU: yenile() listeyi 1. sayfadan kuruyor ve liste
+    onEndReached ile birikiyor; bir gönderiye dokunup geri dönen kullanıcının
+    biriktirdiği sayfalar her dönüşte silinirdi. Keşfet'te aynı karar aynı gerekçeyle
+    alındı (src/lib/engelSurumu.js).
+
+    İşleyici ref'te: yenile() her render'da yeni kapanışla kuruluyor, odak geri
+    çağrısı ise sabit kalmalı.
+  */
+  const gorulenForumSurumu = useRef(forumSurumu())
+  const forumSonrasiTazele = useRef(null)
+  forumSonrasiTazele.current = () => {
+    gorulenForumSurumu.current = forumSurumu()
+    yenile()
+  }
+  useFocusEffect(
+    useCallback(() => {
+      if (gorulenForumSurumu.current !== forumSurumu()) forumSonrasiTazele.current()
+    }, []),
+  )
+
   const listeRef = useRef(null)
   /* Geç dönen eski yanıt yeni listeyi ezmesin: her yükleme kendi sıra numarasını taşır. */
   const seq = useRef(0)
@@ -665,17 +694,37 @@ export default function Topluluk() {
   const ipligiAc = (gonderi) => {
     const postId = gonderi.postId
     setAcikGonderiKopya(gonderi)
-    // Zaten çekildiyse tekrar isteme: kapat-aç, ağ isteği değil bir görünürlük kararı.
-    if (yorumlar[postId]?.liste) return
 
-    setYorumlar((m) => ({ ...m, [postId]: { yukleniyor: true, hata: null, liste: null } }))
+    /*
+      ÖNBELLEK GÖSTERİLİR, AMA HER AÇILIŞTA SESSİZCE TAZELENİR.
+
+      Eskiden önbellek varsa istek hiç atılmıyordu ("kapat-aç ağ isteği değil, görünürlük
+      kararı"). O karar ekran YIĞIN ekranıyken doğruydu: ekran sökülünce önbellek de
+      gidiyordu. Topluluk ana ekran olunca KURULU kalmaya başladı — sabah okunan iki
+      yorum, akşam hâlâ o iki yorumdu ve arada yazılanlar hiç görünmüyordu.
+
+      Yükleme göstergesi YALNIZCA önbellek yokken çıkıyor: elinde liste olan kullanıcıya
+      spinner göstermek, zaten doğru olan içeriği sebepsiz gizlerdi.
+    */
+    const onbellek = yorumlar[postId]?.liste
+    if (!onbellek) {
+      setYorumlar((m) => ({ ...m, [postId]: { yukleniyor: true, hata: null, liste: null } }))
+    }
     api
       .forumComments(postId)
       .then((liste) =>
         setYorumlar((m) => ({ ...m, [postId]: { yukleniyor: false, hata: null, liste } })),
       )
       .catch((err) =>
-        setYorumlar((m) => ({ ...m, [postId]: { yukleniyor: false, hata: err, liste: null } })),
+        /* Sessiz tazeleme düşerse elindeki liste KORUNUYOR ve hata gösterilmiyor:
+           kullanıcı bir şey istemedi, biz tazelemeye çalıştık. Hata yalnızca ilk
+           açılışta (önbellek yokken) anlamlı. */
+        setYorumlar((m) => ({
+          ...m,
+          [postId]: onbellek
+            ? { yukleniyor: false, hata: null, liste: onbellek }
+            : { yukleniyor: false, hata: err, liste: null },
+        })),
       )
   }
 
@@ -818,23 +867,14 @@ export default function Topluluk() {
           yığın ekranlarının dili; sekmede geri gidilecek bir yer yok ve `router.replace('/')`
           yedeği bu ekranı KENDİSİYLE değiştirirdi (geri tuşu ölü düğme olurdu). */}
       {/*
-        ⛔ ODAKTA TAZELEME YOK ve bu bilinçli (2026-09-23).
+        ODAKTA TAZELEME KOŞULLU — gerekçesi yukarıda, forumSonrasiTazele'nin yanında.
 
-        Ekran yığından sekmeye taşınınca KURULU kalmaya başladı, yani "geri dönünce
-        bayat içerik" riski doğdu. Yine de `useFocusEffect` EKLENMEDİ çünkü kazancı yok,
-        kaybı kesin:
+        ⚠️ İLK HÂLİ YANLIŞTI ve düzeltildi (2026-09-23): yorum "bu ekranın verisini
+        değiştiren BAŞKA ekran yok" diyordu. Yönetim ekranı forum içeriğini kaldırıyor
+        ve çekmeceden iki dokunuş uzakta — kaldırılan gönderi akışta duruyordu.
 
-        • KAZANÇ YOK: bu ekranın verisini değiştiren BAŞKA ekran yok. Gönderi, yorum ve
-          oy hepsi burada (ya da bu ekranın alt sayfalarında) oluyor ve yerel durumu
-          zaten güncelliyorlar. CLAUDE.md'deki "başka ekranda değişen veri" sorunu
-          burada oluşmuyor.
-        • KAYIP KESİN: `yenile()` listeyi 1. sayfadan kuruyor. Liste onEndReached ile
-          birikiyor — her odakta tazelense, bir gönderiye dokunup geri dönen kullanıcının
-          biriktirdiği sayfalar silinirdi. Keşfet'te tam bu sebeple tazeleme engel
-          sürümüne bağlanmış (src/lib/engelSurumu.js).
-
-        Zamanla eskiyen akış için doğru araç çekerek yenileme ve o zaten var
-        (RefreshControl).
+        Zamanla eskiyen akış için doğru araç yine çekerek yenileme (RefreshControl):
+        sayaç yalnızca MODERASYONU yakalıyor, "başkası yeni gönderi attı"yı değil.
       */}
       <EkranBasligi baslik="Topluluk" sol={<HamburgerDugmesi />} />
 
@@ -868,10 +908,10 @@ export default function Topluluk() {
         /* Dolgu ve boşluk YOK: gönderiler artık tam genişlik satır ve kendi p-4'ünü
            taşıyor. Başlık, boş durum ve altbilgi kendi px-4'ünü veriyor. */
         contentContainerClassName=""
-        /* YÜZEN SEKME ÇUBUĞU içeriğin ÜSTÜNDE duruyor. Bu ekran yığın ekranıyken alt
-           dolguya gerek yoktu; sekme olunca son gönderi ve "kurallar" satırı hapın
-           ALTINDA kalıyordu (bkz. src/lib/sekmeCubugu.js). */
-        contentContainerStyle={{ paddingBottom: sekmeAltDolgusu(guvenli.bottom) }}
+        /* Alt dolgu = güvenli alan (home indicator) + nefes payı. Eskiden buraya yüzen
+           sekme çubuğunun yüksekliği de giriyordu (sekmeCubugu.js); çubuk kalktı, gezinme
+           artık soldaki çekmeceden ve içeriğin üstünde duran bir katman yok. */
+        contentContainerStyle={{ paddingBottom: guvenli.bottom + 16 }}
         ListHeaderComponent={baslikBolumu}
         ListEmptyComponent={<View className="px-4 pt-4">{bosDurum}</View>}
         onEndReached={dahaGetir}

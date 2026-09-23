@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { sekmeAltDolgusu } from '../../src/lib/sekmeCubugu'
 import * as ImagePicker from 'expo-image-picker'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import { api } from '../../src/lib/api'
@@ -17,7 +16,7 @@ import { RehberiTekrarIzle } from '../../src/components/UrunTuru'
 import { VeriTercihleriBaglantisi } from '../../src/components/IzinSayfasi'
 
 /*
-  PROFİLİM SEKMESİ — web'deki Profile.jsx'in "kendi profilim" hâli. Başkasının profili
+  PROFİLİM — web'deki Profile.jsx'in "kendi profilim" hâli. Başkasının profili
   ayrı rotada (app/profil/[userId].jsx); web'deki "tek bileşen, iki rota" kararının
   mobil karşılığı: görünüm ProfilGorunumu'nda ortak, fark yalnızca düzenleme
   düğmelerinin ve çıkışın görünürlüğü.
@@ -108,9 +107,10 @@ export default function Profil() {
       <EkranBasligi baslik="Profilim" sol={<HamburgerDugmesi />} />
 
       <ScrollView contentContainerClassName="gap-3 p-4"
-        /* Yüzen sekme çubuğu içeriğin ÜSTÜNDE duruyor; alt dolgu olmadan son öğe onun
-           altında kalır (bkz. src/lib/sekmeCubugu.js). */
-        contentContainerStyle={{ paddingBottom: sekmeAltDolgusu(guvenli.bottom) }}
+        /* Alt dolgu = güvenli alan (home indicator) + nefes payı. Eskiden buraya yüzen
+           sekme çubuğunun yüksekliği de giriyordu (sekmeCubugu.js); çubuk kalktı, gezinme
+           artık soldaki çekmeceden ve içeriğin üstünde duran bir katman yok. */
+        contentContainerStyle={{ paddingBottom: guvenli.bottom + 16 }}
       >
         {notice && (
           <Notice tone="success" onDismiss={() => setNotice(null)}>
@@ -130,8 +130,8 @@ export default function Profil() {
           </Button>
         </View>
 
-        {/* Tab çubuğuna girmeyen iki bölümün ikinci girişi (ilki Akış başlığında):
-            profil, "benimle ilgili her şey"in doğal toplanma yeri. */}
+        {/* Çekmeceden de açılan iki bölümün ikinci girişi: profil, "benimle ilgili
+            her şey"in doğal toplanma yeri. */}
         {/* ui.jsx Button: hemen üstteki "Fotoğrafı değiştir" ile aynı yüzey. Eskiden elle
             yazılmış Pressable'lardı (köşe 12, kenar slate-200) ve üstteki satırla (köşe 8,
             kenar slate-300) alt alta farklı görünüyordu. */}
@@ -140,7 +140,8 @@ export default function Profil() {
             Derslerim
           </Button>
           {/* "Arkadaşlarım" ARKADAŞ listesini açmalı; parametresiz rota Gelen isteklerle
-              açılıyordu. Akış başlığındaki ikon parametresiz kalıyor: orada niyet istekler. */}
+              açılıyordu. Çekmecedeki "Arkadaşlar" satırı parametresiz kalıyor: orada niyet
+              isteklerin tamamı. */}
           <Button variant="secondary" className={dugmeSinifi} onPress={() => router.push('/eslesmeler?sekme=active')}>
             Arkadaşlarım
           </Button>

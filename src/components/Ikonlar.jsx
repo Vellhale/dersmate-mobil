@@ -10,8 +10,9 @@ import { ink } from '../lib/theme'
   çizgileri react-native-svg ile çiziliyor.
 
   RN FARKI: currentColor yok — renk, kullanıldığı yerden `renk` prop'u ile gelir
-  (tab bar zaten aktif/pasif rengi parametre olarak veriyor). `kalinlik` web'deki
-  strokeWidth; aktif sekme kalın çizgiyle vurgulanır (web'deki Layout kararı).
+  (çekmece aktif/pasif rengi parametre olarak veriyor). `kalinlik` web'deki
+  strokeWidth; çekmecede aktif satır kalın çizgiyle vurgulanır (web'deki Layout
+  kararı).
 */
 
 function Cizgi({ children, renk = ink, boy = 24, kalinlik = 2 }) {

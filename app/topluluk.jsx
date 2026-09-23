@@ -3,7 +3,7 @@ import { Redirect } from 'expo-router'
 /*
   ESKİ TOPLULUK ADRESİ — yönlendirme (2026-09-23).
 
-  Topluluk ekranı ana sekmeye taşındı (app/(tabs)/index.jsx), yani artık adresi `/`.
+  Topluluk ekranı ana ekrana taşındı (app/index.jsx), yani artık adresi `/`.
   Bu dosya silinmedi çünkü `dersmate://topluluk` derin bağlantısı sessizce ölürdü:
   projede `linking` yapılandırması YOK, adresler dosya adlarından türüyor (app.json'daki
   `scheme: "dersmate"`), dolayısıyla dosyayı silmek adresi de siler ve bunu hiçbir uyarı

@@ -1,13 +1,12 @@
 import { FlatList, Pressable, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { sekmeAltDolgusu } from '../../src/lib/sekmeCubugu'
-import { useInbox } from '../../src/state/InboxContext'
-import { formatDateTime } from '../../src/lib/format'
-import { EkranBasligi } from '../../src/components/EkranBasligi'
-import { HamburgerDugmesi } from '../../src/components/Cekmece'
-import { Avatar } from '../../src/components/Avatar'
-import { Badge, Button, EmptyState, ErrorBox, Loading } from '../../src/components/ui'
+import { useInbox } from '../src/state/InboxContext'
+import { formatDateTime } from '../src/lib/format'
+import { EkranBasligi } from '../src/components/EkranBasligi'
+import { HamburgerDugmesi } from '../src/components/Cekmece'
+import { Avatar } from '../src/components/Avatar'
+import { Badge, Button, EmptyState, ErrorBox, Loading } from '../src/components/ui'
 
 /*
   MESAJLAR — web'deki Chat.jsx'in LİSTE yarısı. Web ana-detay ızgarasını lg'de yan
@@ -48,7 +47,8 @@ export default function Mesajlar() {
             title="Henüz sohbetin yok"
             description="Sohbet, bir arkadaş isteği kabul edildiğinde otomatik açılır."
             // Arkadaş Ekle sekmesi: Profilim ve Arkadaşlar'daki "Arkadaş bul" ile aynı hedef (web de
-            // /kesfet'e gidiyor). Akış'a gitmek aynı etiketle öneri listesine indiriyordu.
+            // /kesfet'e gidiyor). Parametre ŞART: Keşfet varsayılan olarak öneri kipinde
+            // açılıyor, isim araması üçüncü sekmede.
             action={<Button onPress={() => router.push('/kesfet?sekme=arkadas')}>Arkadaş bul</Button>}
           />
         </View>
@@ -57,9 +57,10 @@ export default function Mesajlar() {
           data={conversations}
           keyExtractor={(c) => c.conversationId}
           contentContainerClassName="gap-1.5 p-4"
-        /* Yüzen sekme çubuğu içeriğin ÜSTÜNDE duruyor; alt dolgu olmadan son öğe onun
-           altında kalır (bkz. src/lib/sekmeCubugu.js). */
-        contentContainerStyle={{ paddingBottom: sekmeAltDolgusu(guvenli.bottom) }}
+        /* Alt dolgu = güvenli alan (home indicator) + nefes payı. Eskiden buraya yüzen
+           sekme çubuğunun yüksekliği de giriyordu (sekmeCubugu.js); çubuk kalktı, gezinme
+           artık soldaki çekmeceden ve içeriğin üstünde duran bir katman yok. */
+        contentContainerStyle={{ paddingBottom: guvenli.bottom + 16 }}
           renderItem={({ item }) => <KonusmaSatiri konusma={item} router={router} />}
         />
       )}

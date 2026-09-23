@@ -38,7 +38,9 @@ import { useCallback, useEffect, useRef } from 'react'
 export const TUR_ADIMLARI = [
   {
     id: 'free',
-    cipa: 'rutbe',
+    // Çıpasız: web'de bu adım üst bardaki seviye rozetine bağlı (data-tour="rank"),
+    // mobilde her ekranda duran böyle bir rozet yok. Metin zaten bir yere işaret
+    // etmiyor, ortada kart olarak doğru çalışıyor.
     title: 'Ders almak ücretsiz',
     body: 'Burada para yok, harcadığın bir kredi de yok. Puanı ders anlatarak kazanırsın.',
     points: [
@@ -49,9 +51,9 @@ export const TUR_ADIMLARI = [
   },
   {
     id: 'discover',
-    cipa: 'kesfet',
+    // Çıpasız: tek kaydı silinen sekme düğmesiydi.
     title: 'Keşfet — ders bul',
-    body: 'Almak istediğin konuyu anlatabilen öğrencileri Keşfet sekmesinde bulursun.',
+    body: 'Almak istediğin konuyu anlatabilen öğrencileri sol üstteki menüde “Keşfet” altında bulursun.',
     points: [
       'Konu, ders ya da eğitmen adıyla ara.',
       'Filtreyle sınavı, dersi ve eğitmen puanını daralt.',
@@ -60,14 +62,15 @@ export const TUR_ADIMLARI = [
   },
   {
     /*
-      Web'de bu adımın adı "Ders Portföyü" ve çıpası sol raydaki menü öğesiydi.
-      Mobilde portföye giriş, tab çubuğunun ortasındaki ekleme sekmesi — kullanıcının
-      göreceği ad "Oluştur" olduğu için başlık da o adı kullanıyor. Rehberin işaret
-      ettiği yerin adı, ekranda yazan adla aynı olmalı.
+      Başlık 2026-09-23'te web'e GERİ hizalandı. Mobilde portföye giriş bir süre tab
+      çubuğunun ortasındaki ekleme sekmesiydi ve kullanıcının gördüğü ad "Oluştur"du;
+      sekme çubuğu kalkınca o ad ekranda hiçbir yerde yazmıyor. Çekmecedeki satır
+      web'le aynı: "Ders Portföyü". Rehberin işaret ettiği yerin adı, ekranda yazan
+      adla aynı olmalı.
     */
     id: 'portfolio',
-    cipa: 'portfoy',
-    title: 'Oluştur — ne anlatabilirsin',
+    // Çıpasız: tek kaydı silinen sekme düğmesiydi.
+    title: 'Ders Portföyü — ne anlatabilirsin',
     body: 'Anlatabildiğin konuları ekle; Keşfet’te başkalarına böyle görünürsün.',
     points: [
       'Portföyün boşken kimse senden ders isteyemez.',
@@ -88,9 +91,9 @@ export const TUR_ADIMLARI = [
   },
   {
     id: 'chat',
-    cipa: 'sohbet',
-    title: 'Mesajlar — saati ve linki kararlaştır',
-    body: 'Ders saatini ve görüşme linkini karşı tarafla Mesajlar sekmesinde konuşursun.',
+    // Çıpasız: tek kaydı silinen sekme düğmesiydi.
+    title: 'Sohbet — saati ve linki kararlaştır',
+    body: 'Ders saatini ve görüşme linkini karşı tarafla sol üstteki menüde “Sohbet” altında konuşursun.',
     points: [
       'Zoom, Google Meet ya da Discord — dersi biz barındırmıyoruz.',
       'Linki sohbete yapıştırman yeterli.',
@@ -128,7 +131,7 @@ export const TUR_ADIM_SAYISI = TUR_ADIMLARI.length
 */
 
 const olcumler = new Map() // ad -> { x, y, width, height }
-const olcerler = new Map() // ad -> yeniden ölçen fonksiyon
+const olcerler = new Map() // ad -> Set<yeniden ölçen fonksiyon>
 const cipaDinleyicileri = new Set()
 
 function ayniOlcum(a, b) {
@@ -156,9 +159,26 @@ export function turCipasiKaydet(ad, olcum) {
   for (const dinleyici of cipaDinleyicileri) dinleyici()
 }
 
-/** Çıpayı defterden düşürür (ekran söküldüğünde). */
-export function turCipasiSil(ad) {
-  olcerler.delete(ad)
+/**
+ * Çıpayı defterden düşürür (ekran söküldüğünde).
+ *
+ * ⚠️ AYNI ADI BİRDEN ÇOK SAHİP KAYDEDEBİLİR ve bu olağan hâl: hamburger düğmesi
+ * (`menu` çıpası) kabuk ekranlarının HEPSİNDE ayrı bir örnek. Sekme çubuğu kök
+ * yığına düzleştirildiğinde alttaki ekranlar MONTE kalıyor, yani beş örnek aynı
+ * anda kayıtlı oluyor. Kayıt koşulsuz silinseydi, sahiplerden HERHANGİ BİRİ
+ * sökülünce çıpa tamamen ölür ve hâlâ ekranda duran düğme rehbere görünmez olurdu.
+ * Bu yüzden ölçüm ancak SON sahip de çıkınca düşüyor.
+ *
+ * `olc` verilmezse (doğrudan çağrı) çıpanın tüm sahipleri birden düşürülür.
+ */
+export function turCipasiSil(ad, olc) {
+  const kume = olcerler.get(ad)
+  if (kume) {
+    if (olc) kume.delete(olc)
+    else kume.clear()
+    if (kume.size > 0) return // hâlâ monte sahip var: ölçüm DURSUN
+    olcerler.delete(ad)
+  }
   turCipasiKaydet(ad, null)
 }
 
@@ -182,7 +202,7 @@ export function turCipalariniDinle(dinleyici) {
  * ölçünün gerçekten kullanılacağı anda bir kez ölçüyoruz.
  */
 export function turCipalariniTazele() {
-  for (const olc of olcerler.values()) olc()
+  for (const kume of olcerler.values()) for (const olc of kume) olc()
 }
 
 /**
@@ -211,8 +231,14 @@ export function useTurCipasi(ad) {
   }, [ad])
 
   useEffect(() => {
-    olcerler.set(ad, olc)
-    return () => turCipasiSil(ad)
+    let kume = olcerler.get(ad)
+    if (!kume) {
+      kume = new Set()
+      olcerler.set(ad, kume)
+    }
+    kume.add(olc)
+    // Yalnızca BU sahip düşer; aynı adı taşıyan diğerleri kayıtta kalır.
+    return () => turCipasiSil(ad, olc)
   }, [ad, olc])
 
   return { ref, onLayout: olc, collapsable: false }

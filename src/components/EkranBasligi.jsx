@@ -2,11 +2,14 @@ import { Text, View } from 'react-native'
 import { Logo } from './Logo'
 
 /*
-  EKRAN BAŞLIĞI — Instagram düzeninde her sekmenin üst şeridi.
+  EKRAN BAŞLIĞI — her ekranın üst şeridi. Web'deki üst barın karşılığı.
 
-  Akış'ta marka kilidi (Instagram'ın kendi ana sayfası gibi), diğer sekmelerde sayfa
-  adı. Web'deki üst barın karşılığı; seviye rozeti ve bildirim işaretleri ADIM 3'te
-  `sag` yuvasına gelecek.
+  ⚠️ `baslik` VERİLMEYEN DAL (aşağıdaki `<Logo boyut="lg" />` yedeği) 2026-09-23'ten
+  beri ÖLÜ: marka kilidi Akış ekranına aitti ve o ekran silindi; kalan ekranların
+  hepsi başlık geçiyor. Dal kaldırılmadı çünkü bileşenin sözleşmesi `baslik`i isteğe
+  bağlı sayıyor — kaldırmak, başlıksız bir çağrıyı sessizce boş şeride çevirirdi.
+
+  Seviye rozeti ve bildirim işaretleri `sag` yuvasına gelecek.
 */
 /*
   `sol` YUVASI (2026-09-23): çekmece menüsünün hamburger düğmesi için açıldı. Web'de
