@@ -156,16 +156,19 @@
           "Parola YAZILMAZ; Apple iki adımlı doğrulama istiyor, EAS uygulamaya-özel parolayı",
           "sorar ve kendi kasasında saklar.",
           "",
-          "⛔ AŞAĞIDAKİ İKİ DEĞER YER TUTUCU — Apple Developer üyeliği açılıp App Store",
-          "Connect'te uygulama kaydı (bundle: com.dersmate.app) oluşturulmadan GERÇEK",
-          "karşılıkları YOKTUR. Yanlış bırakılırsa gönderim hata vererek durur; sessizce",
-          "yanlış yere yüklenmez.",
-          "  ascAppId    → App Store Connect › uygulama › App Information › 'Apple ID'",
-          "                (10 haneli sayı; bundle identifier DEĞİL)",
-          "  appleTeamId → developer.apple.com › Membership (10 karakter, harf+rakam)"
+          "AŞAĞIDAKİ İKİ DEĞER 2026-09-23'te DOLDURULDU — üyelik açıldı, App Store",
+          "Connect'te uygulama kaydı oluşturuldu (bundle: com.dersmate.app).",
+          "  ascAppId    = 6815211357  → App Store Connect › uygulama › App Information",
+          "                › 'Apple ID'. Uygulamanın ASC adresinde de görünür:",
+          "                appstoreconnect.apple.com/apps/6815211357/...",
+          "  appleTeamId = 666M4C2SLA  → developer.apple.com sağ üst köşe ve Membership.",
+          "",
+          "⚠️ İKİSİ DE GİZLİ DEĞİL. ascAppId uygulamanın App Store adresinde zaten açık,",
+          "Team ID de her imzalı pakette taşınıyor. Depoda durmaları sorun değil — sızması",
+          "sorun olan tek alan appleId ve o yukarıdaki gerekçeyle burada YOK."
         ],
-        "ascAppId": "DOLDURULACAK",
-        "appleTeamId": "DOLDURULACAK"
+        "ascAppId": "6815211357",
+        "appleTeamId": "666M4C2SLA"
       }
     }
   }
