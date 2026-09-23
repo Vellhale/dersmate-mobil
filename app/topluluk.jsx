@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native'
+import { FlatList, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { api } from '../src/lib/api'
@@ -488,6 +488,7 @@ export default function Topluluk() {
   const [bildirim, setBildirim] = useState(null)
   const [yaziyor, setYaziyor] = useState(false)
   const [kurallarAcik, setKurallarAcik] = useState(false)
+  const [filtreAcik, setFiltreAcik] = useState(false)
 
   /*
     YORUMLAR GÖNDERİ AÇILINCA ÇEKİLİYOR, akışla birlikte değil: akışta 20 gönderi var ve
@@ -783,19 +784,6 @@ export default function Topluluk() {
 
       <GonderiKutusu session={session} onAc={() => setYaziyor(true)} />
 
-      <FiltreSeridi
-        sira={sira}
-        onSira={(k) => filtreDegistir(() => setSira(k))}
-        zaman={zaman}
-        onZaman={(k) => filtreDegistir(() => setZaman(k))}
-        etiket={etiket}
-        onEtiket={(k) => filtreDegistir(() => setEtiket(k))}
-        aciklama={seciliSiralama?.aciklama}
-        zamanAdi={zamanAdi}
-        sonuc={toplam}
-        yukleniyor={ilkYukleme}
-      />
-
       {/* Hata akışın ÜSTÜNDE ve liste yerinde kalıyor: oy verirken düşen bir istek,
           okunmakta olan listeyi silmemeli. */}
       <ErrorBox
@@ -836,6 +824,18 @@ export default function Topluluk() {
         </Pressable>
         <Text className="flex-1 text-lg font-bold text-slate-900">Topluluk</Text>
       </View>
+
+      {/* Filtre çubuğu listenin DIŞINDA: başlıkta olsaydı kaydırınca kaybolurdu ve
+          kullanıcı hangi filtrede olduğunu görmek için başa dönmek zorunda kalırdı. */}
+      <FiltreSeridi
+        sira={sira}
+        zaman={zaman}
+        etiket={etiket}
+        onEtiket={(k) => filtreDegistir(() => setEtiket(k))}
+        onAyarAc={() => setFiltreAcik(true)}
+        siraAdi={seciliSiralama?.label ?? 'Yeni'}
+        zamanAdi={zamanAdi}
+      />
 
       <FlatList
         ref={listeRef}
@@ -902,6 +902,19 @@ export default function Topluluk() {
           </View>
         }
       />
+
+      {filtreAcik && (
+        <FiltreAltSayfasi
+          sira={sira}
+          onSira={(k) => filtreDegistir(() => setSira(k))}
+          zaman={zaman}
+          onZaman={(k) => filtreDegistir(() => setZaman(k))}
+          aciklama={seciliSiralama?.aciklama}
+          sonuc={toplam}
+          yukleniyor={ilkYukleme}
+          onClose={() => setFiltreAcik(false)}
+        />
+      )}
 
       {kurallarAcik && <ToplulukHakkindaSayfasi onClose={() => setKurallarAcik(false)} />}
 
@@ -1007,21 +1020,70 @@ function Pil({ aktif, onPress, ad, children }) {
   arkaya tek bir denetim gibi okunurdu (web'de tarih bir <select> olduğu için bu ayrım
   biçimin kendisinden geliyordu).
 */
-function FiltreSeridi({
-  sira,
-  onSira,
-  zaman,
-  onZaman,
-  etiket,
-  onEtiket,
-  aciklama,
-  zamanAdi,
-  sonuc,
-  yukleniyor,
-}) {
+/*
+  FİLTRE ÇUBUĞU — tek satır, listenin DIŞINDA, her zaman görünür.
+
+  ⚠️ ESKİDEN TEK BİR KART'TI ve içinde ÜÇ denetim vardı (sıralama segmenti + açıklama
+  satırı + 4 tarih pili + 7 etiket pili). Ölçüldü: ~460px. Üst şerit ve gönderi kutusu
+  da eklenince ilk gönderi ~730px'te başlıyordu — 780dp'lik bir ekranda AKIŞ HİÇ
+  GÖRÜNMÜYORDU. Üstüne kart listenin başlığındaydı, yani kaydırınca tamamen kayboluyor
+  ve kullanıcı hangi filtrede olduğunu görmek için başa dönmek zorunda kalıyordu.
+
+  Yeni düzen: soldaki sabit düğme + sağda yatay kayan etiket şeridi. Çubuk FlatList'in
+  başlığında DEĞİL, ekranın kendisinde — yani kaydırırken yerinde kalıyor.
+
+  ⛔ SIRALAMA VE TARİH KAYBOLMADI. Dosyanın başındaki kural bağlayıcı: "ortadan
+  kaybolan bir denetim, kullanıcının 'az önce buradaydı' diye aradığı bir şeye
+  dönüşür." Bu yüzden ikisi alt sayfaya taşınırken MEVCUT DEĞERLERİ düğmenin üstünde
+  yazıyor ("Yeni · Tümü") — denetim gitmedi, bir dokunuş uzağa gitti ve durumu
+  görünür kaldı.
+
+  ⚠️ Etiket şeridi YATAY KAYIYOR. Dosyanın başındaki not yatay kaydırmayı SIRALAMA
+  segmenti için reddediyor (üç seçenek, üçü de görünmeli) — etiketler için değil:
+  yedi etiket hiçbir düzende tek satıra sığmıyor ve eski çözüm onları dört satıra
+  sarıyordu. Kaydırılabilirlik sağ kenardan taşan pille görünür kalıyor.
+*/
+function FiltreSeridi({ sira, zaman, etiket, onEtiket, onAyarAc, siraAdi, zamanAdi }) {
   return (
-    <Card>
-      <View className="flex-row rounded-xl bg-slate-100 p-1" accessibilityRole="tablist">
+    <View className="flex-row items-center border-b border-slate-200 bg-white">
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Sıralama ve tarih: ${siraAdi}, ${zamanAdi}. Değiştirmek için dokun.`}
+        onPress={onAyarAc}
+        className="min-h-[52px] flex-row items-center gap-1.5 border-r border-slate-200 px-4 active:bg-slate-50"
+      >
+        <Text className="text-xs font-semibold text-slate-700">{siraAdi}</Text>
+        <Text className="text-xs text-slate-400">·</Text>
+        <Text className="text-xs text-slate-500">{zamanAdi}</Text>
+        <Text className="text-[10px] text-slate-400">▾</Text>
+      </Pressable>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerClassName="items-center gap-2 px-3"
+        className="flex-1"
+      >
+        {ETIKETLER.map(({ key, label }) => (
+          <Pil key={key} aktif={etiket === key} onPress={() => onEtiket(key)}>
+            {label}
+          </Pil>
+        ))}
+      </ScrollView>
+    </View>
+  )
+}
+
+/*
+  SIRALAMA + TARİH alt sayfası. İkisi AYRI EKSEN (dosya başındaki nota bak): sıralama
+  "hangisi önce gelsin", tarih "hangileri hiç görünmesin". Tek listede birleştirmek
+  seçenek sayısını 3'ten 12'ye çıkarırdı, o yüzden burada da ayrı duruyorlar.
+*/
+function FiltreAltSayfasi({ sira, onSira, zaman, onZaman, aciklama, sonuc, yukleniyor, onClose }) {
+  return (
+    <Modal open onClose={onClose} title="Sırala ve filtrele">
+      <Text className="text-xs font-medium uppercase tracking-wide text-slate-500">Sıralama</Text>
+      <View className="mt-2 flex-row rounded-xl bg-slate-100 p-1" accessibilityRole="tablist">
         {SIRALAMALAR.map(({ key, label }) => (
           <Pressable
             key={key}
@@ -1034,8 +1096,6 @@ function FiltreSeridi({
           >
             <Text
               numberOfLines={1}
-              /* 12px: 320px'te üç düğmeye düşen ~66px'e "Tartışmalı" ancak bu puntoda
-                 kesilmeden sığıyor. Dokunma hedefi puntodan bağımsız 44px. */
               className={`text-xs font-medium ${sira === key ? 'text-brand-700' : 'text-slate-600'}`}
             >
               {label}
@@ -1044,42 +1104,24 @@ function FiltreSeridi({
         ))}
       </View>
 
-      {/* Seçilen sıralamanın ne yaptığı YAZIYOR: "Tartışmalı" hiçbir kullanıcının tahmin
-          edemeyeceği bir ölçüt. Tarih aralığı da burada tam adıyla tekrar ediyor — sonuç
-          sayısının neden düştüğü, sayının yanında yazmazsa fark edilmiyor. */}
-      <Text className="mt-3 text-xs text-slate-600">
-        {aciklama} · {zamanAdi} ·{' '}
-        {/* Yüklenirken eski sayıyı göstermek yanlış olurdu: filtre değişmiş ama sayı hâlâ
-            önceki filtrenin sonucunu söylüyor olurdu. */}
-        {yukleniyor ? 'yükleniyor…' : `${sonuc} gönderi`}
+      {/* Seçilen sıralamanın NE YAPTIĞI yazıyor: "Tartışmalı" hiçbir kullanıcının
+          tahmin edemeyeceği bir ölçüt. Sonuç sayısı da burada — filtre değiştirince
+          kaç gönderi kaldığı aynı ekranda görünsün. */}
+      <Text className="mt-2 text-xs text-slate-600">
+        {aciklama} · {yukleniyor ? 'yükleniyor…' : `${sonuc} gönderi`}
       </Text>
 
-      <View className="mt-4 border-t border-slate-100 pt-4">
-        <Text className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
-          Tarih
-        </Text>
-        <View className="flex-row flex-wrap gap-2">
-          {/* Görünen metin kısa ("Hafta"), okunan ad tam ("Bu hafta"): dört pil tek
-              satıra sığsın ama ekran okuyucu kısaltmayı çözmek zorunda kalmasın. */}
+      <View className="mt-5 border-t border-slate-100 pt-5">
+        <Text className="text-xs font-medium uppercase tracking-wide text-slate-500">Tarih</Text>
+        <View className="mt-2 flex-row flex-wrap gap-2">
           {ZAMAN_ARALIKLARI.map(({ key, label, kisa }) => (
             <Pil key={key} ad={label} aktif={zaman === key} onPress={() => onZaman(key)}>
               {kisa}
             </Pil>
           ))}
         </View>
-
-        <Text className="mb-2 mt-4 text-xs font-medium uppercase tracking-wide text-slate-500">
-          Etiket
-        </Text>
-        <View className="flex-row flex-wrap gap-2">
-          {ETIKETLER.map(({ key, label }) => (
-            <Pil key={key} aktif={etiket === key} onPress={() => onEtiket(key)}>
-              {label}
-            </Pil>
-          ))}
-        </View>
       </View>
-    </Card>
+    </Modal>
   )
 }
 
