@@ -9,6 +9,7 @@ import { api } from '../../src/lib/api'
 import { useAsync } from '../../src/state/useAsync'
 import { useAuth } from '../../src/state/AuthContext'
 import { EkranBasligi } from '../../src/components/EkranBasligi'
+import { HamburgerDugmesi } from '../../src/components/Cekmece'
 import { KunyeSatiri } from '../../src/components/Kunye'
 import { ProfilGorunumu } from '../../src/components/ProfilGorunumu'
 import { Button, ErrorBox, Field, Girdi, Loading, Modal, Notice } from '../../src/components/ui'
@@ -104,7 +105,7 @@ export default function Profil() {
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
-      <EkranBasligi baslik="Profilim" />
+      <EkranBasligi baslik="Profilim" sol={<HamburgerDugmesi />} />
 
       <ScrollView contentContainerClassName="gap-3 p-4"
         /* Yüzen sekme çubuğu içeriğin ÜSTÜNDE duruyor; alt dolgu olmadan son öğe onun

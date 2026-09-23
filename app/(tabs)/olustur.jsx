@@ -5,6 +5,7 @@ import { sekmeAltDolgusu } from '../../src/lib/sekmeCubugu'
 import { api } from '../../src/lib/api'
 import { useAsync } from '../../src/state/useAsync'
 import { EkranBasligi } from '../../src/components/EkranBasligi'
+import { HamburgerDugmesi } from '../../src/components/Cekmece'
 import { KonuSecici } from '../../src/components/KonuSecici'
 import { Badge, Button, Card, ErrorBox, Field, Girdi, Loading, Modal, Notice } from '../../src/components/ui'
 
@@ -38,7 +39,7 @@ export default function Olustur() {
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
-      <EkranBasligi baslik="Ders Portföyü" />
+      <EkranBasligi baslik="Ders Portföyü" sol={<HamburgerDugmesi />} />
 
       <ScrollView contentContainerClassName="gap-3 p-4"
         /* Yüzen sekme çubuğu içeriğin ÜSTÜNDE duruyor; alt dolgu olmadan son öğe onun

@@ -293,3 +293,18 @@ export function TakvimIkonu(props) {
     </Cizgi>
   )
 }
+
+/**
+ * Menü (hamburger) — web'deki MenuIkonu'nun portu (Ikonlar.jsx:30-36, üç yatay çizgi).
+ * Çekmeceyi açan düğmede kullanılır. Web'de iki ayrı hamburger var (dar ekranda
+ * çekmeceyi açan, geniş ekranda rayı daraltan); mobilde tek iş yapar: çekmeceyi açar.
+ */
+export function MenuIkonu(props) {
+  return (
+    <Cizgi {...props}>
+      <Path d="M4 6h16" />
+      <Path d="M4 12h16" />
+      <Path d="M4 18h16" />
+    </Cizgi>
+  )
+}

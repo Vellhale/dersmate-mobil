@@ -17,6 +17,7 @@ import { YonetimRozeti } from '../../src/components/YonetimRozeti'
 import { EslesmeIstegiModali } from '../../src/components/EslesmeIstegiModali'
 import { EngellemeModali } from '../../src/components/EngellemeModali'
 import { EkranBasligi } from '../../src/components/EkranBasligi'
+import { HamburgerDugmesi } from '../../src/components/Cekmece'
 import { KepIkonu, SaatIkonu, YildizIkonu } from '../../src/components/Ikonlar'
 import { Badge, Button, Card, EmptyState, ErrorBox, Field, Girdi, Loading, Modal, Notice, Spinner } from '../../src/components/ui'
 import { amber, brand, slate } from '../../src/lib/theme'
@@ -568,7 +569,7 @@ export default function Kesfet() {
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
-      <EkranBasligi baslik="Keşfet" />
+      <EkranBasligi baslik="Keşfet" sol={<HamburgerDugmesi />} />
 
       <FlatList
         data={arkadasKipi && (isimKisa || isimBekliyor || !sonucGuncel) ? [] : liste.items}

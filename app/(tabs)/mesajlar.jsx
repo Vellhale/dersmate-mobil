@@ -5,6 +5,7 @@ import { sekmeAltDolgusu } from '../../src/lib/sekmeCubugu'
 import { useInbox } from '../../src/state/InboxContext'
 import { formatDateTime } from '../../src/lib/format'
 import { EkranBasligi } from '../../src/components/EkranBasligi'
+import { HamburgerDugmesi } from '../../src/components/Cekmece'
 import { Avatar } from '../../src/components/Avatar'
 import { Badge, Button, EmptyState, ErrorBox, Loading } from '../../src/components/ui'
 
@@ -33,7 +34,7 @@ export default function Mesajlar() {
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
-      <EkranBasligi baslik="Mesajlar" sag={<Badge tone={durum.tone}>{durum.label}</Badge>} />
+      <EkranBasligi baslik="Mesajlar" sol={<HamburgerDugmesi />} sag={<Badge tone={durum.tone}>{durum.label}</Badge>} />
 
       {loading ? (
         <Loading />

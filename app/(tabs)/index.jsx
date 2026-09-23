@@ -7,6 +7,7 @@ import { api } from '../../src/lib/api'
 import { useAsync } from '../../src/state/useAsync'
 import { brand, slate } from '../../src/lib/theme'
 import { EkranBasligi } from '../../src/components/EkranBasligi'
+import { HamburgerDugmesi } from '../../src/components/Cekmece'
 import { KepIkonu, KisilerIkonu, ToplulukIkonu } from '../../src/components/Ikonlar'
 import { useTurCipasi } from '../../src/lib/tur'
 import { IlanKarti } from '../../src/components/IlanKarti'
@@ -77,6 +78,7 @@ export default function Akis() {
           kanıt akışı). Üçü de sekme olmadı çünkü alt bar beşten fazlasını taşıyamaz;
           sıra kullanma sıklığına göre. */}
       <EkranBasligi
+        sol={<HamburgerDugmesi />}
         sag={
           <View className="flex-row items-center">
             <Pressable

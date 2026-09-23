@@ -8,6 +8,7 @@ import { CUBUK_BOSLUGU, CUBUK_YUKSEKLIGI } from '../../src/lib/sekmeCubugu'
 import { brand, beyaz, gece, ink, rose, slate, zemin } from '../../src/lib/theme'
 import { AramaIkonu, ArtiDaireIkonu, EvIkonu, KisiIkonu, MesajIkonu } from '../../src/components/Ikonlar'
 import { useInbox } from '../../src/state/InboxContext'
+import { CekmeceSaglayici } from '../../src/components/Cekmece'
 
 /*
   ANA KABUK — Instagram düzeni: beş sekmeli alt bar. Web'deki Layout.jsx'in (sol ray)
@@ -217,6 +218,7 @@ export default function TabsLayout() {
   }
 
   return (
+    <CekmeceSaglayici>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -312,5 +314,6 @@ export default function TabsLayout() {
         }}
       />
     </Tabs>
+    </CekmeceSaglayici>
   )
 }
