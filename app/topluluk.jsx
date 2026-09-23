@@ -12,7 +12,6 @@ import { YonetimRozeti } from '../src/components/YonetimRozeti'
 import {
   Badge,
   Button,
-  Card,
   EmptyState,
   ErrorBox,
   Field,
@@ -771,7 +770,7 @@ export default function Topluluk() {
   const benimUserId = session?.userId
 
   const baslikBolumu = (
-    <View className="gap-3 pb-1">
+    <View className="gap-3 bg-white px-4 pb-3 pt-3">
       {/* TANITIM PARAGRAFI BURADAN ALINDI (2026-09-23). Üç satırlık metin akışın en
           üstünde her kaydırmada yer kaplıyordu ve kartsız tek öğe olduğu için ritmi de
           bozuyordu. Metin kaybolmadı: "Topluluk hakkında" alt sayfasının başına taşındı
@@ -852,9 +851,11 @@ export default function Topluluk() {
             onSikayet={setSikayetHedefi}
           />
         )}
-        contentContainerClassName="gap-4 p-4"
+        /* Dolgu ve boşluk YOK: gönderiler artık tam genişlik satır ve kendi p-4'ünü
+           taşıyor. Başlık, boş durum ve altbilgi kendi px-4'ünü veriyor. */
+        contentContainerClassName=""
         ListHeaderComponent={baslikBolumu}
-        ListEmptyComponent={bosDurum}
+        ListEmptyComponent={<View className="px-4 pt-4">{bosDurum}</View>}
         onEndReached={dahaGetir}
         onEndReachedThreshold={0.4}
         refreshControl={
@@ -869,7 +870,7 @@ export default function Topluluk() {
           />
         }
         ListFooterComponent={
-          <View className="gap-4 pt-2">
+          <View className="gap-4 px-4 pb-2 pt-4">
             {ekYukleme && (
               <View className="py-2">
                 <Spinner />
@@ -966,17 +967,19 @@ export default function Topluluk() {
 */
 function GonderiKutusu({ session, onAc }) {
   return (
-    /* Card'ın kendi dolgusu (p-5) EZİLMİYOR: NativeWind çakışan iki utility'yi string
-       sırasına göre değil üretilen CSS sırasına göre çözüyor, yani "p-4" güvenilir bir
-       geçersiz kılma değil. Yüzeyin dolgusu tek yerde (ui.jsx) kalıyor. */
-    <Card>
+    /* CARD KALKTI (2026-09-23): başlık bölümü artık beyaz bir yüzey, içine kart koymak
+       beyaz üstüne beyaz ikinci katman üretiyordu — ekranın asıl şikâyeti buydu. Kutu
+       yalnızca girdiyi taşıyor, kendi kenarı yok. */
+    <View>
       <View className="flex-row items-center gap-3">
         <Avatar userId={session?.userId} name={session?.displayName} size="sm" />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Yeni gönderi yaz"
           onPress={onAc}
-          className="min-h-[44px] flex-1 justify-center rounded-xl border border-slate-200 bg-white px-4 active:bg-slate-50"
+          /* Zemin slate-50: beyaz yüzeyin üstünde beyaz bir kutu, kenarı okunmadığı
+             için "buraya yazılır" demiyordu (kontrast ~1.04:1). */
+          className="min-h-[44px] flex-1 justify-center rounded-xl border border-slate-200 bg-slate-50 px-4 active:bg-slate-100"
         >
           <Text numberOfLines={1} className="text-sm text-slate-500">
             Bir soru sor ya da neler olduğunu anlat…
@@ -984,10 +987,10 @@ function GonderiKutusu({ session, onAc }) {
         </Pressable>
       </View>
 
-      <Text className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-600">
+      <Text className="mt-2.5 text-xs text-slate-500">
         Yalnızca metin · Dosya yükleme kapalı · Etiket seçmek zorunlu
       </Text>
-    </Card>
+    </View>
   )
 }
 
@@ -1128,10 +1131,24 @@ function FiltreAltSayfasi({ sira, onSira, zaman, onZaman, aciklama, sonuc, yukle
 /* ─── GÖNDERİ KARTI ────────────────────────────────────────────────────────── */
 
 /*
-  Kart yüzeyi ui.jsx'teki Card ile AYNI dil (rounded-2xl + border-slate-100 + beyaz) ama
-  Card bileşeni değil: perde şeridinin kartın üst kenarına yapışması için iç dolgunun
-  bölünmesi gerekiyor, Card ise tek parça p-5 veriyor (dersler.jsx'teki ders kartı da
-  aynı sebeple ham View).
+  GÖNDERİ SATIRI — kart DEĞİL (2026-09-23 değişikliği).
+
+  ⚠️ ESKİDEN KARTTI ve "her şey beyaz, karışık duruyor" şikâyetinin kaynağı tam olarak
+  buydu. Ölçüldü: sayfa zemini slate-50 (#F8FAFC), kart beyaz (#FFFFFF) — aradaki
+  kontrast ~1.04:1, yani kartın kenarı fiziksel olarak okunmuyordu. Hiyerarşi tamamen
+  `shadowOpacity 0.05`'e bırakılmıştı ve ekranda aynı anda ALTI beyaz yüzey vardı
+  (üst şerit, gönderi kutusu, filtre kartı, gönderi kartı, kurallar, önlemler).
+
+  Daha kötüsü GÖLGE TERSİNE ÇALIŞIYORDU: gönderiler (asıl içerik) düz ve gölgesizdi,
+  çevre kutular (filtre, kurallar) ui.jsx'in Card'ını kullandığı için yüzüyordu. Görsel
+  ağırlık sırası, içerik hiyerarşisinin tersiydi.
+
+  Çözüm Reddit'in deseni: gönderiler kart değil, ince ayırıcıyla bölünmüş tam genişlik
+  SATIRLAR. Tek sürekli beyaz yüzey — üst üste binen kutu yok, sayılacak kenar yok.
+
+  ⚠️ CLAUDE.md "sayfalar kendi yüzey dilini icat etmez" diyor ve bu haklı bir kural.
+  Burada icat edilen bir yüzey YOK: kart kaldırıldı, geriye zemin + ayırıcı kaldı.
+  Dolgu (p-4) satırın kendisinde çünkü perde şeridi satırın üst kenarına yapışıyor.
 */
 function GonderiKarti({ gonderi, benimUserId, onOy, onAc, gizliAcik, onGizliAc, onSikayet }) {
   const etiketAnahtari = ETIKET_ANAHTARI[gonderi.tag] ?? gonderi.tag
@@ -1153,7 +1170,7 @@ function GonderiKarti({ gonderi, benimUserId, onOy, onAc, gizliAcik, onGizliAc, 
   */
   if (gonderi.underReview && !gizliAcik) {
     return (
-      <View className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+      <View className="border-b border-slate-100 bg-amber-50 p-4">
         <View className="flex-row items-start gap-3">
           <View className="mt-0.5">
             <UyariIkonu renk={amber[800]} boy={20} />
@@ -1183,7 +1200,7 @@ function GonderiKarti({ gonderi, benimUserId, onOy, onAc, gizliAcik, onGizliAc, 
   }
 
   return (
-    <View className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
+    <View className="border-b border-slate-100 bg-white">
       {/* Perde açıldıysa uyarı kartın ÜSTÜNDE kalıyor: kullanıcı "yine de göster"e
           bastığı anı unutabilir, içeriğin durumu unutulmamalı. */}
       {gonderi.underReview && (
