@@ -299,12 +299,23 @@ Beyan edilenler — dördü de ölçülerek seçildi:
 - `1C8F.1` (App Group yok), `AC6B.1` (MDM yok), `B728.1` (sağlık araştırması değil).
 - `ActiveKeyboards` kategorisi — dokunan hiçbir şey yok.
 
-⚠️ **Pod birleştirmesi bu listeyi EZMEZ ama GENİŞLETİR.** RN'in `post_install` betiği
-(`privacy_manifest_utils.rb`) kurulu her pod'un beyanını uygulama manifestine EKLİYOR.
-Yani `0A2A.1`/`85F4.1` pakette yine görünecek — o pod'ların kendi beyanı olarak, bizim
-değil. Kapatmak mümkün (`expo-build-properties` → `ios.privacyManifestAggregationEnabled:
-false`) ama KAPATILMADI: o zaman yeni bir pod'un beyanı kendiliğinden gelmez ve eksik
-beyan riski bize döner. Fazla beyan pod'un sorumluluğu, eksik beyan bizim.
+✅ **ÖLÇÜLDÜ (2026-09-23, ilk iOS derlemesinin .ipa'sı açılarak):** gönderilen
+`Payload/dersmate.app/PrivacyInfo.xcprivacy` tam olarak yukarıdaki dört kategoriyi ve
+yedi türü taşıyor, `NSPrivacyTracking: false`. **Fazladan hiçbir kod eklenmemiş.**
+
+Bu, önceki beklentiyi düzeltiyor: RN'in `post_install` betiğinin
+(`privacy_manifest_utils.rb`) pod beyanlarını uygulama manifestine ekleyip `0A2A.1` /
+`85F4.1` kodlarını geri getireceği düşünülmüştü. Getirmedi — her pod kendi ayrı
+`*_privacy.bundle/PrivacyInfo.xcprivacy` dosyasında duruyor (pakette 10 tane var:
+React-timing, ExpoConstants, ExpoApplication, ExpoDevice, RNCAsyncStorage, folly, glog,
+boost…). Uygulama manifesti yalnızca bizim yazdığımız.
+
+`expo-build-properties` → `ios.privacyManifestAggregationEnabled: false` anahtarına
+GEREK KALMADI; varsayılan davranış zaten istediğimiz sonucu veriyor.
+
+⚠️ Bu ölçüm `onizleme` profilinde yapıldı. `production` farklı pod kümesi derlemiyor,
+yani sonucun değişmesi beklenmiyor — ama mağazaya ilk gönderimden önce aynı kontrol
+tekrarlanabilir: .ipa bir zip, `Payload/<ad>.app/PrivacyInfo.xcprivacy` içinden okunur.
 
 `NSPrivacyCollectedDataTypes` yedi tür sayıyor (ad, e-posta, kullanıcı kimliği, cihaz
 kimliği, fotoğraf, mesaj, diğer kullanıcı içeriği). Hepsi `Linked: true`, `Tracking: false`.
