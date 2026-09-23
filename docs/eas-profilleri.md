@@ -100,6 +100,10 @@ iOS'ta da aynı işi görür ve **Windows'tan geliştirmenin çalışan yoludur*
 derlenir, iPhone'a bir kez kurulur, sonrası Metro üzerinden canlıdır — Mac gerekmez.
 
 
+Ama bu da ad-hoc imzalıdır, yani cihazın UDID'si önce `eas device:create` ile
+kaydedilmeli. **Pratikte iOS tarafında atılacak ilk derleme budur**; mağaza paketi ondan
+sonra gelir.
+
 ### ⚠️ `.env` EAS SUNUCUSUNA GİTMEZ — ATS kararını bu belirler
 
 `.env` `.gitignore`'da, yani EAS derleme sunucusuna **yüklenmiyor**. `app.config.js`
@@ -127,10 +131,6 @@ kabuk yeniden derlenmeli, `development` profiline açık `env` verilerek:
 ⓘ `NSLocalNetworkUsageDescription` dev client derlemelerinde ZATEN var ama bizim
 koşulumuzdan gelmiyor: `expo-dev-launcher` Metro'ya LAN üzerinden ulaşmak için kendisi
 ekliyor ve release derlemelerinde bir betikle siliyor (`withDevLauncher.js:62-64`).
-
-Ama bu da ad-hoc imzalıdır, yani cihazın UDID'si önce `eas device:create` ile
-kaydedilmeli. **Pratikte iOS tarafında atılacak ilk derleme budur**; mağaza paketi ondan
-sonra gelir.
 
 ---
 
