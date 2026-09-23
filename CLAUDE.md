@@ -23,6 +23,29 @@ npx expo config --type introspect --json   # üretilecek Info.plist/manifest'i g
 ⚠️ `npm run ios` (`expo run:ios`) **bu makinede çalışmaz** — Xcode yalnızca macOS'ta.
 iOS'un tek yolu bulut derlemesi; bkz. "iOS ve App Store".
 
+### ⛔ `eas.json`'A YORUM YAZILAMAZ — her EAS komutunu kırar
+
+Dosya bir süre `"//"` anahtarlarıyla belgelenmişti. eas-cli bunları **reddediyor** ve
+hata tek bir komuta özgü değil: `eas config`, `eas device:list`, `eas build` — hepsi
+düşüyor:
+
+```
+eas.json is not valid.
+- "build.//" must be of type object
+- "build.preview.//" is not allowed
+    Error: config command failed.
+```
+
+Sebep şema: `@expo/eas-json` doğrulamayı `allowUnknown: false` ile yapıyor ve
+desteklenen bir açıklama alanı **yok** (JSON5/JSONC de değil, düz JSON).
+
+⚠️ Bu 2026-09-23'e kadar FARK EDİLMEDİ çünkü depoda hiç EAS derlemesi yapılmamıştı
+(ne `owner` ne `extra.eas.projectId` vardı; Android APK'ları yerelde Gradle ile
+derlenmişti). İlk iOS derlemesini tam olarak bu engelledi.
+
+Profillerin ne işe yaradığı ve her kararın gerekçesi **`docs/eas-profilleri.md`**'de.
+Yeni profil ya da karar eklenince açıklaması oraya yazılır; `eas.json` veri olarak kalır.
+
 ### ⚠️ APK derlemesi bu yoldan ÇALIŞMAZ — 260 karakter sınırı
 
 `gradlew assembleRelease`, `C:\projeler\dersmate Mobil` altında **kırılıyor**:
