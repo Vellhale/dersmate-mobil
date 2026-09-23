@@ -364,6 +364,19 @@ HEIC'tir ve sunucu reddeder — kullanıcı sebebini anlamadığı bir hata alı
 
 ### Dağıtım: ad-hoc mu TestFlight mi
 
+⚠️ **İLK KURULUMDA GELİŞTİRİCİ MODU** (ölçüldü 2026-09-23). iOS 16'dan beri ad-hoc /
+geliştirme imzalı uygulamalar, cihazda **Geliştirici Modu** açık olmadan AÇILMIYOR.
+Uygulama kuruluyor, ikon ana ekranda beliriyor, dokununca "geliştirici modu olmadan
+açılamaz" uyarısı çıkıyor — kurulum hatası sanılıyor, değil.
+
+Yol: **Ayarlar → Gizlilik ve Güvenlik → Geliştirici Modu** → aç → cihaz yeniden başlar →
+kilidi açınca onayla. Tek seferlik; cihaz başına bir kez.
+
+Menü satırı ancak cihaza geliştirme imzalı bir uygulama kurulduktan SONRA beliriyor,
+yani kurulumdan önce aramaya çalışma. TestFlight'tan gelen paketlerde bu gerekmiyor —
+yalnızca ad-hoc dağıtımda.
+
+
 iOS'ta `distribution: "internal"` Android'deki gibi serbest değil. Üretilen `.ipa`
 ad-hoc imzalıdır ve **yalnızca UDID'si kayıtlı cihazlara** kurulur (`eas device:create`,
 yılda 100 cihaz). Kayıtsız bir iPhone'a bağlantıyı açmak yetmez.
