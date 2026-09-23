@@ -107,9 +107,8 @@
     "android": {
       "package": "com.dersmate.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FB",
+        "backgroundColor": "#0088CC",
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "blockedPermissions": [
@@ -126,7 +125,7 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#0F172A",
-          "image": "./assets/icon.png",
+          "image": "./assets/splash-icon.png",
           "imageWidth": 160
         }
       ],
