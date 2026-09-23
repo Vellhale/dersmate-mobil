@@ -11,13 +11,13 @@ import { Badge, Button, EmptyState, ErrorBox, Loading, Notice } from '../src/com
 
 /*
   ARKADAŞLAR — web'deki pages/Matches.jsx'in portu. Tab çubuğunun üstünde yığın ekranı
-  (Akış başlığından ve profildeki kısayoldan gelinir): gelen isteği kabul etmeden ders
+  (ÇEKMECEDEN ve profildeki kısayoldan gelinir — 2026-09-23'e kadar Akış başlığındaki
   akışı hiç başlayamaz — bu ekran Derslerim'in ön koşulu.
 
   ROTA ADI BİLEREK ESKİ (/eslesmeler). Web #31'de ekran "Eşleşmeler"den "Arkadaşlar"a
   döndü ve web adresi /arkadaslar oldu, ama eski adresi yönlendirme olarak tuttu. Mobilde
   yol kullanıcıya görünmüyor; değiştirmek ise sessizce kırar: tur çıpası 'eslesmeler'
-  (src/lib/tur.js ↔ Akış başlığı), dersmate://eslesmeler derin bağlantısı ve kök
+  (src/lib/tur.js — çıpa artık hamburger düğmesinde, adım adı 'menu'),
   Stack.Protected listesi — yeni ad oraya eklenmezse ekran OTURUMSUZ da açılır.
   Bileşen/API adları da (Eslesmeler, MatchKarti, myMatches…) web gibi aynı kaldı.
 

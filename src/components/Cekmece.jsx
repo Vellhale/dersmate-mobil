@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Animated, Modal as RNModal, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native'
 import { usePathname, useRouter } from 'expo-router'
+import { useTurCipasi } from '../lib/tur'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { brand, ink, slate } from '../lib/theme'
 import { useAuth } from '../state/AuthContext'
@@ -9,13 +10,13 @@ import { Avatar } from './Avatar'
 import {
   AramaIkonu,
   BilgiIkonu,
+  EvIkonu,
   KalkanIkonu,
   KepIkonu,
   KisilerIkonu,
   KitapIkonu,
   MenuIkonu,
   MesajIkonu,
-  ToplulukIkonu,
 } from './Ikonlar'
 
 /*
@@ -63,7 +64,10 @@ const OGELER = [
   { yol: '/eslesmeler', etiket: 'Arkadaşlar', Ikon: KisilerIkonu },
   { yol: '/mesajlar', etiket: 'Sohbet', Ikon: MesajIkonu, rozet: true },
   { yol: '/dersler', etiket: 'Derslerim', Ikon: KepIkonu },
-  { yol: '/topluluk', etiket: 'Topluluk', Ikon: ToplulukIkonu },
+  /* Topluluk ARTIK ANA SEKME ('/'), çekmecede ayrı satırı yok — sekme çubuğundan
+     zaten bir dokunuş uzakta. Yerine Akış geldi: ana sekmeden indi ve tek girişi
+     burası. */
+  { yol: '/akis', etiket: 'Akış', Ikon: EvIkonu },
 ]
 
 function Oge({ Ikon, etiket, aktif, rozet, onPress }) {
@@ -267,12 +271,18 @@ export function useCekmece() {
  */
 export function HamburgerDugmesi() {
   const { ac } = useCekmece()
+  /* TUR ÇIPASI: 'eslesmeler' ve 'dersler' adımları eskiden Akış başlığındaki iki
+     ikona ışık tutuyordu. O ikonlar kalktı (hedefleri çekmeceye taşındı), çıpa da
+     buraya geldi. İki adım da aynı öğeyi gösteriyor ve bu doğru: ikisinin de yolu
+     menüden geçiyor. */
+  const cipa = useTurCipasi('menu')
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel="Menüyü aç"
       onPress={ac}
       className="-ml-2 h-11 w-11 items-center justify-center rounded-lg active:bg-slate-100"
+      {...cipa}
     >
       <MenuIkonu renk={slate[700]} boy={24} />
     </Pressable>

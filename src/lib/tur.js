@@ -77,9 +77,9 @@ export const TUR_ADIMLARI = [
   },
   {
     id: 'matches',
-    cipa: 'eslesmeler',
+    cipa: 'menu',
     title: 'Arkadaşlar — istek gönder ve al',
-    body: 'Gönderdiğin ve sana gelen ders istekleri, Akış başlığındaki kişiler simgesinde toplanır.',
+    body: 'Gönderdiğin ve sana gelen ders istekleri, sol üstteki menüde “Arkadaşlar” altında toplanır.',
     points: [
       'Gelen bir isteği kabul ya da reddedersin.',
       'Kabul edilen istekte sohbet kendiliğinden açılır.',
@@ -99,7 +99,7 @@ export const TUR_ADIMLARI = [
   },
   {
     id: 'sessions',
-    cipa: 'dersler',
+    cipa: 'menu',
     title: 'Derslerim — kanıt ve onay',
     body: 'Ders bittikten sonra puanın yazılması için tek bir adım kalır: onay.',
     points: [

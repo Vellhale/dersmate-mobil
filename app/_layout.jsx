@@ -47,6 +47,11 @@ function RootNavigator() {
         <Stack.Screen name="sohbet/[conversationId]" />
         <Stack.Screen name="eslesmeler" />
         <Stack.Screen name="dersler" />
+        {/* Akış ana sekmeden indi (Topluluk oraya çıktı), artık yığın ekranı ve
+            çekmeceden açılıyor. */}
+        <Stack.Screen name="akis" />
+        {/* Eski /topluluk adresi: dosyanın kendisi artık yalnızca '/'a yönlendiriyor
+            ama rota KAYITLI kalmalı, yoksa dersmate://topluluk ölür. */}
         <Stack.Screen name="topluluk" />
         <Stack.Screen name="yonetim" />
       </Stack.Protected>

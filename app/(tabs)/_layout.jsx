@@ -269,7 +269,12 @@ export default function TabsLayout() {
     >
       <Tabs.Screen
         name="index"
-        options={{ title: 'Akış', tabBarAccessibilityLabel: 'Akış', tabBarIcon: ikon(EvIkonu) }}
+        /* İLK SEKME ARTIK TOPLULUK (2026-09-23). Akış kök yığın ekranına indi ve
+           çekmeceden açılıyor. SEKME_YOLLARI'na dokunmak GEREKMEDİ: '/' hâlâ ilk
+           sekme, yalnızca arkasındaki dosya değişti — gösterge ışığı yerinde kalıyor.
+           İkon EvIkonu kaldı: bu yuva 'ana sayfa' anlamını taşıyor, içeriğin ne olduğunu
+           değil (Reddit de forum akışını ev ikonuyla gösteriyor). */
+        options={{ title: 'Topluluk', tabBarAccessibilityLabel: 'Topluluk', tabBarIcon: ikon(EvIkonu) }}
       />
       <Tabs.Screen
         name="kesfet"
