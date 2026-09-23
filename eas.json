@@ -4,58 +4,13 @@
     "appVersionSource": "remote"
   },
   "build": {
-    "//": [
-      "APK PROFİLLERİ — ikisi de 'internal' dağıtım, yani doğrudan kurulabilen .apk üretir.",
-      "Play Store'un istediği .aab yalnızca production profilinde; internal profillerde",
-      "android.buildType 'apk' olmadan EAS varsayılan olarak .aab üretir ve telefona kurulamaz.",
-      "",
-      "iOS — PROFİLLER ORTAK, DERLEME BULUTTA. Her profil `--platform ios` ile de çalışır;",
-      "ayrı bir iOS profili ya da ayrı bir depo YOK. Native klasörler (/ios, /android)",
-      ".gitignore'da: EAS her derlemede prebuild ile üretiyor, yani iOS için depoya",
-      "eklenecek hiçbir şey yok.",
-      "",
-      "⛔ BU MAKİNEDE YEREL iOS DERLEMESİ YAPILAMAZ. Xcode yalnızca macOS'ta çalışır;",
-      "`npm run ios` (expo run:ios) Windows'ta hata verir, simülatör de yoktur. iOS'un",
-      "TEK yolu bulut derlemesi: `eas build --platform ios`. Windows'ta çalışan tek yerel",
-      "sağlama `npx expo export --platform ios` — JS paketini derler, native'e dokunmaz.",
-      "",
-      "⛔ HİÇBİR iOS PROFİLİ APPLE DEVELOPER ÜYELİĞİ OLMADAN DERLENMEZ. Android'de",
-      "EAS imza anahtarını kendisi üretebiliyor; iOS'ta sertifika ve tedarik profili",
-      "Apple'dan gelir ve üyelik ($99/yıl) olmadan üretilemez."
-    ],
     "onizleme": {
-      "//": [
-        "BACKEND'SİZ ÇALIŞAN DEMO APK'sı. EXPO_PUBLIC_ONIZLEME derleme anında gömülür;",
-        "uygulama sunucuya hiç gitmez, veriler src/lib/onizleme.js'ten gelir (bkz. o dosyanın",
-        "başlığı). Tasarımı ve akışları gerçek cihazda gezmek için — sunucu, ağ, giriş gerekmez.",
-        "",
-        "iOS'ta bu profil .ipa üretir ve preview'ın env'ini MİRAS ALIR — yani şifresiz",
-        "EXPO_PUBLIC_API_URL de gelir ve app.config.js ATS istisnasını açar. Demo hiç ağa",
-        "çıkmadığı için zararsız, ama en çok elden ele dolaşan paket budur: mağazaya giden",
-        "sürüm bu değil, production'dır ve orada istisna kapalıdır."
-      ],
       "extends": "preview",
       "env": {
         "EXPO_PUBLIC_ONIZLEME": "1"
       }
     },
     "preview": {
-      "//": [
-        "GERÇEK APK — backend'e bağlanır. EXPO_PUBLIC_API_URL ŞART: bağımsız derlemede",
-        "Constants.expoConfig.hostUri null gelir (Metro yok) ve api.js emülatör adresine",
-        "(10.0.2.2) düşer; gerçek telefonda o adres anlamsızdır. Değer, backend'in LAN",
-        "adresidir — ağ değişirse burası da güncellenmeli. Port 5099: telefon dotnet'e DOĞRUDAN ulaşamıyor (güvenlik duvarı kuralları programa bağlı), araclar/lan-koprusu.js üzerinden geçiyor. Ayrıntı: CLAUDE.md → Yerel arka uç.",
-        "",
-        "⚠️ iOS'ta 'internal' dağıtım Android'deki gibi SERBEST DEĞİL. Üretilen .ipa",
-        "ad-hoc imzalıdır ve YALNIZCA UDID'si Apple hesabına önceden kayıtlı cihazlara",
-        "kurulur (`eas device:create` ile kaydedilir, yılda 100 cihaz sınırı). Kayıtsız",
-        "bir iPhone'a bağlantıyı açmak yetmez, kurulum reddedilir.",
-        "",
-        "Test dağıtımı için daha az sürtünmeli yol TestFlight'tır: production profiliyle",
-        "derleyip `eas submit` ile yüklemek, UDID kaydı gerektirmez ve e-posta davetiyle",
-        "dağıtılır. Bu profil yerel arka uca bağlandığı için TestFlight'a UYGUN DEĞİL —",
-        "LAN adresi Apple'ın incelemesinde de sizin dışınızdaki testçide de çalışmaz."
-      ],
       "distribution": "internal",
       "android": {
         "buildType": "apk"
@@ -65,17 +20,6 @@
       }
     },
     "development": {
-      "//": [
-        "Geliştirme istemcisi: içinde Metro'ya bağlanan bir kabuk taşır (Expo Go'nun",
-        "projeye özel hâli). Expo Go'nun SDK uyuşmazlığı sorununu kalıcı olarak çözer —",
-        "bir kez kurulur, sonra 'npx expo start' ile canlı geliştirme yapılır.",
-        "",
-        "iOS'ta da aynı işi görür ve Windows'tan geliştirmenin ÇALIŞAN yoludur: kabuk",
-        "bulutta derlenir, iPhone'a bir kez kurulur, sonrası Metro üzerinden canlıdır —",
-        "Mac gerekmez. Ama bu da ad-hoc imzalıdır, yani cihazın UDID'si önce",
-        "`eas device:create` ile kaydedilmeli. Pratikte iOS tarafında atılacak İLK",
-        "derleme budur; mağaza paketi ondan sonra gelir."
-      ],
       "developmentClient": true,
       "distribution": "internal",
       "android": {
@@ -83,49 +27,12 @@
       }
     },
     "production": {
-      "//": [
-        "MAĞAZA PAKETİ (.aab). Play yalnızca .aab kabul ediyor; doğrudan kurulabilen .apk",
-        "için production-apk profili kullanılır — İKİSİ DE AYNI ANAHTARLA imzalanmalı, aksi",
-        "halde Android bunları farklı uygulama sayar ve kullanıcı geçişte veri kaybeder.",
-        "",
-        "⛔ EXPO_PUBLIC_API_URL GERÇEK ALAN ADI OLMAK ZORUNDA. 2026-09-04’te yer tutucu",
-        "gerçek adresle değiştirildi: api.dersmate.com (canlı, ölçüldü). Yanlış bir adres",
-        "bırakılırsa uygulama yine derlenir, mağazaya",
-        "yüklenir ve kullanıcıda sessizce 'sunucuya ulaşılamadı' verir — derleme anında",
-        "hiçbir uyarı çıkmaz, çünkü adres yalnızca çalışma anında denenir.",
-        "",
-        "https:// olması ayrıca gerekli: app.config.js şifresiz trafik iznini adresin",
-        "şemasına bağlıyor. http:// bırakılırsa izin açık kalır ve mağaza sürümü",
-        "gereksiz yere zayıflar. iOS'ta aynı koşul ATS istisnasını kapatıyor; gerekçesiz",
-        "NSAllowsArbitraryLoads taşıyan paket App Review'da açıklama istenerek geri",
-        "çevrilebiliyor.",
-        "",
-        "iOS'ta bu profil App Store paketi (.ipa) üretir — ayrı bir profil gerekmez.",
-        "autoIncrement, Android'de versionCode'u artırdığı gibi iOS'ta buildNumber'ı",
-        "artırır (cli.appVersionSource 'remote': sayaç EAS'te tutulur, depoda değil).",
-        "App Store Connect aynı buildNumber'ı iki kez KABUL ETMEZ; elle artırma.",
-        "",
-        "ⓘ app.json → ios.infoPlist.ITSAppUsesNonExemptEncryption = false: uygulama",
-        "yalnızca standart HTTPS kullanıyor, bu da Apple'ın ihracat kısıtlaması",
-        "muafiyetine giriyor. Anahtar olmasa her TestFlight yüklemesinde aynı soru elle",
-        "yanıtlanır ve yanıtlanana kadar paket testçilere DAĞITILMAZ."
-      ],
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.dersmate.com"
       }
     },
     "production-apk": {
-      "//": [
-        "SİTEDEN DOĞRUDAN İNDİRİLEN APK. production ile aynı ortamı miras alır; yalnızca",
-        "paket biçimi farklıdır. distribution 'internal' değil: bu bir üretim paketi ve",
-        "mağaza sürümüyle AYNI imza anahtarını kullanmalı.",
-        "",
-        "⛔ BU PROFİL ANDROID'E ÖZGÜ — `--platform ios` ile ÇAĞIRMA. iOS'ta 'siteden",
-        "indirilen paket' diye bir şey yok: Apple imzalı dağıtımın dışında kurulum yolu",
-        "bırakmıyor. İstemeden çağrılırsa production ile aynı mağaza paketini üretir ve",
-        "iki ayrı derleme aynı buildNumber'ı tüketir."
-      ],
       "extends": "production",
       "android": {
         "buildType": "apk"
@@ -134,38 +41,13 @@
   },
   "submit": {
     "production": {
-      "//": [
-        "Play'e otomatik gönderim. serviceAccountKeyPath, Play Console'dan indirilen JSON",
-        "anahtarın yoludur ve DEPOYA İŞLENMEZ — depo dışında tutulup yolu buraya yazılır.",
-        "track 'internal' ile başla: yalnızca test listesindeki hesaplara gider, mağaza",
-        "incelemesi beklemeden kurulabilir. 'production' ise herkese açık yayındır."
-      ],
       "android": {
         "serviceAccountKeyPath": "./play-service-account.json",
         "track": "internal"
       },
       "ios": {
-        "//": [
-          "App Store Connect'e gönderim. Apple tarafında Play'in servis hesabı anahtarına",
-          "denk bir DOSYA yok; kimlik üç alandan kuruluyor ve ikisi buraya yazılabiliyor.",
-          "",
-          "⛔ appleId (Apple hesabının e-postası) BİLEREK BURADA DEĞİL. Bu depo GitHub'da",
-          "HERKESE AÇIK; buraya yazılan adres kalıcı olarak dışarı sızar ve Apple hesabı",
-          "kimlik avının birinci hedefidir. Bunun yerine gönderim anında ortamdan verilir:",
-          "  EXPO_APPLE_ID=<eposta> npx eas submit --platform ios --profile production",
-          "Parola YAZILMAZ; Apple iki adımlı doğrulama istiyor, EAS uygulamaya-özel parolayı",
-          "sorar ve kendi kasasında saklar.",
-          "",
-          "⛔ AŞAĞIDAKİ İKİ DEĞER YER TUTUCU — Apple Developer üyeliği açılıp App Store",
-          "Connect'te uygulama kaydı (bundle: com.dersmate.app) oluşturulmadan GERÇEK",
-          "karşılıkları YOKTUR. Yanlış bırakılırsa gönderim hata vererek durur; sessizce",
-          "yanlış yere yüklenmez.",
-          "  ascAppId    → App Store Connect › uygulama › App Information › 'Apple ID'",
-          "                (10 haneli sayı; bundle identifier DEĞİL)",
-          "  appleTeamId → developer.apple.com › Membership (10 karakter, harf+rakam)"
-        ],
-        "ascAppId": "DOLDURULACAK",
-        "appleTeamId": "DOLDURULACAK"
+        "ascAppId": "6815211357",
+        "appleTeamId": "666M4C2SLA"
       }
     }
   }

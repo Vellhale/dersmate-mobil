@@ -23,6 +23,29 @@ npx expo config --type introspect --json   # üretilecek Info.plist/manifest'i g
 ⚠️ `npm run ios` (`expo run:ios`) **bu makinede çalışmaz** — Xcode yalnızca macOS'ta.
 iOS'un tek yolu bulut derlemesi; bkz. "iOS ve App Store".
 
+### ⛔ `eas.json`'A YORUM YAZILAMAZ — her EAS komutunu kırar
+
+Dosya bir süre `"//"` anahtarlarıyla belgelenmişti. eas-cli bunları **reddediyor** ve
+hata tek bir komuta özgü değil: `eas config`, `eas device:list`, `eas build` — hepsi
+düşüyor:
+
+```
+eas.json is not valid.
+- "build.//" must be of type object
+- "build.preview.//" is not allowed
+    Error: config command failed.
+```
+
+Sebep şema: `@expo/eas-json` doğrulamayı `allowUnknown: false` ile yapıyor ve
+desteklenen bir açıklama alanı **yok** (JSON5/JSONC de değil, düz JSON).
+
+⚠️ Bu 2026-09-23'e kadar FARK EDİLMEDİ çünkü depoda hiç EAS derlemesi yapılmamıştı
+(ne `owner` ne `extra.eas.projectId` vardı; Android APK'ları yerelde Gradle ile
+derlenmişti). İlk iOS derlemesini tam olarak bu engelledi.
+
+Profillerin ne işe yaradığı ve her kararın gerekçesi **`docs/eas-profilleri.md`**'de.
+Yeni profil ya da karar eklenince açıklaması oraya yazılır; `eas.json` veri olarak kalır.
+
 ### ⚠️ APK derlemesi bu yoldan ÇALIŞMAZ — 260 karakter sınırı
 
 `gradlew assembleRelease`, `C:\projeler\dersmate Mobil` altında **kırılıyor**:
@@ -276,12 +299,23 @@ Beyan edilenler — dördü de ölçülerek seçildi:
 - `1C8F.1` (App Group yok), `AC6B.1` (MDM yok), `B728.1` (sağlık araştırması değil).
 - `ActiveKeyboards` kategorisi — dokunan hiçbir şey yok.
 
-⚠️ **Pod birleştirmesi bu listeyi EZMEZ ama GENİŞLETİR.** RN'in `post_install` betiği
-(`privacy_manifest_utils.rb`) kurulu her pod'un beyanını uygulama manifestine EKLİYOR.
-Yani `0A2A.1`/`85F4.1` pakette yine görünecek — o pod'ların kendi beyanı olarak, bizim
-değil. Kapatmak mümkün (`expo-build-properties` → `ios.privacyManifestAggregationEnabled:
-false`) ama KAPATILMADI: o zaman yeni bir pod'un beyanı kendiliğinden gelmez ve eksik
-beyan riski bize döner. Fazla beyan pod'un sorumluluğu, eksik beyan bizim.
+✅ **ÖLÇÜLDÜ (2026-09-23, ilk iOS derlemesinin .ipa'sı açılarak):** gönderilen
+`Payload/dersmate.app/PrivacyInfo.xcprivacy` tam olarak yukarıdaki dört kategoriyi ve
+yedi türü taşıyor, `NSPrivacyTracking: false`. **Fazladan hiçbir kod eklenmemiş.**
+
+Bu, önceki beklentiyi düzeltiyor: RN'in `post_install` betiğinin
+(`privacy_manifest_utils.rb`) pod beyanlarını uygulama manifestine ekleyip `0A2A.1` /
+`85F4.1` kodlarını geri getireceği düşünülmüştü. Getirmedi — her pod kendi ayrı
+`*_privacy.bundle/PrivacyInfo.xcprivacy` dosyasında duruyor (pakette 10 tane var:
+React-timing, ExpoConstants, ExpoApplication, ExpoDevice, RNCAsyncStorage, folly, glog,
+boost…). Uygulama manifesti yalnızca bizim yazdığımız.
+
+`expo-build-properties` → `ios.privacyManifestAggregationEnabled: false` anahtarına
+GEREK KALMADI; varsayılan davranış zaten istediğimiz sonucu veriyor.
+
+⚠️ Bu ölçüm `onizleme` profilinde yapıldı. `production` farklı pod kümesi derlemiyor,
+yani sonucun değişmesi beklenmiyor — ama mağazaya ilk gönderimden önce aynı kontrol
+tekrarlanabilir: .ipa bir zip, `Payload/<ad>.app/PrivacyInfo.xcprivacy` içinden okunur.
 
 `NSPrivacyCollectedDataTypes` yedi tür sayıyor (ad, e-posta, kullanıcı kimliği, cihaz
 kimliği, fotoğraf, mesaj, diğer kullanıcı içeriği). Hepsi `Linked: true`, `Tracking: false`.
@@ -329,6 +363,19 @@ BÜYÜTÜR de — ekran görüntüsü zaten dardaysa büyütmek dosyayı şişir
 HEIC'tir ve sunucu reddeder — kullanıcı sebebini anlamadığı bir hata alırdı.
 
 ### Dağıtım: ad-hoc mu TestFlight mi
+
+⚠️ **İLK KURULUMDA GELİŞTİRİCİ MODU** (ölçüldü 2026-09-23). iOS 16'dan beri ad-hoc /
+geliştirme imzalı uygulamalar, cihazda **Geliştirici Modu** açık olmadan AÇILMIYOR.
+Uygulama kuruluyor, ikon ana ekranda beliriyor, dokununca "geliştirici modu olmadan
+açılamaz" uyarısı çıkıyor — kurulum hatası sanılıyor, değil.
+
+Yol: **Ayarlar → Gizlilik ve Güvenlik → Geliştirici Modu** → aç → cihaz yeniden başlar →
+kilidi açınca onayla. Tek seferlik; cihaz başına bir kez.
+
+Menü satırı ancak cihaza geliştirme imzalı bir uygulama kurulduktan SONRA beliriyor,
+yani kurulumdan önce aramaya çalışma. TestFlight'tan gelen paketlerde bu gerekmiyor —
+yalnızca ad-hoc dağıtımda.
+
 
 iOS'ta `distribution: "internal"` Android'deki gibi serbest değil. Üretilen `.ipa`
 ad-hoc imzalıdır ve **yalnızca UDID'si kayıtlı cihazlara** kurulur (`eas device:create`,
