@@ -487,6 +487,7 @@ export default function Topluluk() {
   const [sikayetHedefi, setSikayetHedefi] = useState(null)
   const [bildirim, setBildirim] = useState(null)
   const [yaziyor, setYaziyor] = useState(false)
+  const [kurallarAcik, setKurallarAcik] = useState(false)
 
   /*
     YORUMLAR GÖNDERİ AÇILINCA ÇEKİLİYOR, akışla birlikte değil: akışta 20 gönderi var ve
@@ -770,12 +771,10 @@ export default function Topluluk() {
 
   const baslikBolumu = (
     <View className="gap-3 pb-1">
-      <Text className="text-sm leading-relaxed text-slate-600">
-        Sınav stresinden soru çözümüne, kaynak tartışmasından tercih kararına — herkesin aynı
-        sıralarda olduğu ortak alan. Ders almak için arkadaş olmana gerek yok; buraya yazıp topluluğa
-        sorabilirsin.
-      </Text>
-
+      {/* TANITIM PARAGRAFI BURADAN ALINDI (2026-09-23). Üç satırlık metin akışın en
+          üstünde her kaydırmada yer kaplıyordu ve kartsız tek öğe olduğu için ritmi de
+          bozuyordu. Metin kaybolmadı: "Topluluk hakkında" alt sayfasının başına taşındı
+          (Reddit'in topluluk açıklamasını "Daha fazla" arkasına koyması gibi). */}
       {bildirim && (
         <Notice tone="success" onDismiss={() => setBildirim(null)}>
           {bildirim}
@@ -876,13 +875,35 @@ export default function Topluluk() {
                 <Spinner />
               </View>
             )}
-            {/* Kurallar ve önlemler listenin ALTINDA: forumdan önce dört maddelik bir
-                kural listesi okutmak, kimsenin okumadığı bir duvar üretirdi. */}
-            <KurallarKarti />
-            <OnlemlerKarti />
+            {/*
+              KURALLAR VE ÖNLEMLER AKIŞTAN ÇIKTI (2026-09-23), yerinde tek satır kaldı.
+
+              Eskiden burada iki tam kart vardı (~530px statik metin) ve ikisi de yanlış
+              anlarda görünüyordu: (a) sonsuz kaydırma yüzünden okumak için aşağı inen
+              kullanıcı her seferinde yeni sayfa tetikliyor, kartlar aşağı kaçıyordu —
+              gönderiler bitene kadar pratikte ULAŞILAMIYORLARDI; (b) FlatList altbilgiyi
+              liste BOŞKEN de çiziyor, yani ilk yüklemede ve filtre boş sonuç verdiğinde
+              ekrandaki ana içerik o iki kart oluyordu.
+
+              Yerine geçen satır "yine aşağıda" (ürün sahibi böyle istedi) ama akışı
+              tıkamıyor; içerik alt sayfada ve istendiğinde tam olarak okunuyor.
+            */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Topluluk hakkında: kurallar ve alınan önlemler"
+              onPress={() => setKurallarAcik(true)}
+              className="min-h-[44px] flex-row items-center justify-between rounded-xl border border-slate-200 bg-white px-4 active:bg-slate-50"
+            >
+              <Text className="text-sm font-medium text-slate-700">
+                Topluluk kuralları ve alınan önlemler
+              </Text>
+              <Text className="text-base text-slate-400">›</Text>
+            </Pressable>
           </View>
         }
       />
+
+      {kurallarAcik && <ToplulukHakkindaSayfasi onClose={() => setKurallarAcik(false)} />}
 
       {yaziyor && <GonderiAltSayfasi onClose={() => setYaziyor(false)} onPaylas={gonderiEkle} />}
 
@@ -1665,45 +1686,63 @@ function SikayetAltSayfasi({ hedef, onClose, onGonder }) {
 
 /* ─── KURALLAR VE ÖNLEMLER ─────────────────────────────────────────────────── */
 
-function KurallarKarti() {
+/*
+  TOPLULUK HAKKINDA — kurallar + alınan önlemler, tek alt sayfada.
+
+  ⚠️ ESKİDEN İKİ AYRI KART'TI ve akışın içindeydi (ListFooterComponent). Ölçüldü:
+  ~530px statik metin ve ikisi de yanlış anlarda görünüyordu — sonsuz kaydırma yüzünden
+  okumak için inen kullanıcı yeni sayfa tetikliyor ve kartlar kaçıyordu; liste boşken ise
+  ekrandaki ANA İÇERİK onlar oluyordu. Akışta tek satır kaldı, içerik buraya taşındı.
+
+  Kart KULLANILMIYOR: alt sayfa zaten beyaz bir yüzey, içine kart koymak beyaz üstüne
+  beyaz üçüncü bir katman üretirdi (topluluk ekranının asıl şikâyeti buydu). Bölümler
+  ayırıcı çizgiyle bölünüyor.
+*/
+function ToplulukHakkindaSayfasi({ onClose }) {
   return (
-    <Card>
-      <Text className="text-sm font-bold text-slate-900">Topluluk kuralları</Text>
-
-      <View className="mt-3 gap-2.5">
-        {KURALLAR.map((kural, i) => (
-          <View key={kural} className="flex-row gap-2.5">
-            {/* Numara madde işaretinden daha iyi: kurallar bir moderasyon kararında
-                referans veriliyor ("3. kural"), numarasız bir liste bunu yapamaz. */}
-            <View className="mt-0.5 h-5 w-5 shrink-0 items-center justify-center rounded-md bg-slate-100">
-              <Text className="text-[11px] font-bold text-slate-600">{i + 1}</Text>
-            </View>
-            <Text className="flex-1 text-xs leading-relaxed text-slate-600">{kural}</Text>
-          </View>
-        ))}
-      </View>
-
-      <Text className="mt-4 border-t border-slate-100 pt-3 text-xs leading-relaxed text-slate-500">
-        Kuralları ihlal eden içerik moderasyon ekibince kaldırılır; tekrarlayan ihlallerde hesaba
-        yaptırım uygulanır.
+    <Modal open onClose={onClose} title="Topluluk hakkında">
+      {/* Akışın en üstündeki tanıtım paragrafı buraya taşındı — orada her kaydırmada
+          yer kaplıyordu, burada sorulduğunda okunuyor. */}
+      <Text className="text-sm leading-relaxed text-slate-600">
+        Sınav stresinden soru çözümüne, kaynak tartışmasından tercih kararına — herkesin aynı
+        sıralarda olduğu ortak alan. Ders almak için arkadaş olmana gerek yok; buraya yazıp
+        topluluğa sorabilirsin.
       </Text>
-    </Card>
-  )
-}
 
-function OnlemlerKarti() {
-  return (
-    <Card>
-      <Text className="text-sm font-bold text-slate-900">Nasıl korunuyor?</Text>
+      <View className="mt-5 border-t border-slate-100 pt-5">
+        <Text className="text-sm font-bold text-slate-900">Topluluk kuralları</Text>
 
-      <View className="mt-3 gap-3">
-        {ONLEMLER.map(({ baslik, metin }) => (
-          <View key={baslik}>
-            <Text className="text-xs font-semibold text-slate-800">{baslik}</Text>
-            <Text className="mt-0.5 text-xs leading-relaxed text-slate-600">{metin}</Text>
-          </View>
-        ))}
+        <View className="mt-3 gap-2.5">
+          {KURALLAR.map((kural, i) => (
+            <View key={kural} className="flex-row gap-2.5">
+              {/* Numara madde işaretinden daha iyi: kurallar bir moderasyon kararında
+                  referans veriliyor ("3. kural"), numarasız bir liste bunu yapamaz. */}
+              <View className="mt-0.5 h-5 w-5 shrink-0 items-center justify-center rounded-md bg-slate-100">
+                <Text className="text-[11px] font-bold text-slate-600">{i + 1}</Text>
+              </View>
+              <Text className="flex-1 text-[13px] leading-relaxed text-slate-600">{kural}</Text>
+            </View>
+          ))}
+        </View>
+
+        <Text className="mt-4 text-xs leading-relaxed text-slate-500">
+          Kuralları ihlal eden içerik moderasyon ekibince kaldırılır; tekrarlayan ihlallerde
+          hesaba yaptırım uygulanır.
+        </Text>
       </View>
-    </Card>
+
+      <View className="mt-5 border-t border-slate-100 pt-5">
+        <Text className="text-sm font-bold text-slate-900">Nasıl korunuyor?</Text>
+
+        <View className="mt-3 gap-3">
+          {ONLEMLER.map(({ baslik, metin }) => (
+            <View key={baslik}>
+              <Text className="text-[13px] font-semibold text-slate-800">{baslik}</Text>
+              <Text className="mt-0.5 text-[13px] leading-relaxed text-slate-600">{metin}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    </Modal>
   )
 }
