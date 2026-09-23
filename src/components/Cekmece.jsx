@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { Animated, Modal as RNModal, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native'
+import { Animated, Linking, Modal as RNModal, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native'
 import { usePathname, useRouter } from 'expo-router'
 import { useTurCipasi } from '../lib/tur'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -7,6 +7,7 @@ import { brand, ink, slate } from '../lib/theme'
 import { useAuth } from '../state/AuthContext'
 import { useInbox } from '../state/InboxContext'
 import { Avatar } from './Avatar'
+import { Logo } from './Logo'
 import {
   AramaIkonu,
   BilgiIkonu,
@@ -14,9 +15,12 @@ import {
   KepIkonu,
   KisilerIkonu,
   KitapIkonu,
+  InstagramIkonu,
   MenuIkonu,
   MesajIkonu,
+  TiktokIkonu,
   ToplulukIkonu,
+  XIkonu,
 } from './Ikonlar'
 
 /*
@@ -73,6 +77,52 @@ const OGELER = [
      bir /topluluk adresine gitmek aynı ekranı yığına ikinci kez iterdi. */
   { yol: '/', etiket: 'Topluluk', Ikon: ToplulukIkonu },
 ]
+
+/*
+  SOSYAL HESAPLAR — web'deki SOSYAL dizisinin (Layout.jsx:121-125) birebir portu.
+
+  ⚠️ KULLANICI ADI PLATFORM BAŞINA FARKLI: TikTok `dersmate`, Instagram ve X
+  `dersmate_`. Web'de bir süre üçü de tek sabitten yazdırılıyordu ve TikTok
+  bağlantısı VAR OLMAYAN bir hesaba gidiyordu. Ad href ile aynı satırda duruyor ki
+  ikisi bir daha ayrışmasın: linki değiştiren, altındaki metni de görür.
+
+  Satırlar yalnız ikon + kullanıcı adı gösteriyor; "Instagram sayfamız" gibi
+  açıklama metni bilinçli olarak yok (web'deki tasarım isteri).
+*/
+const SOSYAL = [
+  { ad: 'Instagram', kullanici: 'dersmate_', href: 'https://instagram.com/dersmate_', Ikon: InstagramIkonu },
+  { ad: 'TikTok', kullanici: 'dersmate', href: 'https://tiktok.com/@dersmate', Ikon: TiktokIkonu },
+  { ad: 'X', kullanici: 'dersmate_', href: 'https://x.com/dersmate_', Ikon: XIkonu },
+]
+
+/*
+  SOSYAL SATIR — gezinme öğesinden BİLEREK daha sessiz: ikon 18px (menüde 22),
+  renk slate-400 (menüde slate-200). Bunlar uygulamadan ÇIKARAN bağlantılar;
+  menü öğeleriyle aynı ağırlıkta çizilselerdi gezinme gibi okunurlardı.
+
+  Dokunma hedefi yine 44px (CLAUDE.md, koşulsuz) — küçülen şey görsel ağırlık,
+  dokunulabilir alan değil.
+*/
+function SosyalSatir({ Ikon, ad, kullanici, href, onGit }) {
+  return (
+    <Pressable
+      accessibilityRole="link"
+      /* Ekran okuyucu "dersmate_" diye okusaydı hangi platform olduğu kaybolurdu;
+         görsel ayrımı ikon taşıyor, erişilebilir adı bu etiket. */
+      accessibilityLabel={`${ad}: ${kullanici}`}
+      onPress={() => {
+        onGit()
+        /* Linking.openURL reddedilebilir (tarayıcı yok, adres desteklenmiyor).
+           Yakalanmazsa bu, kullanıcıya hiçbir şey anlatmayan bir çökme olurdu. */
+        Linking.openURL(href).catch(() => {})
+      }}
+      className="min-h-[44px] flex-row items-center gap-3 rounded-xl px-3 active:bg-white/5"
+    >
+      <Ikon renk={slate[400]} boy={18} kalinlik={1.8} />
+      <Text className="text-sm text-slate-400">{kullanici}</Text>
+    </Pressable>
+  )
+}
 
 function Oge({ Ikon, etiket, aktif, rozet, onPress }) {
   const renk = aktif ? brand[300] : slate[200]
@@ -167,6 +217,22 @@ export function Cekmece({ acik, onKapat, aktifYol }) {
         >
           <ScrollView contentContainerClassName="gap-1 px-3 py-3">
             {/*
+              MARKA KİLİDİ — çekmecenin tepesinde.
+
+              Web'de logo üst barda, her sayfada görünür (Layout.jsx:304-313). Mobilde
+              üst şerit sayfa adını taşıyor, yani markaya yer yok; Akış ekranı
+              silinene kadar marka kilidi ORADA duruyordu (EkranBasligi'nin başlıksız
+              dalı) ve onunla birlikte uygulamadan tamamen kayboldu.
+
+              Çekmece web'in sol rayının karşılığı, logonun doğal yeri burası.
+            */}
+            <View className="px-3 pb-1 pt-1">
+              <Logo boyut="lg" zemin="gece" />
+            </View>
+
+            <View className="mb-1 mt-2 h-px bg-white/10" />
+
+            {/*
               KİMLİK SATIRI — web'de de yalnızca çekmecede var (Layout.jsx:430-437);
               masaüstü rayında yok çünkü orada avatar üst barda duruyor. Mobilde üst
               barda avatar olmadığı için burası profile giden tek kısa yol.
@@ -209,12 +275,23 @@ export function Cekmece({ acik, onKapat, aktifYol }) {
 
             <View className="my-2 h-px bg-white/10" />
 
+            {/*
+              ALT KÜME — web'deki AltKume'nin (Layout.jsx:621-657) portu: Hakkımızda
+              ve altında sosyal hesaplar. Gezinme listesinin DIŞINDA ve ayırıcının
+              altında: biri uygulama içi bir sayfa, diğerleri uygulamadan çıkarıyor.
+            */}
             <Oge
               Ikon={BilgiIkonu}
               etiket="Hakkımızda"
               aktif={aktifYol === '/hakkimizda'}
               onPress={() => git('/hakkimizda')}
             />
+
+            {SOSYAL.map((s) => (
+              /* Çekmece kapanıyor: dönüşte menü açık kalsaydı kullanıcı uygulamaya
+                 girdiğinde üstünde bir katmanla karşılaşırdı. */
+              <SosyalSatir key={s.ad} {...s} onGit={onKapat} />
+            ))}
           </ScrollView>
         </Animated.View>
 
