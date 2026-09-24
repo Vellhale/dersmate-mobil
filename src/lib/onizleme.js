@@ -533,6 +533,87 @@ const PUAN_HAREKETLERI = Array.from({ length: 27 }, (_, i) => ({
   createdAtUtc: dknOnce(60 * 24 * (i + 1)),
 }))
 
+/* ── Push bildirimleri ───────────────────────────────────────────────────── */
+
+/*
+  BİLDİRİM İZNİ — önizlemede işletim sistemi izni YOK (web'de expo-notifications'ın
+  push API'leri çalışmıyor, demo APK'da da bilerek kullanılmıyor). Ayarlar ekranının ve
+  aydınlatma sorusunun bütün hâlleri yine de görülebilsin diye izin ADRES ÇUBUĞUNDAN
+  seçiliyor (web önizlemesi, `npm run web:onizleme`):
+
+    ?izin=verildi                 izin var, aydınlatma görülmüş → "Bildirimler açık"
+    ?izin=verildi-aydinlatmasiz   izin var, aydınlatma yok (Android 7–12'nin ilk hâli)
+    ?izin=reddedildi              telefon ayarlarında kapalı
+    ?izin=belirsiz                hiç sorulmamış; "izin iste" belirsiz → verildi yapar
+    (yok) / ?izin=desteklenmiyor  "Bu sürümde bildirimler desteklenmiyor" — VARSAYILAN
+
+  Varsayılan "desteklenmiyor", çünkü önizleme gerçekte push desteklemiyor ve sorulmadan
+  açılan her önizleme ilk ekranda aydınlatma sorusu görmemeli.
+
+  Adres AÇILIŞTA bir kez okunuyor: expo-router gezinmede history API ile adresi
+  değiştiriyor, sorgu dizesi ilk gezinmede kayboluyor. URLSearchParams kullanılmıyor:
+  RN'nin çoklu dolgusunda get() yok, demo APK'da açılışta patlardı.
+*/
+const IZIN_HALLERI = ['verildi', 'verildi-aydinlatmasiz', 'reddedildi', 'belirsiz', 'desteklenmiyor']
+
+function adrestenIzin() {
+  try {
+    const arama = globalThis.location?.search
+    const deger = typeof arama === 'string' ? /[?&]izin=([^&#]*)/.exec(arama)?.[1] : null
+    return IZIN_HALLERI.includes(deger) ? deger : 'desteklenmiyor'
+  } catch {
+    return 'desteklenmiyor'
+  }
+}
+
+const ADRES_IZNI = ONIZLEME ? adrestenIzin() : 'desteklenmiyor'
+
+/* Aydınlatma sunucu durumu (tercih satırında), izin ise işletim sistemi durumu: ikisi
+   gerçekte de bağımsız. Burada da ayrı tutuluyor ki "izin var ama aydınlatma yok" hâli
+   yürünebilsin. */
+let bildirimIzni = ADRES_IZNI === 'verildi-aydinlatmasiz' ? 'verildi' : ADRES_IZNI
+
+/** 'verildi' | 'reddedildi' | 'belirsiz' | 'desteklenmiyor' — bildirimler.js okur. */
+export function onizlemeBildirimIzni() {
+  return bildirimIzni
+}
+
+/* Sistem isteminde "İzin ver"e basılmış gibi. Yalnızca hiç sorulmamışken: reddedilmiş
+   izin gerçekte de uygulamadan geri açılamaz (yalnızca telefon ayarlarından). */
+export function onizlemeBildirimIzniIste() {
+  if (bildirimIzni === 'belirsiz') bildirimIzni = 'verildi'
+  return bildirimIzni
+}
+
+/* Sunucunun GET /push/preferences yanıtıyla birebir biçim. Bellekte ve DEĞİŞEBİLİR:
+   anahtarlar, aydınlatma kararı ve erteleme sayısı önizlemede gerçekten değişsin. */
+let BILDIRIM_TERCIHLERI = {
+  mesajlar: true,
+  istekler: true,
+  dersOnayi: true,
+  dersPlani: true,
+  aydinlatmaAtUtc: ADRES_IZNI === 'verildi' ? dknOnce(60 * 24 * 3) : null,
+  soruErtelemeSayisi: 0,
+  soruErtelendiAtUtc: null,
+  alici: '0a1b2c3d4e5f6071',
+}
+
+// PUT /push/preferences/{kategori} yolundaki ad → yanıttaki alan adı.
+const TERCIH_ALANLARI = {
+  mesajlar: 'mesajlar',
+  istekler: 'istekler',
+  'ders-onayi': 'dersOnayi',
+  'ders-plani': 'dersPlani',
+}
+
+let pushCihazKayitli = false
+let testBildirimleri = [] // son deneme bildirimlerinin zamanı (ms), 429 taklidi için
+
+/* Gerçek ApiError'ın biçimi (message, code, status). api.js'ten içe aktarılamıyor:
+   api.js bu dosyayı içe aktarıyor, döngü açılışta undefined verirdi. */
+const sahteHata = (message, code, status) =>
+  Object.assign(new Error(message), { name: 'ApiError', code, status })
+
 /* ── Sahte api yüzeyi ────────────────────────────────────────────────────── */
 
 const sayfala = (dizi, page, pageSize) => ({
@@ -685,6 +766,57 @@ export const onizlemeApi = {
   myPreferences: () => gecikme({}),
   saveOnboarding: () => gecikme(null),
   saveCookieConsent: () => gecikme(null),
+
+  /* ── Push ─────────────────────────────────────────────────────────────────
+     Altısı da burada OLMAK ZORUNDA: eksik metot sessizce gerçek ağa düşer (api.js
+     sonundaki Object.assign yalnızca buradakileri ezer). Sunucu kuralları taklit
+     ediliyor: aydınlatma görülmeden kayıt yok (kayitli:false), damga ilk kararda
+     yazılır ve korunur, deneme bildirimi 10 dakikada 3. */
+  registerPushDevice: () => {
+    const kayitli = BILDIRIM_TERCIHLERI.aydinlatmaAtUtc !== null
+    if (kayitli) pushCihazKayitli = true
+    return gecikme({ kayitli, alici: BILDIRIM_TERCIHLERI.alici })
+  },
+  forgetPushDevice: () => {
+    pushCihazKayitli = false
+    return gecikme(null)
+  },
+  pushPreferences: () => gecikme({ ...BILDIRIM_TERCIHLERI }),
+  setPushPreference: (kategori, acik) => {
+    const alan = TERCIH_ALANLARI[kategori]
+    if (!alan) return Promise.reject(sahteHata('Bilinmeyen bildirim kategorisi.', 'VALIDATION_ERROR', 400))
+    BILDIRIM_TERCIHLERI = { ...BILDIRIM_TERCIHLERI, [alan]: Boolean(acik) }
+    return gecikme(null)
+  },
+  pushPromptDecision: (karar) => {
+    const simdi = new Date().toISOString()
+    if (karar === 'Acildi') {
+      BILDIRIM_TERCIHLERI = {
+        ...BILDIRIM_TERCIHLERI,
+        aydinlatmaAtUtc: BILDIRIM_TERCIHLERI.aydinlatmaAtUtc ?? simdi,
+      }
+    } else if (karar === 'Ertelendi') {
+      BILDIRIM_TERCIHLERI = {
+        ...BILDIRIM_TERCIHLERI,
+        soruErtelemeSayisi: BILDIRIM_TERCIHLERI.soruErtelemeSayisi + 1,
+        soruErtelendiAtUtc: simdi,
+      }
+    } else {
+      return Promise.reject(sahteHata('Geçersiz karar.', 'VALIDATION_ERROR', 400))
+    }
+    return gecikme(null)
+  },
+  sendTestPush: () => {
+    const esik = Date.now() - 10 * 60000
+    testBildirimleri = testBildirimleri.filter((t) => t > esik)
+    if (testBildirimleri.length >= 3) {
+      return Promise.reject(
+        sahteHata('Çok fazla deneme bildirimi gönderdin. Biraz sonra tekrar dene.', 'TOO_MANY_REQUESTS', 429),
+      )
+    }
+    testBildirimleri.push(Date.now())
+    return gecikme({ cihaz: pushCihazKayitli ? 1 : 0 })
+  },
 
   // Parola sıfırlama: iki uç da 204 döner ve yanıt adres kayıtlı olsun olmasın AYNIDIR
   // (gerçek uçların sözleşmesi de bu).

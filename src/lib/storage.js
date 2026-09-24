@@ -39,6 +39,18 @@ export const KEYS = {
      adres temel URI'ye dönüyor ve Fresco o anahtarın altındaki ESKİ görseli ağa hiç
      çıkmadan sunuyor — yüklenen yeni fotoğraf kalıcı olarak görünmez oluyordu. */
   avatarSurumleri: 'peerlearn.avatarSurumleri',
+  /* "Bu cihazın push kaydı sunucudan unutturulacak" işareti — SecureStore'da, değeri
+     işaretin yazıldığı an (ms). YALNIZCA çıkışın sunucu çağrısı ulaşmadığında yazılır:
+     çevrimdışı çıkışta sunucudaki cihaz satırı silinemedi ve telefona önceki hesabın
+     bildirimleri gelmeye devam ederdi. Sonraki açılışta bildirimler.js → unutmaCalistir
+     POST /push/devices/forget çağırır ve işareti siler. Token'ın kendisi diske YAZILMAZ;
+     unutma anında yeniden okunur.
+
+     Neden ayrı anahtar, oturum kaydının içinde değil: işaret tam da oturum kaydı
+     silinirken (çıkış) doğuyor. Neden SecureStore: oturumla aynı kasada, "zorunlu"
+     kategoride (hizmetin gereği; IzinContext → zorunlu kategori metni ve gizlilik §4'te
+     beyan edilir, IZIN_SURUMU ARTMAZ — kullanıcı kararı 2026-09-25). */
+  pushUnutulacak: 'peerlearn.pushUnutulacak',
 }
 
 /* SecureStore anahtarlarında nokta geçersiz ([A-Za-z0-9._-] izinli aslında; nokta
