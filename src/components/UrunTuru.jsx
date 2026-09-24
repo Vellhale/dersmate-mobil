@@ -81,6 +81,35 @@ const ACILIS_EKRANLARI = ['/', '/kesfet']
 /** Çıpanın etrafında bırakılan nefes payı (web'deki padding=8 ile aynı). */
 const BOSLUK = 8
 
+/*
+  TUR AÇIK MI — bildirim aydınlatma sorusu (state/BildirimSaglayici) tur ekrandayken
+  kendiliğinden AÇILMAZ. İkisi de kök layout'ta tam ekran katman: soru bir RN Modal ve
+  turun üstüne binseydi kullanıcı ışık tutulan öğeyi göremez, turun altında kalsaydı hiç
+  görünmezdi (izin sayfasıyla yaşanan çakışmanın aynısı, bkz. mutlakaSor).
+
+  Modül düzeyinde, bağlam değil: sağlayıcı turun ATASI (tur onun çocuğu olarak çiziliyor),
+  yani turun durumunu bağlamdan okuyamaz. useSyncExternalStore ile dinleniyor.
+*/
+let turAcik = false
+const turAcikDinleyicileri = new Set()
+
+function turAcikYaz(deger) {
+  if (turAcik === deger) return
+  turAcik = deger
+  for (const dinleyici of [...turAcikDinleyicileri]) dinleyici()
+}
+
+/** Ürün turu şu an açık mı (izin sayfasının arkasında bekliyor olsa da). */
+export function urunTuruAcikMi() {
+  return turAcik
+}
+
+/** @returns vazgeç fonksiyonu */
+export function urunTuruDinle(dinleyici) {
+  turAcikDinleyicileri.add(dinleyici)
+  return () => turAcikDinleyicileri.delete(dinleyici)
+}
+
 export function UrunTuru() {
   const { mutlakaSor } = useIzin()
   const pathname = usePathname()
@@ -89,6 +118,12 @@ export function UrunTuru() {
 
   const [durum, setDurum] = useState({ yukleniyor: true, aktif: false, adim: 0 })
   const [cipa, setCipa] = useState(null)
+
+  // Bildirim sorusu için aktiflik bayrağı (yukarıda). Sökülünce (çıkış) kapalı.
+  useEffect(() => {
+    turAcikYaz(durum.aktif)
+  }, [durum.aktif])
+  useEffect(() => () => turAcikYaz(false), [])
 
   // Sunucu "bu kullanıcıya gösterilebilir" dedi mi? Ekran koşulundan AYRI tutuluyor:
   // biri veriden, diğeri o anki gezinmeden geliyor.

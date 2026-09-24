@@ -8,6 +8,7 @@ import {
   oturumuSonlandir,
   saveSession,
 } from '../lib/api'
+import { oturumKapandi, unutmaCalistir, unutmaIsaretle } from '../lib/bildirimler'
 import { getHwidHash } from '../lib/hwid'
 
 const AuthContext = createContext(null)
@@ -31,6 +32,15 @@ export function AuthProvider({ children }) {
       if (!mounted) return
       setSession(restored)
       setHazir(true)
+      /*
+        ÇEVRİMDIŞI ÇIKIŞTAN KALAN PUSH KAYDI — oturum olsun olmasın, açılışta bir kez.
+        Önceki çıkışın sunucu çağrısı ulaşmadıysa (logout → unutmaIsaretle) bu cihazın
+        token'ı sunucuda eski hesaba bağlı kalmıştır ve telefona o hesabın bildirimleri
+        gelmeye devam eder. İşaret yoksa ağa çıkılmaz; varsa token okunup
+        POST /push/devices/forget çağrılır. Asla fırlatmaz; ulaşmazsa iş sonraki açılışa.
+        Oturumluysa sağlayıcının kaydı da önce bunu bekliyor (sıra: unut → yeniden kaydet).
+      */
+      unutmaCalistir()
     })
     return () => {
       mounted = false
@@ -42,6 +52,10 @@ export function AuthProvider({ children }) {
     return onAuthExpired(() => {
       saveSession(null)
       setSession(null)
+      /* Bildirim merkezi, rozet ve bellekteki alıcı etiketi de gider: kilit ekranında
+         düşmüş oturumun bildirimleri kalmasın. Unutma işareti YAZILMAZ: sunucu bu oturumu
+         zaten reddetti ve gönderim süzgeci "cihazın en yeni oturumu aktif mi" diye bakıyor. */
+      oturumKapandi()
     })
   }, [])
 
@@ -77,12 +91,20 @@ export function AuthProvider({ children }) {
     `onAuthExpired` yolunda BU ÇAĞRI YAPILMIYOR ve yapılmamalı: orada oturumu sunucu
     zaten reddetti, yenileme token'ı ölü. İptal isteği en iyi ihtimalle no-op, en
     kötüsünde başarısız bir istekten sonra yine aynı yere varırdı.
+
+    PUSH: sunucu çıkışta bu cihazın push kaydını da siliyor (LogoutHandler); mobil ayrı
+    bir silme isteği ATMAZ. Çıkış çağrısı ulaşmazsa (false) kayıt sunucuda kalır — o
+    zaman "unutulacak" işareti yazılır ve bir sonraki açılış kaydı unutturur (yukarıdaki
+    unutmaCalistir). Bildirim merkezi ve rozet ağı beklemeden, hemen temizlenir.
   */
   const logout = useCallback(() => {
     const refreshToken = loadSession()?.refreshToken
     saveSession(null)
     setSession(null)
-    oturumuSonlandir(refreshToken)
+    oturumKapandi()
+    oturumuSonlandir(refreshToken).then((ulasti) => {
+      if (!ulasti) unutmaIsaretle().catch(() => {})
+    })
   }, [])
 
   const value = useMemo(

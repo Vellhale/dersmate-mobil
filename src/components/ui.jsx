@@ -417,15 +417,18 @@ export function Notice({ tone = 'success', children, onDismiss }) {
  *   bir kapatma düğmesi, kullanıcıya olmayan bir çıkış yolu vaat eder: ilk açılıştaki izin
  *   sayfasında tam olarak bu oluyordu (onClose boş fonksiyondu, ✕ duruyordu).
  *   Kapanışın tek yolu bir cevap vermekse, o cevabı veren düğmeler de zaten footer'da.
+ * @param onShow Sayfa GERÇEKTEN ekrana geldiğinde (RN Modal'ın onShow'u). "Gösterildi"
+ *   sayılacak bir şey (bildirim aydınlatması) açma kararına değil buna bağlanmalı: iOS'ta
+ *   kapanan bir Modal'la aynı anda açılan ikincisi hiç görünmeyebiliyor.
  */
-export function Modal({ open, title, onClose, children, footer, kapatilabilir = true }) {
+export function Modal({ open, title, onClose, onShow, children, footer, kapatilabilir = true }) {
   const insets = useSafeAreaInsets()
   // Android'in donanım geri tuşu onRequestClose'u ÇAĞIRIR ve prop zorunludur; kapatılamaz
   // kipte olayı yutan bir no-op veriliyor, yoksa geri tuşu sayfayı kapatırdı.
   const kapat = kapatilabilir ? onClose : () => {}
 
   return (
-    <RNModal visible={open} transparent animationType="slide" onRequestClose={kapat}>
+    <RNModal visible={open} transparent animationType="slide" onRequestClose={kapat} onShow={onShow}>
       {/*
         KLAVYE KAÇINMA MODALIN KENDİ İÇİNDE ŞART: RN Modal ayrı bir pencere — ekrandaki
         (varsa) KeyboardAvoidingView onu etkilemez ve iOS'ta klavye, alta yaslı sheet'in
