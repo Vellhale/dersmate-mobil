@@ -634,7 +634,9 @@ yeni bir ifşaysa `SOZLESME_SURUMU` da.
 `?izin=verildi|verildi-aydinlatmasiz|reddedildi|belirsiz|desteklenmiyor` (varsayılan
 `desteklenmiyor`; açılışta bir kez okunur). `onizleme.js`'teki altı sahte metot sunucu
 kurallarını taklit ediyor: aydınlatmasız kayıt `kayitli: false`, bilinmeyen kategori
-400, 10 dakikada 4. deneme 429. Web'de expo-notifications YOK: soğuk açılış, sıcak dokunuş,
+404 (sunucu `BildirimTercihleri.cs` 404 veriyor; taklit 2026-09-25'e kadar 400 diyordu),
+geçersiz karar 400, 10 dakikada 4. deneme 429 — hata kodu üçünde de sunucununki
+(`VALIDATION_FAILED`). Web'de expo-notifications YOK: soğuk açılış, sıcak dokunuş,
 ön plan işleyicisi, rozet, `sunulanlariKapat` ve unutma işareti yalnızca cihazda sınanır.
 
 ### Kullanıcı adımları (cihaz doğrulamasından önce, elle)
@@ -1072,6 +1074,18 @@ Kalan iki ⬜ kapanmadan baseline ilerletilmemeli. (`03dc360` 2026-09-21'de kapa
 en eski açık iş artık `ac0a6bf`, yani baseline en fazla oraya kadar düşünülebilir —
 ama o da incelenmeden değil.)
 
+⚠️ `ozellik/push-bildirimleri` main'e birleşince aynı diff'te üç commit daha görünecek.
+Üçü de **ters yönde** (web ← mobil), yani mobile taşınacak bir şey yok:
+
+| commit | iş | durum |
+|---|---|---|
+| `9cdccbc` | W1 — web api'sine altı push sarmalayıcısı | ✅ mobilden geldi (sözleşme pariteti, bkz. aşağıdaki api tablosu) |
+| `f140b6d` | web yasal metinleri: toplanmayan telefon numarası, bayat "Profil sekmesi" | ✅ mobil 2026-09-22 / 2026-09-23'te zaten düzeltmişti |
+| `8ec0cea` | W2 — web gizlilik metnine push, silme listeleri, `SOZLESME_SURUMU` 2026-09-25 | ✅ mobil karşılığı `app/gizlilik.jsx` + `yasalMetinler.js` (aynı değer) |
+
+Baseline'a bu üçü yüzünden dokunulmaz: ileri çekmek yukarıdaki iki ⬜'yi diff'ten
+düşürürdü.
+
 `b93422a..6aafac7` aralığında `frontend/src`'ye dokunan her PR ya taşındı ya da mobilde
 karşılığı yok: #21 → mobil PR #6 (`fe8e875`); #26, #29, #30, #31, #33 →
 `ozellik/web-esitleme-26-33` dalı; #24 ve #25 → aşağıdaki "bilerek taşınmayanlar".
@@ -1097,9 +1111,9 @@ baseline ileri kalırsa gerçek bir fark hiç görünmez.
   artık tam tersi (bkz. "Gezinme").
 
 ⚠️ `api.js` yüzeyini karşılaştırmak için metot adlarını çıkarıp kümeleri karşılaştır
-(`export const api = {` nesnesinin birinci düzey anahtarları). Son ölçüm **2026-09-25:
-web 79, mobil 86 metot**; fark **5 web ↔ 12 mobil**, bunun 6'sı henüz web'e gelmemiş push
-metotları:
+(`export const api = {` nesnesinin birinci düzey anahtarları). Son ölçüm **2026-09-25,
+iki depo da `ozellik/push-bildirimleri` dalında: web 85, mobil 86 metot**; fark **5 web ↔
+6 mobil**:
 
 | web | mobil |
 |---|---|
@@ -1109,14 +1123,19 @@ metotları:
 | `adminTeacherDocument` | `adminTeacherDocumentSource` |
 | — | `teacherDocumentSource` (kendi belgesini geri okuma; web'de karşılığı yok) |
 | `logout(refreshToken, tumCihazlar)` | api nesnesinde YOK — modül fonksiyonu `oturumuSonlandir(refreshToken)`: ham axios (401 → yenile zinciri iptal edilecek token'ı tazelemesin), `Promise<boolean>`, "her yerden çıkış" argümanı yok |
-| ⬜ — | `registerPushDevice`, `forgetPushDevice`, `pushPreferences`, `setPushPreference`, `pushPromptDecision`, `sendTestPush` |
 
-⬜ Son satır SENKRON AÇIĞI, bilinçli fark DEĞİL: web'in aynı altı sarmalayıcıyı AYNI adla
-ve AYNI imzayla alması planlı (sunucu deposunda aynı dal, W1; `registerPushDevice` TEK
-nesne parametresi alır). Web onları alınca fark 5 ↔ 6'ya iner ve bu satır silinir.
-(Önceki ölçüm 2026-09-11: web 78, mobil 80. `logout` web'e 2026-09-19'da `03dc360`'la
-geldi; 2026-09-21 portu onu api nesnesinin DIŞINDA taşıdı ve tablo güncellenmedi — bu
-ölçüme kadar kayıtsız kalan bir fark.)
+Altı push metodu (`registerPushDevice`, `forgetPushDevice`, `pushPreferences`,
+`setPushPreference`, `pushPromptDecision`, `sendTestPush`) iki tarafta da var ve fark
+DEĞİL: web onları `9cdccbc`'de (W1) AYNI adla ve AYNI imzayla aldı — `registerPushDevice`
+TEK nesne parametresi, `forgetPushDevice` iki tarafta da ham istek, başlıksız ve fırlatan.
+Web bu metotları ÇAĞIRMIYOR (web'de push yok); sözleşme iki istemcide aynı kalsın diye
+duruyorlar. Bu dal main'e birleşmeden web'in main'i ölçülürse 79 metot görünür ve altısı
+"yalnız mobil" çıkar — o fark dalın birleşmesiyle kapanır, senkron hatası değildir.
+
+(Önceki ölçümler: 2026-09-11 web 78, mobil 80. 2026-09-25 W1'den önce web 79, mobil 86.
+`logout` web'e 2026-09-19'da `03dc360`'la geldi; 2026-09-21 portu onu api nesnesinin
+DIŞINDA taşıdı ve tablo güncellenmedi — 2026-09-25 ölçümüne kadar kayıtsız kalan bir
+fark.)
 
 Gerekçe: web baytları blob olarak indirip object URL'e çeviriyor, RN'de
 `URL.createObjectURL` yok. Mobil `*Source` metotları yalnızca `{ yol }` döndürüyor;

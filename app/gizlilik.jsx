@@ -83,18 +83,20 @@ import { SOZLESME_TARIHI } from '../src/lib/yasalMetinler'
   Kilit ekranı cümlesi işletim sisteminin YAPTIĞINDAN FAZLASINI iddia etmiyor: Android
   kanalları PRIVATE kuruluyor ama kullanıcının telefon ayarı bunu geçersiz kılabilir.
 
-  ⚠️ İKİ DEĞER HENÜZ ÖLÇÜLMEDİ, METİN TASARIMA GÜVENİYOR:
+  ⚠️ BİR DEĞER HENÜZ ÖLÇÜLMEDİ, METİN TASARIMA GÜVENİYOR:
     1. "Aydınlatmadan önce Firebase'e bağlanılmaz" — plugins/firebase-otomatik-baslatma.js
        ile sağlanıyor; release APK'da taze kurulumda ağ ölçümüyle doğrulanacak. Ölçüm
        başka bir şey gösterirse §4 ve §6 düzeltilmeli, Data safety de bu ölçümden sonra.
-    2. Defterin 30 günü ve makbuzların 24 saati sunucunun temizlik işinden
-       (CleanupNotifications / PushReceiptJob) geliyor; iş yazılırken süre değişirse §5
-       burada da değişmeli.
+  ✅ Tasarımdan gelen §5 süreleri sunucu işleri yazıldıktan sonra KODDAN ölçüldü
+     (2026-09-25) ve metinle aynı: defter CleanupNotificationsHandler.SaklamaGunu = 30
+     (yalnızca işlenmiş satırlar), sohbet kısma yuvası KismaSaklama = 1 gün, makbuz
+     biletleri CheckPushReceiptsHandler.EnGec = 24 saat (15 dakikada bir koşuyor). Bu
+     sabitler değişirse §5 de değişir.
 
   ⚠️ /gizlilik-uygulama (mağazalara verilecek herkese açık adres) bu turda YOK — ayrı PR.
-  Web'in /gizlilik sayfasına push aynı dalda "mobil uygulamada" kapsamıyla ekleniyor. İki
-  metin aynı olguları söylemeli (taşıyıcılar, süreler, silme noktaları); ifade platforma
-  göre ayrışabilir, olgu ayrışamaz.
+  Web'in /gizlilik sayfasına push aynı dalda, "mobil uygulamada" kapsamıyla eklendi
+  (sunucu deposu 8ec0cea). İki metin aynı olguları söylemeli (taşıyıcılar, süreler,
+  silme noktaları); ifade platforma göre ayrışabilir, olgu ayrışamaz.
 
   ─── 2026-09-22'de DÜZELTİLEN YANLIŞ BEYAN: TELEFON NUMARASI ────────────────
   §2 "isteğe bağlı profil bilgileri" arasında ve §6'da "telefon numaran" yazıyordu.
@@ -114,8 +116,9 @@ import { SOZLESME_TARIHI } from '../src/lib/yasalMetinler'
   onaylatmak gerekmez. Ayrıca tek taraflı artırmak sunucuyla (2026-09-19) eşitliği
   bozar ve kayıt ekranını kilitler — bkz. src/lib/yasalMetinler.js.
 
-  ⚠️ WEB'DE AYNI HATA DURUYOR. frontend/src/pages/Gizlilik.jsx de telefon numarasını
-  sayıyor; orası ayrı depo, bu değişiklikle kapanmadı.
+  Web'deki aynı hata 2026-09-25'te kapandı (sunucu deposu f140b6d, ozellik/push-bildirimleri
+  dalı: Gizlilik §2/§6, Hesap silme §2, Profil "Silinecekler"). O dal main'e birleşene
+  kadar yayındaki web metni hâlâ telefon numarasını sayıyor.
 
   ─── 2026-09-05'te DÜZELTİLEN YANLIŞ BEYAN ─────────────────────────────────
   §7 "hesabını kendi başına silebileceğin bir düğme YOK, e-posta at" diyordu. Uç ve

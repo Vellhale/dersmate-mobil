@@ -771,7 +771,9 @@ export const onizlemeApi = {
      Altısı da burada OLMAK ZORUNDA: eksik metot sessizce gerçek ağa düşer (api.js
      sonundaki Object.assign yalnızca buradakileri ezer). Sunucu kuralları taklit
      ediliyor: aydınlatma görülmeden kayıt yok (kayitli:false), damga ilk kararda
-     yazılır ve korunur, deneme bildirimi 10 dakikada 3. */
+     yazılır ve korunur, deneme bildirimi 10 dakikada 3. Hata kodu, durum ve metin
+     sunucununki (BildirimTercihleri.cs, TestBildirimi.cs): bilinmeyen kategori 404 —
+     2026-09-25'e kadar burada 400 yazıyordu, sunucu 404 veriyor. */
   registerPushDevice: () => {
     const kayitli = BILDIRIM_TERCIHLERI.aydinlatmaAtUtc !== null
     if (kayitli) pushCihazKayitli = true
@@ -784,7 +786,7 @@ export const onizlemeApi = {
   pushPreferences: () => gecikme({ ...BILDIRIM_TERCIHLERI }),
   setPushPreference: (kategori, acik) => {
     const alan = TERCIH_ALANLARI[kategori]
-    if (!alan) return Promise.reject(sahteHata('Bilinmeyen bildirim kategorisi.', 'VALIDATION_ERROR', 400))
+    if (!alan) return Promise.reject(sahteHata('Bilinmeyen bildirim kategorisi.', 'VALIDATION_FAILED', 404))
     BILDIRIM_TERCIHLERI = { ...BILDIRIM_TERCIHLERI, [alan]: Boolean(acik) }
     return gecikme(null)
   },
@@ -802,7 +804,7 @@ export const onizlemeApi = {
         soruErtelendiAtUtc: simdi,
       }
     } else {
-      return Promise.reject(sahteHata('Geçersiz karar.', 'VALIDATION_ERROR', 400))
+      return Promise.reject(sahteHata('Karar zorunludur (Acildi ya da Ertelendi).', 'VALIDATION_FAILED', 400))
     }
     return gecikme(null)
   },
@@ -811,7 +813,7 @@ export const onizlemeApi = {
     testBildirimleri = testBildirimleri.filter((t) => t > esik)
     if (testBildirimleri.length >= 3) {
       return Promise.reject(
-        sahteHata('Çok fazla deneme bildirimi gönderdin. Biraz sonra tekrar dene.', 'TOO_MANY_REQUESTS', 429),
+        sahteHata('Çok sık test bildirimi istedin. Biraz sonra tekrar dene.', 'VALIDATION_FAILED', 429),
       )
     }
     testBildirimleri.push(Date.now())

@@ -1127,7 +1127,7 @@ export const api = {
    * Satır yoksa sunucu varsayılanı döner: dördü açık, damgalar null, sayı 0.
    */
   pushPreferences: () => request('/api/v1/push/preferences'),
-  /** @param kategori 'mesajlar' | 'istekler' | 'ders-onayi' | 'ders-plani' — 204. */
+  /** @param kategori 'mesajlar' | 'istekler' | 'ders-onayi' | 'ders-plani' — 204; bilinmeyen kategori 404. */
   setPushPreference: (kategori, acik) =>
     request(`/api/v1/push/preferences/${encodeURIComponent(kategori)}`, {
       method: 'PUT',
