@@ -783,8 +783,15 @@ sahiplerden biri sökülünce çıpa ölmüyor, son sahip çıkınca düşüyor.
 
 ### Rozetler: hamburger ve çekmece satırları
 
-Sekme çubuğundaki `tabBarBadge` gitti; okunmamış mesaj rozeti **hamburger düğmesinde**.
-Çekmeceye taşınsa yalnızca menü açılınca görünürdü — kullanıcı yeni mesajı fark edemezdi.
+Sekme çubuğundaki `tabBarBadge` gitti; rozet **hamburger düğmesinde**. Çekmeceye taşınsa
+yalnızca menü açılınca görünürdü — kullanıcı yeni mesajı fark edemezdi.
+
+**Hamburger rozeti TOPLAMI gösteriyor** (kullanıcı kararı, 2026-09-26): okunmamış mesaj +
+gelen istek + işlem bekleyen ders. Kural "kırmızı sayı = menüde bekleyen iş var"; hangisi
+olduğu çekmece satırlarında yazıyor. Erişilebilir ad parçaları tek tek sayıyor ("Menüyü aç,
+2 okunmamış mesaj, 1 gelen istek, 2 ders işlem bekliyor"). Seçilmeyenler: yalnızca mesaj
+(süreli işleri menünün içinde saklıyordu) ve "mesaj sayısı + nokta" (iki ayrı işaret
+öğretmek gerekiyordu). Düğme `h-[44px]`; eskiden `h-11` ile cihazda 38.5dp'ydi.
 
 Çekmece SATIRLARINDA üç sayaç var (2026-09-25, push işiyle geri geldi): Arkadaşlar →
 gelen istek, Derslerim → işlem bekleyen ders, Sohbet → okunmamış. Hepsi aynı rose-600
@@ -795,8 +802,6 @@ Veri `src/lib/bekleyenIsler.js` → `useBekleyenIsler()`: kanca DEĞİL, modül 
 ve tek uçuş. Hamburger her kabuk ekranında ayrı örnek; kanca olsaydı her örnek aynı iki
 isteği ayrı atardı. Son abone ayrılınca sıfırlanıyor, hesap değişimi de sınanıyor.
 
-⬜ Hamburger rozeti hâlâ YALNIZCA okunmamış mesajı gösteriyor; gelen istek ve bekleyen
-dersi de toplayıp toplamayacağı açık ürün sorusu.
 
 ## Web'den bilinçli sapmalar
 
@@ -952,8 +957,8 @@ dersi de toplayıp toplamayacağı açık ürün sorusu.
 - **Çekmecede bekleyen iş sayaçları mobilde var, web'de yok.** Web `Layout.jsx`
   yalnızca okunmamış mesaj rozeti taşıyor. Mobilde çekmecenin Arkadaşlar satırı gelen
   istek sayısını (`myMatches().incoming`), Derslerim satırı kullanıcının kapatabileceği
-  ders sayısını (`mySessions(1, 1)` → `eylemBekliyor`) gösteriyor (bkz. "Gezinme →
-  Rozetler"). ⚠️ Bu madde 2026-09-25'e kadar "Akış başlığında" ve "push olmadığı için"
+  ders sayısını (`mySessions(1, 1)` → `eylemBekliyor`) gösteriyor; hamburger rozeti de
+  üçünün toplamı (bkz. "Gezinme → Rozetler"). ⚠️ Bu madde 2026-09-25'e kadar "Akış başlığında" ve "push olmadığı için"
   diyordu; ikisi de bayattı. Akış başlığı 2026-09-23'te gitti ve sayaçlar `3c0f61c`
   birleştirmesinde kayboldu; push işiyle çekmeceye geri geldiler. Push artık var ama
   İSTEĞE BAĞLI: bildirimi reddeden kullanıcıya 14 günde düşen isteği ve 48 saatte otomatik
