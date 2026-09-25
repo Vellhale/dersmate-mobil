@@ -606,12 +606,14 @@ okunmamış toplamından yazılıyor.
   `onAuthExpired`'da işaret yazılmaz (orada oturum zaten ölü). Kalan sınır: çevrimdışı
   çıkıştan sonra uygulama bir daha hiç (internetle) açılmazsa, o cihazın en yeni oturumu
   dolana kadar (60 gün) bildirim gidebilir — gizlilik §5'te yazılı.
-- **Oturumu dolmuş cihazın satırını SUNUCU silmiyor** (2026-09-25 ölçümü, sunucu açığı):
-  dağıtıcı yalnızca bağlı cihazları sorguluyor (`OturumBagi`), `CleanupNotifications`
-  `PushDevices`'a dokunmuyor. Uygulamayı silip 60 gün içinde bildirim almayan kullanıcının
-  satırı hesap silinene kadar kalıyor. Gizlilik §5 bunu "en geç hesabını sildiğinde"
-  diye bugünkü hâliyle söylüyor; sunucuya süreli bir temizlik eklenince süre §5'e (mobil
-  ve web birlikte) yazılmalı.
+- **Oturumu kapanmış cihazın satırını sunucunun günlük temizliği siliyor** (2026-09-25):
+  dağıtıcı yalnızca bağlı cihazları sorguluyor (`OturumBagi`), yani uygulamayı silip 60
+  gün içinde bildirim almayan kullanıcıda `DeviceNotRegistered` hiç gelmiyor ve satır
+  eskiden hesap silinene kadar kalıyordu. `CleanupNotifications` artık bağı kopmuş ve son
+  kaydından 5 günden eski satırı siliyor (`BaglantisizCihazSaklama`); gizlilik §5'teki
+  "oturum kapandıktan ya da süresi dolduktan en geç 7 gün" buradan. Değer değişirse
+  mobil ve web §5 birlikte değişir. Bağlı cihaz (askıdaki kullanıcınınki dahil: askı
+  token'ları iptal etmiyor) bu temizliğe düşmez.
 - **Bildirim ayarları "Bildirimler açık" rozetini YALNIZCA `kayit.kayitli` iken çizer.**
   İzin + aydınlatma tek başına yetmiyor (Firebase dosyası yoksa token alınamıyor, sunucu
   bağlı olmayan oturumu kaydetmiyor); sağlayıcı son kayıt sonucunu (`kayit`,

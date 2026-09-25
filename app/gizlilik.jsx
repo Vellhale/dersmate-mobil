@@ -64,7 +64,9 @@ import { SOZLESME_TARIHI } from '../src/lib/yasalMetinler'
                                konu geçebilir) ve BildirimYuku.cs (data yalnızca tür, url,
                                alıcı etiketi; etiket HMAC türevi)
     • Silme noktaları        → Logout, TumOturumlariDusurAsync, DeleteAccount, BanUser,
-                               makbuzdaki DeviceNotRegistered, çevrimdışı çıkıştan sonra forget
+                               makbuzdaki DeviceNotRegistered, çevrimdışı çıkıştan sonra forget,
+                               günlük temizlik (CleanupNotifications: oturum bağı kopmuş cihaz,
+                               son kayıttan 5 gün + günde bir tur = §5'teki "en geç 7 gün")
     • Cihazdaki saklama      → src/lib/bildirimler.js (kayıt bayrağı KEYS.pushKayitli, unutma
                                işareti KEYS.pushUnutulacak; çıkışta otomatikKaydiKapat) ve
                                node_modules/expo-notifications ServerRegistrationModule:
@@ -351,10 +353,10 @@ export default function Gizlilik() {
               ⚠️ 2026-09-25'te düzeltildi: "uygulamayı kaldırırsan kayıt bir sonraki bildirim
               denemesinde silinir" diyordu. Deneme ancak oturum canlıyken oluyor: dağıtıcı
               yalnızca BAĞLI cihazları sorguluyor (DispatchNotifications → OturumBagi) ve
-              oturum dolduktan sonra satırı silen bir iş YOK (CleanupNotifications yalnızca
-              defteri ve kısma tablosunu temizliyor). Son cümle bugünkü sunucuyu anlatıyor;
-              "en geç" bir ÜST SINIR: sunucuya bağlı olmayan satırları süreyle silen bir
-              temizlik eklenirse cümle yanlış olmaz ama o süre buraya (ve web §5'e) yazılmalı. */}
+              oturumu kapanmış cihazın satırını silen bir iş YOKTU; satır hesap silinene kadar
+              kalıyordu. Son cümlenin "en geç 7 gün"ü sunucuya aynı turda eklenen temizlikten:
+              CleanupNotificationsHandler.BaglantisizCihazSaklama (5 gün, son başarılı kayıttan)
+              + günde bir temizlik. O değer değişirse bu cümle ve web §5 birlikte değişir. */}
           <Madde>
             <Kalin>Bildirim kaydı (telefonunun bildirim adresi):</Kalin> o telefonda çıkış
             yapana kadar. Çıkış yaptığında, “her yerden çıkış” yaptığında ya da parolanı
@@ -367,8 +369,8 @@ export default function Gizlilik() {
             telefondan kaldırırsan adres geçersizleşir; oturumunun süresi dolmadan sana bir
             bildirim gönderilirse kayıt o gönderimde silinir. Oturumunun süresi, uygulamayı
             o telefonda son kullandığın andan 60 gün sonra dolar; bundan sonra o telefona
-            bildirim gönderilmez, kayıt ise sunucuda kullanılmadan durur ve en geç hesabını
-            sildiğinde silinir.
+            bildirim gönderilmez. Bu yollardan hiçbiri işlemese de kayıt süresiz kalmaz: o
+            telefondaki oturum kapandıktan ya da süresi dolduktan en geç 7 gün sonra silinir.
           </Madde>
           <Madde>
             <Kalin>Bildirim tercihlerin:</Kalin> hesabın açık olduğu sürece.
