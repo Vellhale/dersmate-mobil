@@ -1,6 +1,7 @@
 /*
   DİNAMİK YAPILANDIRMA — app.json'ı okur, üzerine yalnızca derleme anında bilinebilen
-  tek şeyi ekler: şifresiz HTTP'ye izin verilip verilmeyeceği.
+  şeyleri ekler: şifresiz HTTP'ye izin verilip verilmeyeceği ve push bildirimlerinin
+  yerel yapılandırması (en altta, "PUSH BİLDİRİMLERİ" notu).
 
   NEDEN VAR: Android 9'dan (API 28) beri şifresiz `http://` trafiği varsayılan olarak
   ENGELLİ. Expo bu izni yalnızca DEBUG manifest'ine koyuyor; release APK'da yok. Sonuç,
@@ -55,11 +56,47 @@
   ürettiğinde yansır. EAS her bulut derlemesinde prebuild çalıştırdığı için orada
   kendiliğinden olur; elde tutulan bir ios/ klasörü YOK (.gitignore).
 */
+const fs = require('fs')
+const path = require('path')
+
 const adres = process.env.EXPO_PUBLIC_API_URL ?? ''
 const sifresizGerekli = adres.startsWith('http://')
 
+/*
+  ── PUSH BİLDİRİMLERİ ───────────────────────────────────────────────────────────
+  Neden app.json'da değil de burada: iki değer derleme anında HESAPLANIYOR.
+
+  1. RENK brand-600, tailwind.config.js'ten OKUNUYOR (theme.js'in yaptığı gibi). Hex elle
+     yazılsaydı palet değişince bildirim ikonunun rengi eskide kalırdı. 600, çünkü
+     birincil eylem zemini o (CLAUDE.md → renk rolleri); 500 beyaz metinle AA'yı geçmiyor.
+
+  2. google-services.json KOŞULLU. Dosyayı kullanıcı Firebase konsolundan indirip köke
+     koyuyor (gizli DEĞİL, depoya işlenebilir: Expo'nun FCM belgesi de öyle diyor;
+     içindeki API anahtarı paket adı + SHA-1 ile kısıtlanır. Gizli olan FCM V1 hizmet
+     hesabı anahtarı: o `eas credentials` ile EAS'e yüklenir, .gitignore'da ayrı kalıbı
+     var). Dosya YOKKEN yol verilseydi prebuild "dosya
+     bulunamadı" diye DÜŞERDİ ve push'tan bağımsız her Android derlemesi kırılırdı.
+     Dosyasız derleme çalışır, yalnızca token alınamaz: bildirimler.js hatayı yutar,
+     uygulama bildirimsiz ama sorunsuz açılır.
+
+  Kanal kimliği `mesajlar`, src/lib/bildirimler.js → KANALLAR ve sunucudaki
+  BildirimKanallari ile BİREBİR aynı. defaultChannel yalnızca kanalı belirtilmemiş bir
+  FCM iletisi için yedek; sunucu her iletiye kanal yazıyor.
+
+  enableBackgroundRemoteNotifications BİLEREK verilmiyor (varsayılan false): arka planda
+  kod çalıştıran bildirim yok, UIBackgroundModes eklemek App Review'da gerekçe sorusu
+  doğurur. iOS `mode` da verilmiyor: aps-environment derlemede 'development' yazılır,
+  mağaza/ad-hoc dışa aktarımında imza profili onu 'production'a çevirir (Expo belgesi).
+*/
+const bildirimRengi = require('./tailwind.config.js').theme.extend.colors.brand[600]
+const googleServicesVar = fs.existsSync(path.join(__dirname, 'google-services.json'))
+
 module.exports = ({ config }) => ({
   ...config,
+  android: {
+    ...config.android,
+    ...(googleServicesVar ? { googleServicesFile: './google-services.json' } : {}),
+  },
   ios: {
     ...config.ios,
     infoPlist: {
@@ -93,5 +130,18 @@ module.exports = ({ config }) => ({
         },
       },
     ],
+    [
+      'expo-notifications',
+      {
+        // 96×96, tamamen beyaz ve saydam: Android durum çubuğu ikonun YALNIZCA alfa
+        // kanalını kullanır, renkli ikon gri bir kareye döner. Marka işaretinin
+        // (Logo.jsx: iki daire + bağ yayı) silueti.
+        icon: './assets/bildirim-ikonu.png',
+        color: bildirimRengi,
+        defaultChannel: 'mesajlar',
+      },
+    ],
+    // expo-notifications'tan SONRA: aynı manifest'e yazıyorlar, gerekçe dosyanın başında.
+    './plugins/firebase-otomatik-baslatma',
   ],
 })

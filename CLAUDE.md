@@ -5,6 +5,15 @@ Web sürümü ve backend `C:\projeler\dersmate` içinde; backend .NET 8 + Postgr
 ve **değişmez** — mobil yalnızca istemcidir. **İletişim dili Türkçe** — kod yorumları,
 commit mesajları ve kullanıcıya görünen her metin Türkçe.
 
+⚠️ **Tek bilinçli istisna: push bildirimleri (2026-09-25, kullanıcı onayıyla).** Push
+sunucusuz yapılamazdı; sunucu + web + mobil aynı iş olarak, aynı adlı dalda
+(`ozellik/push-bildirimleri`) değişti. Sunucuya eklenenler: `comms` şemasında
+`PushDevices`, `Notifications` (defter + outbox), `PushTickets`,
+`NotificationPreferences`, `MessagePushThrottles`; `/api/v1/push/*` uçları; olay
+noktalarında deftere yazım; çıkış/ban/hesap silmede cihaz silme; gönderim işleri. Ayrıntı
+"Push bildirimleri" bölümünde. Bu istisna kuralı gevşetmiyor — sıradaki mobil iş yine
+yalnızca istemci.
+
 Expo SDK 57 / expo-router / NativeWind 4 / JavaScript (TS değil — web projesiyle aynı dil,
 kod çevirisi birebir kalsın diye).
 
@@ -313,6 +322,14 @@ boost…). Uygulama manifesti yalnızca bizim yazdığımız.
 `expo-build-properties` → `ios.privacyManifestAggregationEnabled: false` anahtarına
 GEREK KALMADI; varsayılan davranış zaten istediğimiz sonucu veriyor.
 
+**expo-notifications (2026-09-25) manifesti DEĞİŞTİRMEDİ — bilinçli.** Pod'un kendi
+`PrivacyInfo.xcprivacy`'si yalnızca UserDefaults / `CA92.1` beyan ediyor; uygulama
+manifestinde zaten var. Push token'ı `NSPrivacyCollectedDataTypeDeviceID` altında sayılıyor
+(o da zaten beyanlı), yeni kod `Application.getInstallationTimeAsync` (unutma işaretinin
+ve kayıt bayrağının yeniden kurulum kontrolü) `C617.1` kapsamında. iOS paketinde Firebase YOK (APNs doğrudan),
+yani üçüncü taraf toplama SDK'sı da gelmedi. ⬜ İlk push'lu `.ipa`'da aşağıdaki kontrolle
+doğrulanacak.
+
 ⚠️ Bu ölçüm `onizleme` profilinde yapıldı. `production` farklı pod kümesi derlemiyor,
 yani sonucun değişmesi beklenmiyor — ama mağazaya ilk gönderimden önce aynı kontrol
 tekrarlanabilir: .ipa bir zip, `Payload/<ad>.app/PrivacyInfo.xcprivacy` içinden okunur.
@@ -332,7 +349,10 @@ düşürür — derleme hatası değil, çalışma anında boş sunucu günlüğ
 ⚠️ **App Store Connect formu manifestin kopyası DEĞİL, süperkümesi.** Manifest yalnızca
 bizim topladığımızı anlatır; form üçüncü taraf SDK'ların topladığını da ister. Bugün SDK
 yok, ikisi aynı yedi türde buluşuyor — ama "formu manifestten kopyala" bir yöntem olarak
-yerleşirse ilk SDK eklendiği gün sessizce eksik beyan verilir.
+yerleşirse ilk SDK eklendiği gün sessizce eksik beyan verilir. (Push bunu değiştirmedi:
+expo-notifications veri toplamıyor, token Expo'ya hizmet sağlayıcı olarak gidiyor ve
+DeviceID türünde zaten beyanlı. Android'in Play Data safety formu ise AYRI iş: "Device or
+other IDs" — FID ve push token — Firebase ağ ölçümünden SONRA işaretlenir.)
 
 ⚠️ **`.easignore` tuzağı.** CNG güvencesinin tamamı `.gitignore`'daki `/ios`, `/android`
 satırlarına bağlı. `.easignore` eklenirse `.gitignore` TAMAMEN devre dışı kalır; kökte
@@ -402,6 +422,8 @@ Bunlar kontrol edildi (2026-09-21), yeniden araştırma gerekmiyor:
 | Kullanılmayan izin metinleri | ✅ yok — `expo-image-picker` kamera/mikrofon `false`, yalnızca foto izni üretiliyor |
 | İkon alfa kanalı (App Store reddeder) | ✅ `assets/icon.png` 1024×1024, alfasız (colorType=2) |
 | Privacy manifest (`PrivacyInfo.xcprivacy`) | ✅ `app.json` → `ios.privacyManifests` (2026-09-22) |
+| 4.5.4 push bildirimleri | ✅ (2026-09-25) zorunlu değil — izin vermeyen kullanıcıda uygulama aynı çalışır, bekleyen iş çekmece sayaçlarından görünür; reklam/pazarlama için kullanılmıyor; türler Profil › Bildirim ayarları'ndan tek tek kapatılır |
+| İzin öncesi ekran (HIG, 5.1.1) | ✅ iOS'ta izin hiç sorulmamışken aydınlatma modalında TEK düğme "Devam" ve modal kapatılamıyor; karar sistem isteminde verilir (`BildirimIzniSorusu.jsx`). Android'de "Şimdi değil" duruyor |
 | Gizlilik "nutrition label" formu | ⬜ App Store Connect'te elle doldurulacak — manifestteki 7 türle tutarlı olmalı |
 | Ekran görüntüleri (6.7" ve 6.5") | ⬜ üretilecek — Android'inkiler kullanılamaz |
 
@@ -438,6 +460,21 @@ sayıyı yükseltmek sunucuya gösterilmemiş bir metnin kabul edildiğini bildi
 önce mobil sürüm artar ve YAYINLANIR, sonra sunucu dağıtılır. Bu kez tersi yapılabildi
 çünkü mağazada henüz uygulama yoktu — bir daha o serbestlik olmayacak.
 
+#### 2026-09-25: push ile `2026-09-19` → `2026-09-25`, üç yer AYNI dalda
+
+Push yeni bir veri türü, yeni alıcılar (Expo, Google FCM, Apple APNs) ve yeni bir yurt
+dışı aktarım getirdiği için artış ZORUNLUYDU. Sunucu (`LegalDocuments.cs`), web ve mobil
+(`src/lib/yasalMetinler.js`) `ozellik/push-bildirimleri` dalında birlikte çekildi; mağazada
+hâlâ uygulama olmadığı için "önce mobil yayın" sırası bu kez de gerekmedi. Sayı yine
+METİNLE birlikte taşındı: `app/gizlilik.jsx` §2/§3/§4/§5/§6/§7 ve `IzinContext` zorunlu
+kategori metni. ⚠️ Mağazaya ilk çıkış bu değerle olacak — ilk yayından SONRAKİ ilk artış,
+yukarıdaki ters sırayı ilk kez gerçekten uygulayacak iş.
+
+`IZIN_SURUMU` (veri izni sayfası) bu turda ARTMADI: push'un cihaz saklamaları (bildirim
+bileşeninin kurulum numarası/adresi; kayıt bayrağı ve çevrimdışı çıkıştaki unutma
+işareti) izne tabi değil, "zorunlu" kategoride. Kural `IzinContext.jsx`'te: sürüm izne TABİ kapsam değişince
+artar.
+
 ### ⛔ App Store Connect gizlilik politikası ADRESİ istiyor — uygulama içi metin saymaz
 
 `app/gizlilik.jsx` mobil gerçeğe göre yazılmış durumda (canvas yerine `hwid.js`, çerez
@@ -452,6 +489,236 @@ formdaki beyanı, politikayı ve uygulamanın davranışını karşılaştırıy
 
 ⬜ **Açık iş:** web deposunda mobil metni sunan ayrı bir sayfa (ör. `/gizlilik-uygulama`)
 ve App Store Connect'e o adres. Metin zaten yazılı; taşınması gerekiyor.
+
+⚠️ Push (2026-09-25) bu açığı BÜYÜTTÜ ve kapatmadı: web `/gizlilik`'e push aynı dalda
+"mobil uygulamada" kapsamıyla ekleniyor ama sayfa yine web metni (çerez, GA, tarayıcı
+parmak izi).
+`/gizlilik-uygulama` bilerek bu turda yapılmadı — ayrı PR. Google Play de herkese açık
+gizlilik adresi istiyor; iki mağaza aynı adrese bağlanmalı.
+
+---
+
+## Push bildirimleri (2026-09-25)
+
+Expo Push; uygulama kapalıyken de gelir. **Gönderen sunucu** (Expo → Android'de FCM,
+iOS'ta APNs); mobilin işi kayıt, izin, aydınlatma, dokunuş yönlendirmesi, ön plan
+tazelemeleri ve ayarlar. Sunucu tarafının tuzakları sunucu deposunun CLAUDE.md'sinde.
+Kimlik bilgileri ve profil başına durum `docs/eas-profilleri.md` → "Push bildirimleri".
+
+### Dosyalar
+
+| dosya | iş |
+|---|---|
+| `src/lib/bildirimler.js` | expo-notifications'ı içe aktaran TEK modül: kanallar, izin, token kaydı (tek uçuş), dinleyiciler, rota beyaz listesi, sunulan bildirimleri kapatma, unutma işareti |
+| `src/state/BildirimSaglayici.jsx` | oturumlu yarı: tercihler, aydınlatma bayrağı, kayıt, dokunuş yönlendirmesi, ön plan tazelemeleri, aktif sohbet, rozet, aydınlatma sorusunun kuralları → `useBildirim()` |
+| `src/components/BildirimIzniSorusu.jsx` | `BildirimIzniModali` (kökte tek örnek), `BildirimIzniKarti` (satır içi), `TASIYICI_METNI` |
+| `app/bildirimler.jsx` | Bildirim ayarları — tek girişi Profil › "Bildirim ayarları" (çekmecede YOK: ayar bir gezinme hedefi değil) |
+| `src/lib/bekleyenIsler.js` | çekmece sayaçlarının deposu (bkz. "Gezinme → Rozetler") |
+| `src/lib/iliskiSurumu.js`, `src/lib/dersSurumu.js` | sürüm sayaçları: `engelSurumu` deseni + abone listesi |
+| `plugins/firebase-otomatik-baslatma.js`, `assets/bildirim-ikonu.png`, `app.config.js` | yerel yapılandırma; `googleServicesFile` yalnızca kökte `google-services.json` VARSA |
+
+Sağlayıcı ağacı (`app/_layout.jsx`, oturumlu dal): `WalletProvider > InboxProvider >
+BildirimSaglayici > (CekmeceSaglayici, UrunTuru, BildirimIzniModali)`. Gelen kutusunun
+İÇİNDE, çünkü ön planda gelen mesaj bildirimi sohbet listesini tazeliyor ve ikon rozeti
+okunmamış toplamından yazılıyor.
+
+### ⛔ Kırılmaz kurallar
+
+- **expo-notifications `bildirimler.js` DIŞINDA içe aktarılmaz.** Paket
+  `requireNativeModule` kullanıyor ve modülü taşımayan kabukta (push'tan önce derlenmiş
+  dev client / APK / `.ipa`) import anında fırlatıyor; köke konan bir import uygulamayı
+  açılışta düşürürdü. Modül tembel, korumalı `require` ile yükleniyor; yüklenemezse (ve
+  önizlemede, web'de, Expo Go'da) her dışa açılan fonksiyon no-op döner.
+- **`app/_layout.jsx`'teki yan etkili `import '../src/lib/bildirimler'` silinmez.**
+  `setNotificationHandler` modül yüklenirken kuruluyor; işleyici yoksa ön planda gelen
+  bildirim HİÇ gösterilmez.
+- **Kanal kimlikleri sunucudaki `BildirimKanallari` ile BİREBİR:** `mesajlar`,
+  `istekler`, `ders-onayi`, `ders-plani`. Sunucu cihazın tanımadığı bir kanala gönderirse
+  Android bildirimi SESSİZCE düşürür. Önem (importance) kanal ilk oluşturulurken sabitlenir
+  ve sonradan DEĞİŞMEZ: değişecekse yeni kimlik + eski kanalı silme, iki depoda aynı gün.
+  Dördü de kilit ekranında PRIVATE. Tercih kategorisi kimliği (`PUT
+  /push/preferences/{kategori}`) kanal kimliğinin aynısı; GET yanıtındaki alan adı
+  camelCase (`dersOnayi`) — eşleme `KANALLAR[].tercih`.
+- **Aydınlatma kapısı:** token YALNIZCA işletim sistemi izni VE sunucudaki
+  `aydinlatmaAtUtc` birlikteyken alınır (`setAydinlatmaTamam`). Android 7-12'de izin
+  kurulumla açık gelir; izne bakmak kullanıcıyı hiçbir şey görmeden kaydetmek olurdu (KVKK
+  Aydınlatma Tebliği m.5/1(b)). Sunucu da damgasız kaydı `kayitli: false` ile almıyor.
+- **Sohbet ekranı `setAktifSohbet` ÇAĞIRMAZ.** Aktif sohbet sağlayıcıda `usePathname`'den
+  yazılıyor (odaktaki rota; üstüne profil itilince kendiliğinden düşer); ikinci bir yazan
+  iki doğruluk kaynağı olurdu. Sohbetin kendi işi: açılışta, odağa dönüşte ve odaktayken
+  öne gelişte `sunulanlariKapat({ grup: 'mesaj', kayitId })` + `markRead`.
+- **Yönlendirme `router.navigate`, push DEĞİL** ve hedefler `guvenliRota` beyaz
+  listesinden geçer: `/sohbet/<id>`, `/eslesmeler?sekme=incoming|active`,
+  `/dersler?ders=<id>`, `/bildirimler`. Hepsi `dangerouslySingular` (sohbet kimlik
+  başına; gerekçe "Korunan iş kuralları" 3).
+- **Token dinleyicisi SÜZÜLMEDEN kayıt tetiklemez** (`tokenDinle`). Yerel modül
+  `onDevicePushToken` olayını her `getDevicePushTokenAsync` çağrısında yayıyor (Android
+  `PushTokenModule.kt` resolve'un hemen ardından, iOS `didRegister`), kaydın kendisi de o
+  çağrıyı yapıyor. Süzgeç kaldırılırsa kayıt kendini sonsuza tetikler: uygulama öndeyken
+  saniyede birkaç tur exp.host + `PUT /push/devices` (28af310'da vardı; simülasyonda tek
+  kayıt 2 sn'de 34 PUT). Derleme sağlaması ve web önizlemesi bunu YAKALAMAZ (önizlemede
+  yerel modül yok). Cihazda doğrulama: açılışta sunucu günlüğünde TEK `PUT /push/devices`.
+- **Çıkışta Expo'nun otomatik kaydı kapatılır** (`otomatikKaydiKapat`, `oturumKapandi`
+  içinde). `getExpoPushTokenAsync` onu her çağrıda kalıcı olarak AÇIYOR ve açık kaldıkça
+  paket her açılışta, oturuma bakmadan FCM/APNs token'ı istiyor, 7 günde bir exp.host'a
+  POST ediyor. ⚠️ iOS'ta paketin kendi kapatması fırlatıyor (`setRegistrationInfoAsync`
+  imzası opsiyonel olmayan `String`, `null` reddediliyor); yedek yol aynı yerel modüle
+  `{"isEnabled":false}` yazıyor. Kayıt açık değilse hiçbir şey YAZILMAZ: yoksa bildirim
+  açmamış kullanıcının her çıkışında Anahtar Zinciri'ne öğe doğardı (gizlilik §4).
+
+### ⚠️ Tuzaklar ve açık ölçümler
+
+- **Firebase otomatik başlatma KAPALI** (`plugins/firebase-otomatik-baslatma.js`):
+  aydınlatmadan önce Firebase'e istek çıkmasın diye. ⬜ Kapalıyken `getExpoPushTokenAsync`
+  token veriyor mu, cihazda ÖLÇÜLMEDİ. Vermezse token isteminden hemen önce
+  `FirebaseMessaging.setAutoInitEnabled(true)` çağıran küçük bir yerel modül gerekir —
+  bilerek yazılmadı, risk kabul edildi. Aynı ölçüm release APK'nın taze kurulumunda,
+  aydınlatma onaylanmadan `firebaseinstallations.googleapis.com` /
+  `fcmregistrations.googleapis.com`'a istek ÇIKMADIĞINI da göstermeli; gizlilik §4/§6
+  ve Play Data safety bu ölçüme bağlı.
+- **Android'de `collapseId` YOK** (sunucu, `BildirimYuku.cs`): Expo onu FCM
+  `collapse_key`'e yazıyor ve FCM çevrimdışı cihaz için yalnızca dört anahtar saklıyor;
+  beşinci sohbetin mesajı hiç ulaşmayabilirdi. Ekrandakini değiştiren alan `tag`. iOS'ta
+  `collapseId` + `threadId` var. Mobilde sonucu: sunulan bildirimleri kapatma
+  (`sunulanlariKapat`) etikete değil, `data.url`'deki kayıt kimliğine ve türe bakıyor.
+- **`data` yalnızca `{ tur, url, alici }`.** `alici` hesabın HMAC etiketi, GUID değil:
+  telefonda başka hesap açıksa ön plan işleyicisi bildirimi bastırır, dokunuş gezinmez
+  (etiket henüz gelmediyse en fazla 3 sn beklenir).
+- **Dokunuş:** soğuk açılış ve sıcak dokunuş TEK `isle()`'den geçer ve İKİ yol da son
+  yanıtı temizler (yalnızca soğuk yolda temizlense çıkış-giriş sonrası eski dokunuşa
+  yeniden gidilirdi). 24 saatten eski ya da varsayılan olmayan eylem yok sayılır.
+  Oturumsuzken yanıt yerel modülde bekler ve girişte işlenir; başka hesapta etiket tutmaz.
+  `?sekme=` ve `?ders=` efektle işlenip adresten siliniyor (`?rezerve=` kalıbı). `?ders=`
+  kararı dersin GÜNCEL durumundan verilir (adres türü taşımıyor): onay bekliyorsa
+  `ApproveModal`, değilse duruma göre bilgi kutusu. Kökte `IzinSayfasi` ya da bildirim
+  sorusu açıkken `ApproveModal` kendiliğinden AÇILMAZ (iOS'ta iki RN Modal üst üste).
+- **Çıkış ve unutma işareti:** `logout` → `oturumKapandi()` → `oturumuSonlandir(rt)` →
+  `cikisSonuclandi(ulasti, cikisAni)`. Ulaşmadıysa `unutmaIsaretle()`
+  (`KEYS.pushUnutulacak`, değeri yalnızca zaman); ulaştıysa kayıt bayrağı silinir. Cihaz
+  kaydını çıkışta SUNUCU siliyor; mobil ayrı silme isteği atmaz. Açılışta (oturumlu ya da
+  değil) bir kez `unutmaCalistir()` → `POST /push/devices/forget`.
+  İşaret, **kalıcı kayıt bayrağına** bağlı (`KEYS.pushKayitli`, ilk başarılı kayıtta
+  yazılır): eskiden yalnızca "bu süreçte token alındı mı"ya bakılıyordu ve uygulama
+  çevrimdışı açılıp çevrimdışı çıkış yapılınca işaret hiç yazılmıyordu. Bayrak aynı
+  zamanda aydınlatmanın kanıtı: kayıt yapılmamış kurulumda unutmak için token istenmez.
+  iOS Keychain ikisini de uygulama silinse de taşıdığı için kurulum zamanından ESKİ bayrak
+  ve işaret ATILIR — yoksa yeni kurulumda aydınlatmasız APNs/Expo çağrısı olurdu.
+  `onAuthExpired`'da işaret yazılmaz (orada oturum zaten ölü). Kalan sınır: çevrimdışı
+  çıkıştan sonra uygulama bir daha hiç (internetle) açılmazsa, o cihazın en yeni oturumu
+  dolana kadar (60 gün) bildirim gidebilir — gizlilik §5'te yazılı.
+- **Oturumu kapanmış cihazın satırını sunucunun günlük temizliği siliyor** (2026-09-25):
+  dağıtıcı yalnızca bağlı cihazları sorguluyor (`OturumBagi`), yani uygulamayı silip 60
+  gün içinde bildirim almayan kullanıcıda `DeviceNotRegistered` hiç gelmiyor ve satır
+  eskiden hesap silinene kadar kalıyordu. `CleanupNotifications` artık bağı kopmuş ve son
+  kaydından 5 günden eski satırı siliyor (`BaglantisizCihazSaklama`); gizlilik §5'teki
+  "oturum kapandıktan ya da süresi dolduktan en geç 7 gün" buradan. Değer değişirse
+  mobil ve web §5 birlikte değişir. Bağlı cihaz (askıdaki kullanıcınınki dahil: askı
+  token'ları iptal etmiyor) bu temizliğe düşmez.
+- **Bildirim ayarları "Bildirimler açık" rozetini YALNIZCA `kayit.kayitli` iken çizer.**
+  İzin + aydınlatma tek başına yetmiyor (Firebase dosyası yoksa token alınamıyor, sunucu
+  bağlı olmayan oturumu kaydetmiyor); sağlayıcı son kayıt sonucunu (`kayit`,
+  `kayitSuruyor`) bağlama koyuyor, ekran odakta `kaydiDenetle()` çağırıyor ve
+  kaydedilemediyse amber uyarı + "Yeniden dene" gösteriyor.
+- **`useBildirim()` sağlayıcı dışında FIRLATMAZ**, no-op nesne döner (`useAuth` /
+  `useInbox` kalıbından bilinçli ayrılış: push isteğe bağlı katman, istek gönderen
+  bileşeni düşürmemeli).
+- **Yeni bir kullanıcı işlemi** ilişki ya da ders durumunu değiştiriyorsa başarıdan sonra
+  `iliskiDegisti()` / `dersDegisti()` çağırmalı (bkz. "ODAKTA tazelenir"). Engelleme hem
+  `engelDegisti()` hem `iliskiDegisti()` çağırıyor: engel bekleyen istekleri kapatıyor.
+
+### Aydınlatma sorusu kuralları
+
+- İhtiyaç: (izin yok ve sorulabilir) ya da (izin var ama aydınlatma yok).
+- Tetikler: istek gönderildi / kabul edildi → modal, kaynak alt sayfa kapandıktan
+  `IZIN_KAPANMA_SURESI` (350 ms) sonra (kaynak sayfa yoksa `{ gecikme: 0 }`); sohbette ilk
+  mesajdan sonra, Derslerim'de yaklaşan ders varken, Arkadaşlar'ın Gelen sekmesinde istek
+  varken → satır içi kart; ayarlar ekranı → elle.
+- **Oturum başına TEK yüzey** (modal ya da ilk kart; modal `onShow` anında, kart ilk
+  görünüşünde işaretlenir — `ui.jsx` Modal'a `onShow` bu yüzden eklendi). Sonucu:
+  Arkadaşlar'da "gelen-istek" kartı yüzeyi kabulden ÖNCE sahiplendiği için "istek-kabul"
+  modalı orada pratikte açılmıyor. Kod tasarıma uygun; öncelik değişecekse ürün kararı.
+- Geri çekilme sunucu sayacından: 0 serbest, 1 → 14 gün, 2 → 60 gün, 3+ → yalnızca
+  ayarlar ekranından elle.
+- Kendiliğinden açılmış sorunun HER kapanışı (✕, karartma, geri tuşu, "Şimdi değil",
+  "Gizle") `Ertelendi` sayılır; elle açılan sayılmaz. **Sistem isteminde ret de
+  `Ertelendi`**: Android 13+'ta ilk retten sonra `canAskAgain` true kaldığı için geri
+  çekilmesiz soru her oturumda dönerdi.
+- İzin sayfası ya da ürün turu açıkken sorulmaz (`UrunTuru.jsx` → `urunTuruAcikMi`,
+  `urunTuruDinle`).
+- iOS'ta izin hiç sorulmamışken TEK düğme "Devam" ve modal kapatılamaz (HIG); Android'de
+  ve kartta "Şimdi değil" / "Gizle" var.
+- Metnin tek kaynakları: `KANALLAR[].aciklama` (modal listesi + ayarlar satırları) ve
+  `TASIYICI_METNI` (modal, kart, ayarlar ekranı). Gizlilik §2–§7 aynı olguları uzun
+  anlatıyor; biri değişirse diğerleri de.
+
+### Sunucu kuralları (mobil metinleri bunları anlatıyor)
+
+Sessiz saat 22:00–09:00 TR (UTC+3 sabit); mesaj ve yaklaşan ders hatırlatması
+etkilenmez. Günlük istek özeti 10:00 TR. Ders başına hatırlatmalar: yaklaşan ders 60 ve
+10 dk, otomatik onay 24 ve 2 sa. **İsteğin reddi BİLDİRİLMEZ** (engeli sızdırırdı).
+**Mesaj içeriği push'a HİÇ girmez**; kişi adı yalnızca mesaj ve kabul bildiriminde
+(alıcının kendi arkadaşı), diğer istek (yeni istek, düşecek istek özeti) ve ders
+bildiriminde ad yok, konu olabilir. ⚠️ Kabul de `istekler` kanalında: "istek
+bildiriminde ad geçmez" diye kestirme yazmak yanlış (`TASIYICI_METNI` bir kez öyleydi). Bunlardan
+biri değişirse aydınlatma metni, ayarlar ekranı ve gizlilik metni birlikte değişir — ve
+yeni bir ifşaysa `SOZLESME_SURUMU` da.
+
+### Önizleme
+
+`?izin=verildi|verildi-aydinlatmasiz|reddedildi|belirsiz|desteklenmiyor` (varsayılan
+`desteklenmiyor`; açılışta bir kez okunur). `onizleme.js`'teki altı sahte metot sunucu
+kurallarını taklit ediyor: aydınlatmasız kayıt `kayitli: false`, bilinmeyen kategori
+404 (sunucu `BildirimTercihleri.cs` 404 veriyor; taklit 2026-09-25'e kadar 400 diyordu),
+geçersiz karar 400, 10 dakikada 4. deneme 429 — hata kodu üçünde de sunucununki
+(`VALIDATION_FAILED`). Web'de expo-notifications YOK: soğuk açılış, sıcak dokunuş,
+ön plan işleyicisi, rozet, `sunulanlariKapat` ve unutma işareti yalnızca cihazda sınanır.
+
+### Kullanıcı adımları (cihaz doğrulamasından önce, elle)
+
+1. Firebase projesi → Android uygulaması `com.dersmate.app` → `google-services.json`
+   kökte (depoya girer). Yoksa derleme kırılmaz ama Android token alamaz.
+2. FCM V1 hizmet hesabı anahtarı (GİZLİ) → `eas credentials` ile EAS'e; sonra
+   bilgisayardan kaldırılır.
+3. API anahtarı kısıtlanacaksa SHA-1, upload anahtarının DEĞİL Play App Signing
+   anahtarınınki; yanlışı token alınamaması demek.
+4. iOS: ilk `eas build -p ios` sırasında "Setup Push Notifications" → evet (Apple hesap
+   başına en fazla iki APNs anahtarı; önce mevcutlara bak).
+5. expo.dev'de iki robot (geliştirme, üretim) + erişim token'ı; gereken en düşük rol
+   sunucunun `--test-push` komutuyla ölçülür. Üretim token'ı sunucuda `.env.production`
+   → `PUSH_ACCESS_TOKEN`. ⚠️ Yerel sunucunun varsayılanı `Push:Provider=Log`: bildirim
+   Expo'ya HİÇ gitmez, yalnızca maskeli günlüğe yazılır. Cihazda push görmek için API
+   `Push__Provider=Expo` ve `Push__AccessToken=<geliştirme robotu>` ile başlatılır;
+   üretimde `Log` kalırsa sunucu durmaz, açılışta uyarı yazar (dağıtım Expo anahtarına
+   bağlı kılınmadı).
+6. Sunucu Bearer'la göndermeye BAŞLADIKTAN SONRA Expo'da "Enhanced Security for Push
+   Notifications" açılır. Ters sırada her bildirim `UNAUTHORIZED` ile düşer.
+7. YENİDEN DERLEME şart: geliştirme istemcileri, ad-hoc `.ipa`'lar, APK. Eski paketler
+   push almaz; iOS'ta yetki eklendiği için tedarik profilleri de yenilenir. Yerel APK
+   kısa yoldan (`C:\dm`), prebuild sonrası `local.properties` yeniden. Expo Go'da push
+   yok; Google Play hizmetli Android emülatörü geçerli.
+8. Üretim sunucusu `exp.host:443`'e çıkabilmeli.
+9. Hukuk: güncellenen gizlilik metni ve yurt dışı aktarım dayanağı (KVKK m.9, standart
+   sözleşme, 5 iş günü içinde bildirim) hukukçuya okutulur.
+10. Mağaza formları Firebase ölçümünden SONRA: Play Data safety → "Device or other IDs"
+    collected, App functionality; App Store formu manifestle tutarlı.
+
+### ⬜ Cihaz senaryoları (M9)
+
+Soğuk açılış dokunuşu · oturumsuzken dokunup giriş (aynı hesapta gidilir, başka hesapta
+gidilmez) · sohbet → profil → aynı sohbetin bildirimine dokun → geri → canlı mesaj geliyor
+mu · aynı sohbet açıkken ön plan bildirimi bastırılıyor mu · sohbet açıkken kilitle, mesaj
+gelsin, ikondan dön → bildirim kalkıyor ve karşı tarafta okundu · çevrimdışı çıkış →
+işaret → sonraki açılışta forget · Android 7-12'de aydınlatmasız kayıt OLUŞMUYOR · iOS'ta
+tek düğme ve kapatılamazlık · onay bildirimi → `ApproveModal` (soğuk ve sıcak) ·
+otomatik onaylanmış dersin eski bildirimi → "tamamlandı ve onaylandı" · iptal bildirimi →
+"Bu ders iptal edildi." · kabul/ret sonrası son istek de gidince istek bildirimleri
+kalkıyor · Android'de kanal kapatınca ayarlar ekranında amber satır ve "Aç" kanal
+ayarına gidiyor · `__DEV__` yerel deneme düğmeleriyle dört türün yönlendirmesi ·
+Firebase ağ ölçümü (yukarıda) · ilk push'lu `.ipa`'da privacy manifest kontrolü ·
+açılışta sunucu günlüğünde TEK `PUT /push/devices` (dinleyici döngüsü) · uçak modunda
+aç → çıkış → internetle aç → `forget` geliyor · çıkıştan sonraki soğuk açılışta
+exp.host'a `updateDeviceToken` GİTMİYOR (iOS dahil: yedek kapatma yolu) · Firebase
+dosyasız pakette ayarlar ekranı "kaydedilemedi" diyor.
 
 ---
 
@@ -514,10 +781,27 @@ değil ve tur örtüsü açıkken kullanıcı çekmeceyi açamıyor.
 kök yığın alttakini monte tutuyor. `tur.js`'in ölçüm defteri bu yüzden **sayaçlı**:
 sahiplerden biri sökülünce çıpa ölmüyor, son sahip çıkınca düşüyor.
 
-### Okunmamış rozeti
+### Rozetler: hamburger ve çekmece satırları
 
 Sekme çubuğundaki `tabBarBadge` gitti; rozet **hamburger düğmesinde**. Çekmeceye taşınsa
 yalnızca menü açılınca görünürdü — kullanıcı yeni mesajı fark edemezdi.
+
+**Hamburger rozeti TOPLAMI gösteriyor** (kullanıcı kararı, 2026-09-26): okunmamış mesaj +
+gelen istek + işlem bekleyen ders. Kural "kırmızı sayı = menüde bekleyen iş var"; hangisi
+olduğu çekmece satırlarında yazıyor. Erişilebilir ad parçaları tek tek sayıyor ("Menüyü aç,
+2 okunmamış mesaj, 1 gelen istek, 2 ders işlem bekliyor"). Seçilmeyenler: yalnızca mesaj
+(süreli işleri menünün içinde saklıyordu) ve "mesaj sayısı + nokta" (iki ayrı işaret
+öğretmek gerekiyordu). Düğme `h-[44px]`; eskiden `h-11` ile cihazda 38.5dp'ydi.
+
+Çekmece SATIRLARINDA üç sayaç var (2026-09-25, push işiyle geri geldi): Arkadaşlar →
+gelen istek, Derslerim → işlem bekleyen ders, Sohbet → okunmamış. Hepsi aynı rose-600
+hap (renk rolleri: sayaç = rose), sıfırken çizilmiyor; erişilebilir ad satıra göre ("Arkadaşlar, 1
+gelen istek", "Derslerim, 2 ders işlem bekliyor", "Sohbet, 2 okunmamış").
+
+Veri `src/lib/bekleyenIsler.js` → `useBekleyenIsler()`: kanca DEĞİL, modül düzeyinde depo
+ve tek uçuş. Hamburger her kabuk ekranında ayrı örnek; kanca olsaydı her örnek aynı iki
+isteği ayrı atardı. Son abone ayrılınca sıfırlanıyor, hesap değişimi de sınanıyor.
+
 
 ## Web'den bilinçli sapmalar
 
@@ -603,8 +887,13 @@ yalnızca menü açılınca görünürdü — kullanıcı yeni mesajı fark edem
   token'ı sunucuda 60 gün geçerli kalıyordu — silinen değer yeniden ele geçirilirse
   (cihaz yedeği, disk artığı) o süre boyunca taze erişim token'ı üretebilirdi.
 
-  `AuthContext.logout` sırası: token'ı OKU → yereli sil → `oturumuSonlandir()` ile
-  sunucuda iptal et, **beklemeden**. Ağ yokken çıkış yine kesin sonuç verir.
+  `AuthContext.logout` sırası: token'ı OKU → yereli sil → `oturumKapandi()` (push'un
+  bellek durumu, sunulan bildirimler, rozet) → `oturumuSonlandir()` ile sunucuda iptal et,
+  **beklemeden**. Ağ yokken çıkış yine kesin sonuç verir.
+
+  `oturumuSonlandir` 2026-09-25'ten beri `Promise<boolean>` döndürüyor (sunucu 2xx verdi
+  mi) ve yine hiç reddetmiyor. `false` ise push "unutma işareti" yazılır: sunucu çıkışı
+  öğrenemediği için cihaz kaydını da silemedi (bkz. "Push bildirimleri").
 
   ⛔ `oturumuSonlandir` HAM AXIOS kullanır, `request()` değil: istemcinin 401 → yenile
   zinciri, tam da iptal edilmek istenen token'la oturumu tazelerdi.
@@ -628,7 +917,21 @@ yalnızca menü açılınca görünürdü — kullanıcı yeni mesajı fark edem
   yerde yaşandı (profilde engellenen kişi Keşfet'te kaldı, Arkadaşlar ekranında kabul
   edilen istek profildeki sayıya yansımadı).
   - `ArkadaslarBolumu` her odakta sessizce tazeleniyor: değişikliklerin bir kısmı cihazda
-    olmuyor (karşı taraf kabul ediyor) ve kaybedilecek kaydırma yok.
+    olmuyor (karşı taraf kabul ediyor) ve kaybedilecek kaydırma yok. İlişki sürümü
+    artınca da (`src/lib/iliskiSurumu.js`, yalnızca odaktayken) tazeleniyor.
+  - Arkadaşlar (`app/eslesmeler.jsx`) ve Derslerim (`app/dersler.jsx`) odakta, ön plana
+    dönüşte (`useOnePlanaGelince`) ve ilişki / ders sürümü artınca (yalnızca odaktayken,
+    ekranın KENDİ değişikliği hariç) sessizce tazeleniyor (2026-09-25, push). Sürümü
+    artıranlar: push (ön planda gelen, öne gelişte bildirim merkezinde bulunan yeni
+    bildirim, dokunuş) ve kullanıcı işlemleri — kabul, ret, sonlandırma, engelleme, istek
+    gönderme → `iliskiDegisti()`; rezervasyon, tamamlama, onay, itiraz, iptal →
+    `dersDegisti()`. Yeni bir işlem eklenirse o da çağırmalı; yoksa çekmece sayacı ve açık
+    duran ekran eski kalır.
+
+    Derslerim'in biriken geçmiş sayfaları yalnızca geçmiş TOPLAMI (`past.totalCount`)
+    değişince sıfırlanıyor, `sessions.data` her değiştiğinde değil: geçmişe yalnızca ekleme
+    olduğu için toplam aynıysa ofsetler geçerli. Eskisi olsaydı her odak tazelemesi
+    kullanıcının kaydırarak yüklediği sayfaları silerdi.
   - Keşfet YALNIZCA engel sürümü değiştiyse tazeleniyor (`src/lib/engelSurumu.js`).
     `yenile()` listeyi 1. sayfadan kuruyor; her odakta çalışsaydı karta dokunup geri
     dönen kullanıcının biriktirdiği sayfaları silerdi. `blockUser`/`unblockUser` çağıran
@@ -647,18 +950,26 @@ yalnızca menü açılınca görünürdü — kullanıcı yeni mesajı fark edem
     bayrağı bunu YAPAMIYOR: expo-router'ın `useFocusEffect`'i ilk çağrıyı bir render
     geciktiriyor (`useOptionalNavigation`) ve bayrağı inmiş buluyor. Yeni ekranlar
     `src/state/useOnePlanaGelince.js`'i kullanmalı (kurulum anındaki `isFocused()`'a
-    bakıyor). `eslesmeler.jsx` ve `ArkadaslarBolumu` hâlâ eski kalıpta; önizlemede
-    açılışta `myMatches` / `userFriends` ikişer kez çağrılıyor (2026-09-14 ölçümü).
-- **Akış başlığında bekleyen iş sayaçları mobilde var, web'de yok.** Web `Layout.jsx`
-  yalnızca okunmamış mesaj rozeti taşıyor. Mobilde Arkadaşlar ikonu gelen istek sayısını
-  (`myMatches`), Derslerim ikonu kullanıcının kapatabileceği ders sayısını
-  (`mySessions(1, 1)`) gösteriyor; push olmadığı için 14 günde düşen isteği ve 48 saatte
-  otomatik onaylanan dersi kullanıcıya haber veren tek şey bunlar. "İşlem bekliyor"
-  tanımı TEK yerde (`src/lib/dersDurumu.js` → `eylemBekliyor`) ve Derslerim'in aksiyon
-  grubu da onu kullanıyor. Aynı turda Derslerim'de itirazdaki (`Disputed`) dersler aksiyon
-  grubundan "İtirazda, karar yönetimde" başlığına çıktı; web onları hâlâ aksiyonda
-  gösteriyor. Sayaçlar odakta VE ön plana dönüşte tazeleniyor
-  (`src/state/useOnePlanaGelince.js`): odak olayı uygulama arka plandan dönünce gelmiyor.
+    bakıyor). `ArkadaslarBolumu` hâlâ eski kalıpta; önizlemede açılışta `userFriends` iki
+    kez çağrılıyor (2026-09-14 ölçümü). `eslesmeler.jsx` 2026-09-25'te
+    `useOnePlanaGelince`'ye geçti (çift `myMatches` çağrısı kalktı, öne dönüşte de
+    tazeleniyor).
+- **Çekmecede bekleyen iş sayaçları mobilde var, web'de yok.** Web `Layout.jsx`
+  yalnızca okunmamış mesaj rozeti taşıyor. Mobilde çekmecenin Arkadaşlar satırı gelen
+  istek sayısını (`myMatches().incoming`), Derslerim satırı kullanıcının kapatabileceği
+  ders sayısını (`mySessions(1, 1)` → `eylemBekliyor`) gösteriyor; hamburger rozeti de
+  üçünün toplamı (bkz. "Gezinme → Rozetler"). ⚠️ Bu madde 2026-09-25'e kadar "Akış başlığında" ve "push olmadığı için"
+  diyordu; ikisi de bayattı. Akış başlığı 2026-09-23'te gitti ve sayaçlar `3c0f61c`
+  birleştirmesinde kayboldu; push işiyle çekmeceye geri geldiler. Push artık var ama
+  İSTEĞE BAĞLI: bildirimi reddeden kullanıcıya 14 günde düşen isteği ve 48 saatte otomatik
+  onaylanan dersi haber veren tek şey hâlâ bu sayaçlar — push varken de kaldırılmaz.
+  "İşlem bekliyor" tanımı TEK yerde (`src/lib/dersDurumu.js` → `eylemBekliyor`) ve
+  Derslerim'in aksiyon grubu da onu kullanıyor. Aynı turda Derslerim'de itirazdaki
+  (`Disputed`) dersler aksiyon grubundan "İtirazda, karar yönetimde" başlığına çıktı; web
+  onları hâlâ aksiyonda gösteriyor. Sayaçlar ön plana dönüşte, çekmece açılırken
+  (`bekleyenIsleriTazele`) ve ilişki / ders sürümü artınca tazeleniyor
+  (`src/lib/bekleyenIsler.js`); çekmece navigatörün dışında olduğu için odak olayı orada
+  YOK ve `useOnePlanaGelince` kullanılamıyor.
 - Avatar önbellek sayacı **diskte** (`KEYS.avatarSurumleri`). Fresco'nun disk önbelleği
   uygulama yeniden başlatmalarını aşıyor; sayaç bellekte kalırsa açılışta temel URI'ye
   dönülür ve eski görsel ağa hiç çıkmadan sunulur.
@@ -689,7 +1000,11 @@ yalnızca menü açılınca görünürdü — kullanıcı yeni mesajı fark edem
 2. **Seviye/rozet hesabı SUNUCUDA.** `seviye.js` eşik taşımaz; `level`/`nextLevelAt`
    hazır gelir. Branş rozetleri (Öğretici 8 sa / Üstad 15 sa) de sunucudan.
 3. **SignalR tek bağlantı** — `InboxProvider` kök kabukta kurulur, sohbet ekranı kendi
-   hub'ını AÇMAZ (iki bağlantı = bölünen gruplar, kaybolan mesajlar).
+   hub'ını AÇMAZ (iki bağlantı = bölünen gruplar, kaybolan mesajlar). Aynı sebeple
+   `sohbet/[conversationId]` KİMLİK BAŞINA tekil (`dangerouslySingular`, 2026-09-25): aynı
+   sohbetin ikinci ekranı açılabilseydi, sökülen kopya `LeaveConversation` ile ORTAK
+   bağlantıyı gruptan çıkarır ve kalan ekran "Canlı bağlantı" yazarken mesaj almazdı.
+   Bildirime dokunmak bu ikinci ekranı açmanın en kolay yoluydu.
 
 ## Dokunma ve yüzey dili
 
@@ -762,6 +1077,10 @@ yalnızca menü açılınca görünürdü — kullanıcı yeni mesajı fark edem
 - **ADIM 6 (tamam):** hesap silme, itiraz akışı, belge görüntüleyici, `/api/v1` öneki.
 - **ADIM 7 (tamam):** e-posta doğrulama 6 haneli koda geçti, yönetim rozeti profile
   bağlandı, gövdesiz 403/404/5xx'e anlamlı metin, topluluk katkı sayaçları.
+- **ADIM 8 (push bildirimleri — kod tamam, cihaz doğrulaması bekliyor):** M1–M8,
+  `ozellik/push-bildirimleri` dalında (main'e birleşmedi). Sunucu + web aynı adlı dalda.
+  ⬜ M9: kullanıcı adımları ve cihaz senaryoları (bkz. "Push bildirimleri"). Sunucu PR'ı
+  mobil PR'dan önce birleşir.
 
 ## Web ile senkron tutma
 
@@ -798,6 +1117,18 @@ Kalan iki ⬜ kapanmadan baseline ilerletilmemeli. (`03dc360` 2026-09-21'de kapa
 en eski açık iş artık `ac0a6bf`, yani baseline en fazla oraya kadar düşünülebilir —
 ama o da incelenmeden değil.)
 
+⚠️ `ozellik/push-bildirimleri` main'e birleşince aynı diff'te üç commit daha görünecek.
+Üçü de **ters yönde** (web ← mobil), yani mobile taşınacak bir şey yok:
+
+| commit | iş | durum |
+|---|---|---|
+| `9cdccbc` | W1 — web api'sine altı push sarmalayıcısı | ✅ mobilden geldi (sözleşme pariteti, bkz. aşağıdaki api tablosu) |
+| `f140b6d` | web yasal metinleri: toplanmayan telefon numarası, bayat "Profil sekmesi" | ✅ mobil 2026-09-22 / 2026-09-23'te zaten düzeltmişti |
+| `8ec0cea` | W2 — web gizlilik metnine push, silme listeleri, `SOZLESME_SURUMU` 2026-09-25 | ✅ mobil karşılığı `app/gizlilik.jsx` + `yasalMetinler.js` (aynı değer) |
+
+Baseline'a bu üçü yüzünden dokunulmaz: ileri çekmek yukarıdaki iki ⬜'yi diff'ten
+düşürürdü.
+
 `b93422a..6aafac7` aralığında `frontend/src`'ye dokunan her PR ya taşındı ya da mobilde
 karşılığı yok: #21 → mobil PR #6 (`fe8e875`); #26, #29, #30, #31, #33 →
 `ozellik/web-esitleme-26-33` dalı; #24 ve #25 → aşağıdaki "bilerek taşınmayanlar".
@@ -822,8 +1153,10 @@ baseline ileri kalırsa gerçek bir fark hiç görünmez.
   ⚠️ Bu madde 2026-09-23'ten önce "Mobilde menü yok, gezinme sekme çubuğundan" diyordu;
   artık tam tersi (bkz. "Gezinme").
 
-⚠️ `api.js` yüzeyini karşılaştırmak için metot adlarını çıkarıp kümeleri karşılaştır.
-Bilinçli fark **4 web ↔ 6 mobil** (2026-09-11 ölçümü: web 78, mobil 80 metot):
+⚠️ `api.js` yüzeyini karşılaştırmak için metot adlarını çıkarıp kümeleri karşılaştır
+(`export const api = {` nesnesinin birinci düzey anahtarları). Son ölçüm **2026-09-25,
+iki depo da `ozellik/push-bildirimleri` dalında: web 85, mobil 86 metot**; fark **5 web ↔
+6 mobil**:
 
 | web | mobil |
 |---|---|
@@ -832,6 +1165,20 @@ Bilinçli fark **4 web ↔ 6 mobil** (2026-09-11 ölçümü: web 78, mobil 80 me
 | `adminProofContentUrl` | `adminProofImageSource` |
 | `adminTeacherDocument` | `adminTeacherDocumentSource` |
 | — | `teacherDocumentSource` (kendi belgesini geri okuma; web'de karşılığı yok) |
+| `logout(refreshToken, tumCihazlar)` | api nesnesinde YOK — modül fonksiyonu `oturumuSonlandir(refreshToken)`: ham axios (401 → yenile zinciri iptal edilecek token'ı tazelemesin), `Promise<boolean>`, "her yerden çıkış" argümanı yok |
+
+Altı push metodu (`registerPushDevice`, `forgetPushDevice`, `pushPreferences`,
+`setPushPreference`, `pushPromptDecision`, `sendTestPush`) iki tarafta da var ve fark
+DEĞİL: web onları `9cdccbc`'de (W1) AYNI adla ve AYNI imzayla aldı — `registerPushDevice`
+TEK nesne parametresi, `forgetPushDevice` iki tarafta da ham istek, başlıksız ve fırlatan.
+Web bu metotları ÇAĞIRMIYOR (web'de push yok); sözleşme iki istemcide aynı kalsın diye
+duruyorlar. Bu dal main'e birleşmeden web'in main'i ölçülürse 79 metot görünür ve altısı
+"yalnız mobil" çıkar — o fark dalın birleşmesiyle kapanır, senkron hatası değildir.
+
+(Önceki ölçümler: 2026-09-11 web 78, mobil 80. 2026-09-25 W1'den önce web 79, mobil 86.
+`logout` web'e 2026-09-19'da `03dc360`'la geldi; 2026-09-21 portu onu api nesnesinin
+DIŞINDA taşıdı ve tablo güncellenmedi — 2026-09-25 ölçümüne kadar kayıtsız kalan bir
+fark.)
 
 Gerekçe: web baytları blob olarak indirip object URL'e çeviriyor, RN'de
 `URL.createObjectURL` yok. Mobil `*Source` metotları yalnızca `{ yol }` döndürüyor;

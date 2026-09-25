@@ -1,12 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Pressable, ScrollView, Text, View } from 'react-native'
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { api } from '../src/lib/api'
+import { sunulanlariKapat } from '../src/lib/bildirimler'
+import { iliskiDegisti, iliskiSurumu, iliskiSurumuAbone } from '../src/lib/iliskiSurumu'
 import { useAsync } from '../src/state/useAsync'
+import { useBildirim } from '../src/state/BildirimSaglayici'
 import { useInbox } from '../src/state/InboxContext'
+import { useOnePlanaGelince } from '../src/state/useOnePlanaGelince'
 import { formatDateTime } from '../src/lib/format'
 import { Avatar } from '../src/components/Avatar'
+import { BildirimIzniKarti } from '../src/components/BildirimIzniSorusu'
 import { Badge, Button, Card, EmptyState, ErrorBox, GeriDugmesi, Loading, Notice, SayacRozeti } from '../src/components/ui'
 import { ogrenciKonusu } from '../src/lib/iliski'
 
@@ -44,34 +49,116 @@ const TABS = [
   { key: 'active', label: 'Arkadaş' },
 ]
 
+const gecerliSekme = (deger) => TABS.some((t) => t.key === deger)
+
+// Gelen isteğe ait bildirim türleri (url: /eslesmeler?sekme=incoming). Kabulün bildirimi
+// sohbete gidiyor, onun işi burada değil.
+const ISTEK_BILDIRIMLERI = ['istek', 'istekDusecek']
+
 export default function Eslesmeler() {
   const router = useRouter()
+  const navigation = useNavigation()
   const { reloadConversations } = useInbox()
+  const { soruGoster } = useBildirim()
   const matches = useAsync(() => api.myMatches(), [])
 
-  /*
-    ODAKTA SESSİZ TAZELEME (CLAUDE.md → "Başka ekranda değişen veri ODAKTA tazelenir").
-    Bu ekrandan açılan bir profil ekranda başka bir Arkadaşlar ekranına götürebiliyor ya da
-    orada istek gönderilip engel konabiliyor; dönüldüğünde liste eski kalıyor ve zaten
-    yanıtlanmış isteğe "Kabul et" basmak sunucudan 409 alıyordu. Kurulumla aynı anda gelen
-    odak atlanıyor (ArkadaslarBolumu kalıbı): ilk çekimi useAsync zaten yaptı.
-  */
   const tazele = useRef(matches.reload)
   tazele.current = matches.reload
-  const kuruluyor = useRef(true)
-  useFocusEffect(
-    useCallback(() => {
-      if (!kuruluyor.current) tazele.current({ silent: true })
-    }, []),
+  const veriRef = useRef(matches.data)
+  veriRef.current = matches.data
+
+  /*
+    ODAKTA VE ÖNE DÖNÜŞTE SESSİZ TAZELEME (CLAUDE.md → "Başka ekranda değişen veri ODAKTA
+    tazelenir"). Bu ekrandan açılan bir profil ekranda başka bir Arkadaşlar ekranına
+    götürebiliyor ya da orada istek gönderilip engel konabiliyor; dönüldüğünde liste eski
+    kalıyor ve zaten yanıtlanmış isteğe "Kabul et" basmak sunucudan 409 alıyordu.
+
+    useOnePlanaGelince'ye geçti (2026-09-25): eski "kuruluyor" bayrağı kurulumun odağını
+    atlayamıyordu (açılışta myMatches iki kez) ve uygulama öne dönünce hiç tazelemiyordu —
+    kilitli telefona "Yeni arkadaş isteği" gelip ikondan dönen kullanıcı, açık duran bu
+    ekranda isteği göremezdi.
+  */
+  useOnePlanaGelince(() => tazele.current({ silent: true }))
+
+  /*
+    İLİŞKİ SÜRÜMÜ — ekran ODAKTAYKEN anında tazelenir: ön planda gelen istek bildirimi
+    (sağlayıcı sayacı artırıyor) odak olayı doğurmuyor ve kullanıcı tam bu listeye
+    bakarken yeni istek görünmezdi. Odakta değilse bir şey yapılmaz; dönüşteki odak
+    tazelemesi zaten gelecek (iki istek olmasın).
+
+    Kendi yaptığımız değişikliğin sürümü yok sayılıyor: listeyi o işlemin kendisi
+    tazeliyor, sayaç yalnızca DİĞER dinleyiciler (çekmece sayacı, profil) için artıyor.
+  */
+  const kendiSurumum = useRef(null)
+  useEffect(
+    () =>
+      iliskiSurumuAbone((surum) => {
+        if (surum === kendiSurumum.current) return
+        if (navigation.isFocused()) tazele.current({ silent: true })
+      }),
+    [navigation],
   )
-  useEffect(() => {
-    kuruluyor.current = false
-  }, [])
-  /* Başlangıç sekmesi adresten gelebilir (Profilim → "Arkadaşlarım" → ?sekme=active).
-     Bilinmeyen değer Gelen'e düşer: bildirimden gelen kullanıcının niyeti istekler. */
+  function degisikligiDuyur() {
+    kendiSurumum.current = iliskiSurumu() + 1
+    iliskiDegisti()
+  }
+
+  /*
+    ?sekme= — BAŞLANGIÇ SEKMESİ ADRESTEN (Profilim → "Arkadaşlarım" → active; istek
+    bildirimi → incoming). Bilinmeyen değer Gelen'e düşer: bildirimden gelen kullanıcının
+    niyeti istekler.
+
+    İlk useState YETMİYOR: ekran tekil (dangerouslySingular) ve kök yığında kurulu kalıyor.
+    Bildirime dokunulunca router.navigate aynı ekranı öne alıp YALNIZCA parametreyi
+    değiştiriyor; bu yüzden parametre efektle işleniyor ve okunur okunmaz adresten
+    siliniyor (Derslerim'deki ?rezerve= kalıbı: silinmezse aynı değerle ikinci dokunuş
+    parametreyi DEĞİŞTİRMEZ ve kullanıcı başka sekmedeyken hiçbir şey olmaz).
+  */
   const { sekme } = useLocalSearchParams()
-  const [tab, setTab] = useState(() => (TABS.some((t) => t.key === sekme) ? sekme : 'incoming'))
+  const [tab, setTab] = useState(() => (gecerliSekme(sekme) ? sekme : 'incoming'))
   const [notice, setNotice] = useState(null)
+
+  /*
+    İSTEK KONTROLÜ — { onceki, bildir } | null. "Taze bir liste gelince Gelen boş mu?"
+    sorusunu bekletiyor. İki kaynak:
+    • istek bildirimiyle gelindi (?sekme=incoming): istek o arada yanıtlandı, geri çekildi
+      ya da düştüyse ekran bunu SÖYLEMELİ (bildir: true) — yoksa kullanıcı bildirimdeki
+      işi arar.
+    • bu ekranda kabul/ret: son istek de yanıtlandıysa merkezdeki istek bildirimleri
+      artık bayat.
+    `onceki`: kontrol anındaki veri; ancak ondan SONRA gelen yanıt karar verir (eldeki
+    liste bildirimden önceki durumu gösteriyor olabilir).
+  */
+  const [istekKontrolu, setIstekKontrolu] = useState(null)
+  const [istekKalmadi, setIstekKalmadi] = useState(false)
+
+  useEffect(() => {
+    if (!sekme) return
+    const hedef = gecerliSekme(sekme) ? String(sekme) : 'incoming'
+    setTab(hedef)
+    setIstekKalmadi(false)
+    if (hedef === 'incoming') setIstekKontrolu({ onceki: veriRef.current, bildir: true })
+    // Elde veri yoksa ilk yükleme sürüyor ve zaten taze: ikinci istek atılmaz.
+    if (veriRef.current != null) tazele.current({ silent: true })
+    // Bir sonraki tura erteleniyor: ilk commit'te gezinme durumu henüz kurulmamış
+    // olabiliyor (dersler.jsx → ?rezerve= notu).
+    const zamanlayici = setTimeout(() => router.setParams({ sekme: '' }), 0)
+    return () => clearTimeout(zamanlayici)
+  }, [sekme, router])
+
+  useEffect(() => {
+    if (!istekKontrolu) return
+    if (matches.error) {
+      setIstekKontrolu(null)
+      return
+    }
+    const veri = matches.data
+    if (veri == null || veri === istekKontrolu.onceki) return
+    setIstekKontrolu(null)
+    if ((veri.incoming?.length ?? 0) > 0) return
+    if (istekKontrolu.bildir) setIstekKalmadi(true)
+    sunulanlariKapat({ turler: ISTEK_BILDIRIMLERI })
+  }, [matches.data, matches.error, istekKontrolu])
 
   const lists = matches.data ?? { incoming: [], outgoing: [], active: [] }
   const current = lists[tab] ?? []
@@ -101,7 +188,10 @@ export default function Eslesmeler() {
               // ad vermeseydik o sekme sayısız okunurdu. Üç sekme aynı biçimde adlanıyor.
               accessibilityLabel={sayi > 0 ? `${item.label}, ${sayi}` : item.label}
               accessibilityState={{ selected: tab === item.key }}
-              onPress={() => setTab(item.key)}
+              onPress={() => {
+                setTab(item.key)
+                setIstekKalmadi(false)
+              }}
               className={`min-h-[44px] flex-1 flex-row items-center justify-center gap-1 rounded-md ${
                 tab === item.key ? 'bg-white' : ''
               }`}
@@ -113,9 +203,10 @@ export default function Eslesmeler() {
               >
                 {item.label}
               </Text>
-              {/* Gelen, Akış başlığındaki sayaçla aynı rozeti taşıyor: kullanıcıyı buraya o
-                  rozet çağırdı ve iş burada. Giden ile Arkadaş iş değil bilgi, nötr parantez
-                  kalıyor. Rengi slate-600: slate-400 beyaz zeminde bile 2.56:1'di (WCAG 1.4.3). */}
+              {/* Gelen, çekmecedeki Arkadaşlar sayacıyla aynı rozeti taşıyor: kullanıcıyı
+                  buraya o rozet (ya da istek bildirimi) çağırdı ve iş burada. Giden ile Arkadaş
+                  iş değil bilgi, nötr parantez kalıyor. Rengi slate-600: slate-400 beyaz
+                  zeminde bile 2.56:1'di (WCAG 1.4.3). */}
               {item.key === 'incoming' ? (
                 <SayacRozeti sayi={sayi} />
               ) : (
@@ -139,6 +230,11 @@ export default function Eslesmeler() {
 
         <ErrorBox error={matches.error} onRetry={matches.reload} />
 
+        {/* Gelen sekmesinde yanıt bekleyen istek varken: isteği ALAN taraf hiçbir şey
+            göndermediği için sorunun "istek gönderildi" tetiği ona hiç ulaşmıyor, oysa
+            14 günde düşen istek en çok onun işine yarayan bildirim. Görünürlük sağlayıcıda. */}
+        {tab === 'incoming' && current.length > 0 ? <BildirimIzniKarti kimlik="gelen-istek" /> : null}
+
         {matches.loading ? (
           <Loading />
         ) : /* Hata varken boş durum GÖSTERİLMEZ: "Bekleyen istek yok" ile "Sunucuya
@@ -146,7 +242,16 @@ export default function Eslesmeler() {
               isteği kaçırdığını fark etmiyor. Boş durum yalnızca veri gerçekten
               geldiyse doğrudur. */
         matches.error || matches.data == null ? null : current.length === 0 ? (
-          <SekmeBosDurumu tab={tab} router={router} />
+          tab === 'incoming' && istekKalmadi ? (
+            /* Bildirimden gelindi ve istek artık yok: genel boş durum ("Bekleyen istek yok")
+               bildirimdeki isteğe ne olduğunu söylemiyordu. */
+            <Notice tone="info" onDismiss={() => setIstekKalmadi(false)}>
+              Yanıt bekleyen istek kalmadı. Bildirimdeki istek yanıtlanmış, geri çekilmiş ya da
+              süresi dolmuş olabilir.
+            </Notice>
+          ) : (
+            <SekmeBosDurumu tab={tab} router={router} />
+          )
         ) : (
           current.map((match) => (
             <MatchKarti
@@ -154,9 +259,21 @@ export default function Eslesmeler() {
               match={match}
               tab={tab}
               router={router}
-              onChanged={(message) => {
+              onChanged={(message, islem) => {
                 setNotice(message)
+                // Son istek de yanıtlandıysa merkezdeki istek bildirimleri bayat (taze
+                // liste gelince karar verilir). Kontrolün "önceki"si bu an.
+                if (islem === 'kabul' || islem === 'ret') {
+                  setIstekKontrolu({ onceki: matches.data, bildir: false })
+                }
                 matches.reload({ silent: true })
+                // Çekmece sayacı, profil ve Keşfet'teki ilişki durumu da bilsin.
+                degisikligiDuyur()
+                /* Kabul: arkadaş artık yazabilir ve ders planlayabilir — bildirim sorusunun
+                   en anlamlı anı. Satır içi düğmeden yapılıyor, kapanan bir alt sayfa yok:
+                   gecikme 0. Kararları (ihtiyaç, geri çekilme, oturumda tek yüzey) sağlayıcı
+                   veriyor. */
+                if (islem === 'kabul') soruGoster('istek-kabul', { gecikme: 0 })
                 /*
                   SOHBET LİSTESİ DE TAZELENMELİ.
 
@@ -224,7 +341,7 @@ function MatchKarti({ match, tab, router, onChanged }) {
     setError(null)
     try {
       await api.closeMatch(match.matchId)
-      onChanged(`${match.otherDisplayName} ile arkadaşlığın sonlandırıldı. Sohbet geçmişin duruyor.`)
+      onChanged(`${match.otherDisplayName} ile arkadaşlığın sonlandırıldı. Sohbet geçmişin duruyor.`, 'sonlandir')
     } catch (err) {
       setError(err)
     } finally {
@@ -243,6 +360,7 @@ function MatchKarti({ match, tab, router, onChanged }) {
         accept
           ? `${match.otherDisplayName} ile arkadaş oldunuz. Sohbet açıldı — ders saatini kararlaştırın.`
           : 'İstek reddedildi.',
+        accept ? 'kabul' : 'ret',
       )
     } catch (err) {
       setError(err)

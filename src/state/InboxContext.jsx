@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useMemo, useRef } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef } from 'react'
+import { AppState } from 'react-native'
 import { api } from '../lib/api'
 import { useAsync } from './useAsync'
 import { useChatHub } from '../hooks/useChatHub'
@@ -46,6 +47,32 @@ export function InboxProvider({ children }) {
     onMessagesRead: (id, byUserId) =>
       listeners.current.forEach((l) => l.onMessagesRead?.(id, byUserId)),
   })
+
+  /*
+    KAÇIRILAN OLAYLAR — liste iki anda da sessizce yeniden çekiliyor:
+    • Uygulama öne gelince: arka plandayken işletim sistemi bağlantıyı askıya alıyor ya da
+      koparıyor; o arada gelen ConversationUpdated olayları hiç ulaşmadı. Push bildirimi
+      mesajın geldiğini söyledi ama rozet ve liste eski kalırdı.
+    • Hub YENİDEN bağlanınca: kopukluk süresince kaçan olaylar tekrar gönderilmiyor.
+      İlk bağlantı sayılmıyor: liste kurulumda zaten çekildi.
+    Tazeleme sessiz (spinner yok); üst üste gelirse useAsync'in nesil sayacı eskiyi atar.
+  */
+  const tazeleRef = useRef(reloadConversations)
+  tazeleRef.current = reloadConversations
+
+  useEffect(() => {
+    const abonelik = AppState.addEventListener('change', (durum) => {
+      if (durum === 'active') tazeleRef.current()
+    })
+    return () => abonelik.remove()
+  }, [])
+
+  const ilkBaglantiGecti = useRef(false)
+  useEffect(() => {
+    if (hub.status !== 'connected') return
+    if (ilkBaglantiGecti.current) tazeleRef.current()
+    ilkBaglantiGecti.current = true
+  }, [hub.status])
 
   const subscribe = useCallback((handlers) => {
     listeners.current.add(handlers)

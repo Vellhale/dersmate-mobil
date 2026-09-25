@@ -215,3 +215,62 @@ uygulama kaydı oluşturuldu, bundle `com.dersmate.app`):
 ⚠️ **İkisi de gizli değil.** `ascAppId` uygulamanın App Store adresinde zaten açık, Team
 ID de her imzalı pakette taşınıyor. Depoda durmaları sorun değil — sızması sorun olan
 tek alan `appleId` ve o yukarıdaki gerekçeyle dosyada yok.
+
+---
+
+## Push bildirimleri — profil başına durum (2026-09-25)
+
+`expo-notifications` **yerel (native) bir modül**. Bu tarihten önce derlenmiş her paket
+(geliştirme istemcisi, ad-hoc `.ipa`, APK) push ALMAZ: modül pakette yok. Uygulama yine
+açılır — `src/lib/bildirimler.js` modülü tembel yüklüyor ve yüklenemezse "bu sürümde
+bildirimler desteklenmiyor" durumuna düşüyor — ama token alınamaz. **Push'u denemek için
+yeniden derleme şart**; Metro üzerinden gelen yeni JS eski kabuğa native modül ekleyemez.
+
+| Profil | Push | Not |
+|---|---|---|
+| `onizleme` | ❌ yok, bilerek | Demo modu (`EXPO_PUBLIC_ONIZLEME`) push API'lerine hiç dokunmuyor ve hiçbir kayıt isteği ağa çıkmıyor. Web önizlemesinde ayarlar ekranının hâlleri `?izin=verildi\|verildi-aydinlatmasiz\|reddedildi\|belirsiz\|desteklenmiyor` ile seçiliyor (bkz. `onizleme.js`). |
+| `preview` | ✅ | Sunucu LAN'da olsa da çalışır: bildirimi **sunucu** Expo'ya gönderir, telefonun LAN'a ulaşması gerekmez. Sunucunun `exp.host:443`'e çıkabilmesi ve `Push:Provider=Expo` + erişim token'ı yeter. |
+| `development` | ✅ | Geliştirme istemcisi push için **yeniden derlenmeli**. Expo Go'da push YOK (SDK 53'ten beri Android'de kaldırıldı); Google Play hizmetli Android emülatörü ise geçerli bir test ortamı. |
+| `production` / `production-apk` | ✅ | FCM V1 anahtarı ve APNs anahtarı EAS'te tanımlı olmalı (aşağıda). |
+
+### Kimlik bilgileri — hangisi depoya girer, hangisi girmez
+
+- **`google-services.json`** (Firebase konsolu → Android uygulaması, paket
+  `com.dersmate.app`): gizli DEĞİL, kökte durur ve **depoya işlenir** — EAS derlemesine
+  gitmesi gerekiyor. `app.config.js` onu yalnızca dosya VARSA `googleServicesFile` olarak
+  veriyor; dosyasız derleme kırılmaz, yalnızca token alınamaz.
+- **FCM V1 hizmet hesabı anahtarı** (`<proje>-firebase-adminsdk-<kimlik>.json`): GİZLİ.
+  `eas credentials` → Android → production → Google Service Account → "Manage your Google
+  Service Account Key for Push Notifications (FCM V1)" ile EAS'e yüklenir, sonra
+  bilgisayardan kaldırılır. `.gitignore`'da ayrı kalıbı var: varsayılan adı
+  `*-service-account.json` kalıbına uymuyor.
+- **APNs anahtarı** (`.p8`): ilk iOS derlemesinde EAS "Setup Push Notifications?" diye
+  soruyor, evet denir; anahtar EAS'te kalır. Apple hesap başına en fazla iki APNs anahtarı
+  veriyor — önce mevcutlara bakılır. `*.p8` zaten `.gitignore`'da.
+
+### iOS: `aps-environment`
+
+Eklenti yetkiyi derlemede `development` yazıyor (introspect ile ölçüldü, 2026-09-25).
+Mağaza ve ad-hoc dışa aktarımında imza profili onu `production`'a çeviriyor; ayrı bir
+profil ya da `mode` ayarı gerekmiyor. Expo token'ının hangi APNs ortamına gideceğine
+çalışma anında `getIosPushNotificationServiceEnvironmentAsync` karar veriyor.
+
+⚠️ Yetki eklendiği için EAS ilk derlemede App ID yeteneklerini eşitleyip tedarik
+profillerini YENİLER: eski ad-hoc `.ipa`'lar ve geliştirme istemcisi yeniden derlenip
+test iPhone'larına yeniden kurulmalı.
+
+`UIBackgroundModes` eklenmiyor (`enableBackgroundRemoteNotifications` kapalı): arka planda
+kod çalıştıran bildirim yok.
+
+### Android: Firebase otomatik başlatma KAPALI
+
+`plugins/firebase-otomatik-baslatma.js` manifest'e `firebase_messaging_auto_init_enabled`
+ve `firebase_analytics_collection_enabled` = `false` yazıyor: kullanıcı bildirim
+aydınlatmasını görmeden Firebase'e hiçbir istek çıkmasın diye (gerekçe dosyanın başında).
+Doğrulama derlemeden önce: `npx expo config --type introspect --json` → manifest'in
+`application` düğümünde iki meta-data. Derlemeden sonra: release APK taze kurulumda,
+aydınlatma onaylanmadan `firebaseinstallations.googleapis.com` ya da
+`fcmregistrations.googleapis.com`'a istek ÇIKMAMALI (proxy ya da logcat ile ölçülür).
+
+⚠️ `npx expo prebuild --platform android` yerel `android/` klasörünü sıfırlar — sonrasında
+`android/local.properties` yeniden yazılır (`sdk.dir=C:/Android/Sdk`, eğik bölüyle).

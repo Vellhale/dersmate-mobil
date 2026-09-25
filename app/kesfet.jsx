@@ -5,6 +5,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { api } from '../src/lib/api'
 import { engelDegisti, engelSurumu } from '../src/lib/engelSurumu'
 import { ILISKI } from '../src/lib/iliski'
+import { iliskiDegisti } from '../src/lib/iliskiSurumu'
+import { useBildirim } from '../src/state/BildirimSaglayici'
 import { useIliskiler } from '../src/state/useIliskiler'
 import { formatDate } from '../src/lib/format'
 import { seviyeEtiketi, seviyeHesapla } from '../src/lib/seviye'
@@ -1056,6 +1058,7 @@ function UniversiteKarti({
   tanışayım" ile "şu arkadaşımı ekleyeyim".
 */
 function SohbetIstegiModali({ kisi, arkadaslik = false, onClose, onSent, onHata }) {
+  const { soruGoster } = useBildirim()
   const [hata, setHata] = useState(null)
   const [busy, setBusy] = useState(false)
   const [sonKisi, setSonKisi] = useState(null)
@@ -1078,6 +1081,10 @@ function SohbetIstegiModali({ kisi, arkadaslik = false, onClose, onSent, onHata 
         offeredTopicId: null,
       })
       onSent(kisi)
+      // Arkadaş isteği modalıyla (EslesmeIstegiModali) aynı iki adım: ilişki sürümü ve
+      // sayfa kapandıktan sonra bildirim aydınlatması (gerekçe orada).
+      iliskiDegisti()
+      soruGoster('istek-gonderildi')
     } catch (err) {
       setHata(err)
       onHata?.(err)
