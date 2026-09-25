@@ -16,8 +16,10 @@ import { Button, Modal } from './ui'
   • İLK AÇILIŞ (mutlakaSor): kapatılamayan alt sayfa. Kullanıcı bir cevap vermeden
     analitik BAŞLAMAZ — "sonra sorarız" diye toplamaya başlamak, izin fikrini boşa
     çıkarırdı. Yine de zorlamıyor: "Yalnızca zorunlu" tek dokunuş.
-  • SONRADAN DEĞİŞTİRME (ayarlarAcik): aynı sayfa, kapatılabilir. Profil ekranındaki
-    "Veri tercihleri" bağlantısı buradan açıyor.
+  • SONRADAN DEĞİŞTİRME (ayarlarAcik): aynı sayfa, kapatılabilir. Web'deki "Çerez
+    tercihleri" bağlantısının karşılığı iki yerde, ikisi de useIzin().ayarlariAc:
+    oturumluyken Profil › Ayarlar › "Veri tercihleri" (app/ayarlar.jsx), oturumsuzken giriş
+    ekranlarının alt bilgisi (AltBilgi, veriTercihleri).
 
   Web'deki "reddet ve devam et" davranışı korundu: reddin bedeli yok, uygulama aynı
   şekilde çalışır (bkz. IZIN_KATEGORILERI'ndeki zorunlu kategori açıklaması).
@@ -193,20 +195,5 @@ export function IzinSayfasi() {
         </Pressable>
       </View>
     </Modal>
-  )
-}
-
-/** Profil ekranındaki giriş — web'deki "Çerez tercihleri" bağlantısının karşılığı. */
-export function VeriTercihleriBaglantisi() {
-  const { ayarlariAc } = useIzin()
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={ayarlariAc}
-      className="min-h-[44px] justify-center"
-    >
-      <Text className="text-sm font-medium text-brand-700">Veri tercihleri</Text>
-    </Pressable>
   )
 }

@@ -53,8 +53,7 @@ import { AltBilgiBaglantisi, MetinBaglantisi } from './MetinBaglantisi'
  * Boyut px: cihazda rem 14 sayıldığı için text-xs 10.5dp çıkıyor, Apple'ın 11pt alt
  * sınırının altında. 12px slate-500, slate-50 zeminde 4.55:1 (AA).
  *
- * `ortala` prop'u ARTIK YOK (satır her zaman ortalı). Profil M5'e kadar onu geçmeye devam
- * ediyor; bilinmeyen prop yok sayılır, bir şey bozulmaz.
+ * `ortala` prop'u YOK: satır her zaman ortalı.
  */
 export function KunyeSatiri({ className = '' }) {
   return (

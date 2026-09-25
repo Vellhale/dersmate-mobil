@@ -21,7 +21,12 @@ import { Logo } from './Logo'
   düğmeyi sığdırıyor hem de `sol` olan ve olmayan ekranlarda bar aynı kalıyor —
   sekmeler arası geçişte başlığın zıplamaması için bu şart.
 
-  Başlık `flex-1` ve tek satır: uzun başlık `sag` yuvasını ezmesin, kırpılsın.
+  Başlık `flex-1` ve tek satır: uzun başlık `sag` yuvasını ezmesin, kırpılsın. Başlık
+  rolü taşıyor: ekran okuyucu kullanıcısı başlıklar arasında gezinerek ekranın adına
+  atlayabilsin.
+
+  `sag` YUVASI: Profilim'in ayarlar dişlisi (2026-09-26). Düğme -mr-2 ile hamburgerin
+  (-ml-2) aynası; ikon kenardaki px-4 ile optik olarak hizalanır.
 */
 export function EkranBasligi({ baslik, sol, sag }) {
   return (
@@ -29,7 +34,11 @@ export function EkranBasligi({ baslik, sol, sag }) {
       <View className="min-w-0 flex-1 flex-row items-center gap-1">
         {sol ?? null}
         {baslik ? (
-          <Text numberOfLines={1} className="min-w-0 flex-1 text-xl font-bold tracking-tight text-slate-900">
+          <Text
+            accessibilityRole="header"
+            numberOfLines={1}
+            className="min-w-0 flex-1 text-xl font-bold tracking-tight text-slate-900"
+          >
             {baslik}
           </Text>
         ) : (

@@ -185,7 +185,7 @@ export function BildirimIzniModali() {
 
         <Text className="text-sm leading-relaxed text-slate-600">
           Gece 22.00–09.00 arasında acil olmayan bildirimler sabaha kalır. Hangilerini
-          alacağını sonra Profil › Bildirim ayarları'ndan değiştirebilirsin.
+          alacağını sonra Profil › Ayarlar › Bildirim ayarları'ndan değiştirebilirsin.
         </Text>
 
         {bicim.tekDugme ? (

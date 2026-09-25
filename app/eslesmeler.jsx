@@ -104,7 +104,7 @@ export default function Eslesmeler() {
   }
 
   /*
-    ?sekme= — BAŞLANGIÇ SEKMESİ ADRESTEN (Profilim → "Arkadaşlarım" → active; istek
+    ?sekme= — BAŞLANGIÇ SEKMESİ ADRESTEN (Profilim → Arkadaşlarım hapı → active; istek
     bildirimi → incoming). Bilinmeyen değer Gelen'e düşer: bildirimden gelen kullanıcının
     niyeti istekler.
 
@@ -315,7 +315,7 @@ function SekmeBosDurumu({ tab, router }) {
     )
   }
 
-  /* Eylem ŞART: Profilim'deki "Arkadaşlarım" artık doğrudan bu sekmeyi açıyor ve yeni kullanıcı
+  /* Eylem ŞART: Profilim → Arkadaşlarım hapı doğrudan bu sekmeyi açıyor ve yeni kullanıcı
      buraya eylemsiz bir boş durumla iniyordu (Arkadaşlar bölümündeki "Arkadaş bul"un aynısı). */
   return (
     <EmptyState

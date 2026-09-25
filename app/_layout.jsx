@@ -99,9 +99,13 @@ function RootNavigator() {
         <Stack.Screen name="eslesmeler" dangerouslySingular />
         <Stack.Screen name="dersler" dangerouslySingular />
         <Stack.Screen name="yonetim" dangerouslySingular />
-        {/* Bildirim ayarları: Profil'den ve bildirim dokunuşundan (/bildirimler) açılıyor.
-            Tekil, çünkü dokunuş router.navigate ile geliyor ve açık ekranı öne almalı.
-            Korunan listede: oturumsuz açılsaydı tercih uçları 401'e koşardı. */}
+        {/* Ayarlar: Profilim'in sağ üstündeki dişliden açılıyor (app/ayarlar.jsx). Tekil:
+            dişliye iki kez basınca ikinci kopya itilmesin. Korunan listede: Profili
+            düzenle, Hesabımı sil ve Çıkış yap oturum ister. */}
+        <Stack.Screen name="ayarlar" dangerouslySingular />
+        {/* Bildirim ayarları: Profil › Ayarlar'dan ve bildirim dokunuşundan (/bildirimler)
+            açılıyor. Tekil, çünkü dokunuş router.navigate ile geliyor ve açık ekranı öne
+            almalı. Korunan listede: oturumsuz açılsaydı tercih uçları 401'e koşardı. */}
         <Stack.Screen name="bildirimler" dangerouslySingular />
         {/* Eski /topluluk adresi: dosya artık yalnızca köke yönlendiriyor ama rota
             KAYITLI kalmalı, yoksa dersmate://topluluk ölür. */}
@@ -184,8 +188,9 @@ export default function RootLayout() {
       <IzinProvider>
         <RootNavigator />
         {/* İzin sayfası kökte: ilk açılışta kapatılamaz alt sayfa olarak çıkar,
-            sonrasında Profil'deki "Veri tercihleri" bağlantısıyla açılır. Oturumsuz
-            dalda da gerekli — analitik giriş ekranında da toplanabilirdi. */}
+            sonrasında "Veri tercihleri"yle açılır: oturumluyken Profil › Ayarlar'dan,
+            oturumsuzken giriş ekranlarının alt bilgisinden. Oturumsuz dalda da gerekli —
+            analitik giriş ekranında da toplanabilirdi. */}
         <IzinSayfasi />
       </IzinProvider>
     </AuthProvider>

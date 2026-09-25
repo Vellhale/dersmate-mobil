@@ -99,6 +99,14 @@
   main'e birleşmemiş dallarda); bu sürümü kabul etmiş tek bir kullanıcı yok. Yayından
   önce aynı sürümün metnini düzeltmek, kimseye gösterilmemiş bir metni değiştirmek.
   2026-09-25 yayına çıktıktan SONRA §3'e dokunan her değişiklik sürümü artırır.
+
+  ─── 2026-09-25 İÇİNDE, YAYINDAN ÖNCE: GİZLİLİK §4/§7 YOL METİNLERİ (2026-09-26) ────
+
+  Ayarlar Profil ekranından ayrı bir Ayarlar ekranına taşındı (app/ayarlar.jsx). Gizlilik
+  §4 ("Veri tercihleri"nin yeri) ve §7 (Düzeltme, Silme, Bildirimleri kapatma) artık
+  "Profil › Ayarlar › …" diyor; izin sayfasındaki zorunlu kategori metni (IzinContext) ve
+  bildirim aydınlatması da. Yeni bir ifşa yok, yalnızca yol tarifi; aynı gerekçeyle sürüm
+  ARTMADI. IZIN_SURUMU da artmadı: izne tabi kapsam değişmedi (IzinContext kuralı).
 */
 
 /** Sunucudaki LegalDocuments.CurrentVersion ile BİREBİR aynı olmalı. */

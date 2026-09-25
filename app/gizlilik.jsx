@@ -322,7 +322,7 @@ export default function Gizlilik() {
             uygulamada hiç bulunmuyor.
           </Madde>
           <Madde>
-            <Kalin>Veri tercihin hesabına ait:</Kalin> Profil ekranındaki “Veri
+            <Kalin>Veri tercihin hesabına ait:</Kalin> Profil › Ayarlar › “Veri
             tercihleri”nde yaptığın analitik seçimi dersmate <Kalin>hesabına</Kalin>{' '}
             kaydedilir ve web sitesinde de geçerli olur. Mobil uygulama bugün hiçbir ölçüm
             yapmadığı için bu tercih burada bir şeyi açıp kapatmaz; ileride ölçüm
@@ -509,16 +509,21 @@ export default function Gizlilik() {
         </Paragraf>
         <Maddeler>
           <Madde>
-            <Kalin>Düzeltme:</Kalin> profil bilgilerinin çoğunu doğrudan “Profili düzenle”
-            ekranından değiştirebilirsin.
+            <Kalin>Düzeltme:</Kalin> profil bilgilerinin çoğunu Profil › Ayarlar › “Profili
+            düzenle”den değiştirebilirsin; profil fotoğrafını Profil ekranında fotoğrafına
+            dokunarak değiştirirsin.
           </Madde>
-          {/* "Profil sekmesi" 2026-09-23'te bayatladı: sekme çubuğu kalktı, Profil'e sol
-              üstteki menüden (çekmece başlığındaki ad) gidiliyor. Silinenler listesi
-              profil/index.jsx → "Silinecekler" ile aynı olmalı. */}
+          {/* YOL (2026-09-26): ayarlar Profil ekranından Ayarlar ekranına taşındı; Profil'e
+              sol üstteki menüden (çekmece başlığındaki ad), Ayarlar'a Profil'in sağ
+              üstündeki dişliden gidiliyor. "Profil sekmesi" 2026-09-23'te, "Profil ekranının
+              en altı" 2026-09-26'da bayatladı. Web HesapSilme §1 aynı yolu anlatıyor; biri
+              değişirse ikisi birlikte. Silinenler listesi app/ayarlar.jsx → HesabiSilModali
+              "Silinecekler" ile aynı olmalı. */}
           <Madde>
-            <Kalin>Silme:</Kalin> hesabını <Kalin>kendin silebilirsin</Kalin> — Profil
-            ekranının en altındaki “Hesabımı sil” (Profil’e sol üstteki menüden, adına
-            dokunarak gidersin). Onay için parolan yeniden sorulur ve işlem geri alınamaz.
+            <Kalin>Silme:</Kalin> hesabını <Kalin>kendin silebilirsin</Kalin> — Profil ›
+            Ayarlar › “Hesabımı sil” (Profil’e sol üstteki menüden adına dokunarak, Ayarlar’a
+            Profil ekranının sağ üstündeki dişli simgesiyle gidersin). Onay için parolan
+            yeniden sorulur ve işlem geri alınamaz.
             Kimlik bilgilerin siliniyor; bildirim ayarların, bildirim kayıtların ve bildirim
             alan cihazların da siliniyor. Ders geçmişi, kazandırdığın puanlar ve
             değerlendirmeler karşı tarafa ait olduğu için kalıyor ve orada adın yerine
@@ -526,8 +531,8 @@ export default function Gizlilik() {
             yazılı.
           </Madde>
           <Madde>
-            <Kalin>Bildirimleri kapatma:</Kalin> Profil › Bildirim ayarları’ndan bildirim
-            türlerini tek tek kapatabilirsin; kapattığın türler sana hiç gönderilmez.
+            <Kalin>Bildirimleri kapatma:</Kalin> Profil › Ayarlar › Bildirim ayarları’ndan
+            bildirim türlerini tek tek kapatabilirsin; kapattığın türler sana hiç gönderilmez.
             Bildirimleri telefonunun ayarlarından da tamamen kapatabilirsin. Bu telefonun
             bildirim kaydını sunucudan kaldırmak için çıkış yapman yeterli (bkz. §5).
           </Madde>

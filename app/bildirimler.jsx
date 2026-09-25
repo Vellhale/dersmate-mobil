@@ -11,10 +11,11 @@ import { Badge, Button, Card, ErrorBox, GeriDugmesi, Loading, Notice } from '../
 import { TASIYICI_METNI } from '../src/components/BildirimIzniSorusu'
 
 /*
-  BİLDİRİM AYARLARI — Profil › "Bildirim ayarları"ndan ve deneme bildirimine dokununca
-  (/bildirimler) açılan yığın ekranı. Çekmecede YOK: gezinme listesi web'in sol rayının
-  birebir karşılığı ve ayar bir gezinme hedefi değil (aydınlatma metni de kullanıcıyı
-  "Profil › Bildirim ayarları"na yönlendiriyor).
+  BİLDİRİM AYARLARI — Profil › Ayarlar › "Bildirim ayarları"ndan ve deneme bildirimine
+  dokununca (/bildirimler) açılan yığın ekranı. Çekmecede YOK: gezinme listesi web'in sol
+  rayının birebir karşılığı ve ayar bir gezinme hedefi değil (aydınlatma metni de
+  kullanıcıyı "Profil › Ayarlar › Bildirim ayarları"na yönlendiriyor). Geri yedeği
+  (yığında geri yoksa, ör. soğuk açılışta bildirime dokunuş) bu yüzden Ayarlar.
 
   İKİ KATMAN, EKRANDA AYRI:
   • "Bu cihaz" — işletim sistemi izni ve aydınlatma. Telefona ait; uygulama ancak SORABİLİR,
@@ -75,7 +76,7 @@ export default function BildirimAyarlari() {
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
       <View className="flex-row items-center gap-3 border-b border-slate-200 bg-white px-4 py-2">
-        <GeriDugmesi onPress={() => (router.canGoBack() ? router.back() : router.replace('/profil'))} />
+        <GeriDugmesi onPress={() => (router.canGoBack() ? router.back() : router.replace('/ayarlar'))} />
         <Text className="min-w-0 flex-1 text-lg font-bold text-slate-900">Bildirimler</Text>
       </View>
 
