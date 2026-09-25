@@ -203,9 +203,10 @@ export default function Eslesmeler() {
               >
                 {item.label}
               </Text>
-              {/* Gelen, çekmecedeki Arkadaşlar sayacıyla aynı rozeti taşıyor: kullanıcıyı buraya
-                  o rozet (ya da istek bildirimi) çağırdı ve iş burada. Giden ile Arkadaş iş değil bilgi, nötr parantez
-                  kalıyor. Rengi slate-600: slate-400 beyaz zeminde bile 2.56:1'di (WCAG 1.4.3). */}
+              {/* Gelen, çekmecedeki Arkadaşlar sayacıyla aynı rozeti taşıyor: kullanıcıyı
+                  buraya o rozet (ya da istek bildirimi) çağırdı ve iş burada. Giden ile Arkadaş
+                  iş değil bilgi, nötr parantez kalıyor. Rengi slate-600: slate-400 beyaz
+                  zeminde bile 2.56:1'di (WCAG 1.4.3). */}
               {item.key === 'incoming' ? (
                 <SayacRozeti sayi={sayi} />
               ) : (
