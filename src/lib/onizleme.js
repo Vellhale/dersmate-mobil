@@ -901,7 +901,8 @@ export const onizlemeApi = {
       .filter((g) => !tag || g.tag === tag)
       .filter((g) => sinir === null || Date.parse(g.createdAtUtc) >= sinir)
       .sort((a, b) => (olcut ? olcut(a, b) : 0) || yeniOnce(a, b))
-      .map((g) => ({ ...g, firstComment: ilkYorumOnizlemesi(g.postId) }))
+      // Perdeli GÖNDERİNİN önizlemesi kurulmaz (sunucu: ForumOnizleme).
+      .map((g) => ({ ...g, firstComment: g.underReview ? null : ilkYorumOnizlemesi(g.postId) }))
     return gecikme(sayfala(liste, page, pageSize))
   },
   createForumPost: () => gecikme('yeni-gonderi'),
@@ -1034,8 +1035,12 @@ const FORUM_YORUMLARI = {
   önizleme bloğunu hiç çizmez.
 
   Biçim ForumCommentPreviewDto: { commentId, body, author, createdAtUtc }. Oy ve durum
-  alanları YOK: önizleme salt okunur, oylama iplikte yapılır. Gövde sunucuda ~200
-  karaktere kısaltılıyor; kart zaten iki satırda kestiği için burada da aynı sınır.
+  alanları YOK: önizleme salt okunur, oylama iplikte yapılır.
+
+  GÖVDE sunucudaki ForumOnizleme.Metin'in aynası: satır sonları ve art arda boşluklar tek
+  boşluğa iner, 200 birimi aşarsa ilk 199'u + "…" (toplam 200). Sunucu GRAFEM sayıyor
+  (emoji bölünmez); burada kod noktası sayılıyor — Intl.Segmenter her JS motorunda yok
+  ve demo yorumlarında birleşik emoji yok, fark görünmez.
 */
 const ONIZLEME_GOVDE_SINIRI = 200
 
@@ -1044,10 +1049,12 @@ function ilkYorumOnizlemesi(postId) {
     (y) => !y.underReview && !engelliMi(y.author.userId),
   )
   if (!yorum) return null
+  const tekSatir = yorum.body.split(/\s+/).filter(Boolean).join(' ')
+  const birimler = Array.from(tekSatir)
   const body =
-    yorum.body.length > ONIZLEME_GOVDE_SINIRI
-      ? `${yorum.body.slice(0, ONIZLEME_GOVDE_SINIRI).trimEnd()}…`
-      : yorum.body
+    birimler.length > ONIZLEME_GOVDE_SINIRI
+      ? `${birimler.slice(0, ONIZLEME_GOVDE_SINIRI - 1).join('').trimEnd()}…`
+      : tekSatir
   return { commentId: yorum.commentId, body, author: yorum.author, createdAtUtc: yorum.createdAtUtc }
 }
 
