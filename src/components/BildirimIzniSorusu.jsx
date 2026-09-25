@@ -209,8 +209,11 @@ export function BildirimIzniModali() {
  *
  * @param kimlik Kartın yeri ('ilk-mesaj', 'rezervasyon', 'gelen-istek' …) — sahiplenme
  *   bununla yapılıyor. @param sebep açılış cümlesi (verilmezse kimlik).
+ * @param className kartın kendi kenar boşluğu. Boşluk çağıranın sarmalayıcısına değil
+ *   BURAYA verilir: kart gerekmeyince null dönüyor ve dıştaki dolgulu bir View ekranda
+ *   boş bir aralık olarak kalırdı.
  */
-export function BildirimIzniKarti({ kimlik, sebep = kimlik }) {
+export function BildirimIzniKarti({ kimlik, sebep = kimlik, className = '' }) {
   const { izin, kartGorunur, kartiSahiplen, ertele, aydinlatmayiOnayla } = useBildirim()
   const router = useRouter()
   const [mesgul, setMesgul] = useState(false)
@@ -235,7 +238,7 @@ export function BildirimIzniKarti({ kimlik, sebep = kimlik }) {
   const tekDugme = sistemIstemiGelecek(izin)
 
   return (
-    <Card dolgu="p-4">
+    <Card dolgu="p-4" className={className}>
       <Text className="text-sm font-semibold text-slate-900">{SEBEPLER[sebep] ?? VARSAYILAN_SEBEP}</Text>
       <Text className="mt-1 text-xs leading-relaxed text-slate-600">
         Mesaj, arkadaş isteği, ders onayı ve ders hatırlatması için bildirim gönderebiliriz.{' '}

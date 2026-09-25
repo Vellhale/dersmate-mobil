@@ -147,6 +147,12 @@ export default function Profil() {
           </Button>
         </View>
 
+        {/* Bildirim ayarlarının TEK girişi (çekmecede yok: ayar bir gezinme hedefi değil).
+            Adı aydınlatma sorusunun metniyle aynı: "Profil › Bildirim ayarları". */}
+        <Button variant="secondary" onPress={() => router.push('/bildirimler')}>
+          Bildirim ayarları
+        </Button>
+
         {/* Yönetim girişi YALNIZCA yetkili hesapta çizilir. Asıl kapı sunucuda (403);
             buradaki koşul, yetkisi olmayana çalışmayan bir düğme göstermemek için. */}
         {session?.isAdmin && (
@@ -312,6 +318,8 @@ function HesabiSilModali({ open, onClose, onDeleted }) {
             'Biyografin, üniversite ve bölüm bilgin',
             'Açtığın ders ilanları',
             'Veri tercihlerin ve cihaz kaydın',
+            // Sunucu hesap silmede cihaz kayıtlarını, tercihleri ve bildirim defterini siliyor.
+            'Bildirim ayarların, bildirim kayıtların ve bildirim alan cihazların',
           ].map((madde) => (
             <View key={madde} className="flex-row gap-2">
               <Text className="text-xs text-slate-400">•</Text>

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Pressable, Text, View } from 'react-native'
-import { useFocusEffect, useRouter } from 'expo-router'
+import { useFocusEffect, useNavigation, useRouter } from 'expo-router'
 import { api } from '../lib/api'
+import { iliskiSurumuAbone } from '../lib/iliskiSurumu'
 import { seviyeEtiketi, seviyeHesapla } from '../lib/seviye'
 import { useAsync } from '../state/useAsync'
 import { Avatar } from './Avatar'
@@ -82,6 +83,21 @@ export function ArkadaslarBolumu({ userId, kendiProfilim = false, ad }) {
   useEffect(() => {
     kuruluyor.current = false
   }, [])
+
+  /*
+    İLİŞKİ SÜRÜMÜ — profil ODAKTAYKEN ilişki değişirse (ön planda "isteğin kabul edildi"
+    bildirimi geldi; sağlayıcı sayacı artırıyor) arkadaş sayısı ve liste anında tazelenir:
+    ekran zaten odakta olduğu için yukarıdaki odak tazelemesi gelmezdi. Odakta değilse bir
+    şey yapılmaz; dönüşteki odak tazelemesi zaten gelecek (iki istek olmasın).
+  */
+  const navigation = useNavigation()
+  useEffect(
+    () =>
+      iliskiSurumuAbone(() => {
+        if (navigation.isFocused()) tazele.current({ silent: true })
+      }),
+    [navigation],
+  )
   const d = veri.data
 
   /* Yüklenirken bölüm HİÇ çizilmiyor (iskelet de yok, web kararı): profil kartı ayrı

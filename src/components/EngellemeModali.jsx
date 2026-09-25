@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Text, View } from 'react-native'
 import { api } from '../lib/api'
 import { engelDegisti } from '../lib/engelSurumu'
+import { iliskiDegisti } from '../lib/iliskiSurumu'
 import { Button, ErrorBox, Field, Girdi, Modal, Notice } from './ui'
 
 /*
@@ -65,6 +66,9 @@ export function EngellemeModali({ kisi, onClose, onEngellendi }) {
       await api.blockUser(kisi.userId, not.trim() || null)
       // Kurulu kalan Keşfet odakta tazelensin (bkz. lib/engelSurumu).
       engelDegisti()
+      // Engel, bekleyen istekleri de kapatıyor (BlockUserHandler → Declined): çekmecedeki
+      // gelen istek sayacı ve açık duran Arkadaşlar listesi bunu görsün (lib/iliskiSurumu).
+      iliskiDegisti()
       onEngellendi(kisi.displayName)
     } catch (err) {
       setHata(err)

@@ -1,8 +1,8 @@
 /*
   DERS DURUMU — "bu ders benden bir şey bekliyor mu?" sorusunun TEK tanımı.
 
-  İki yer aynı soruyu soruyor: Derslerim'deki "Senden aksiyon bekleyenler" grubu ve Akış
-  başlığındaki Derslerim sayacı. Tanım iki yerde ayrı yazılsaydı biri değişip öteki
+  İki yer aynı soruyu soruyor: Derslerim'deki "Senden aksiyon bekleyenler" grubu ve
+  çekmecedeki Derslerim sayacı (lib/bekleyenIsler.js; Akış başlığından oraya taşındı). Tanım iki yerde ayrı yazılsaydı biri değişip öteki
   kaldığında rozet "2" derken ekranda tek kart olurdu; kullanıcı bekleyen işi aramaya
   başlar ve bulamaz.
 
