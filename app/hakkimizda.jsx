@@ -1,19 +1,51 @@
-import { Linking, Text, View } from 'react-native'
+import { Text, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import { ISLETMECI, ISLETMECI_ADRESI, ISLETMECI_ALAN_ADI, MARKA } from '../src/lib/kunye'
 import { brand } from '../src/lib/theme'
+import {
+  ADIMLAR,
+  BILDIRIM_NOTU,
+  DEGERLER,
+  GUVENCELER,
+  KAPANIS,
+  NASIL,
+  OZET,
+} from '../src/lib/hakkimizdaMetni'
 import { useAuth } from '../src/state/AuthContext'
-import { ArtanIkonu, KepIkonu, KisilerIkonu, KitapIkonu } from '../src/components/Ikonlar'
-import { MetinBaglantisi, MetinSayfasi } from '../src/components/MetinSayfasi'
+import { AltBilgi } from '../src/components/AltBilgi'
+import {
+  AramaIkonu,
+  ArtanIkonu,
+  CuzdansizIkonu,
+  GozIkonu,
+  KanitIkonu,
+  KepIkonu,
+  KisilerIkonu,
+  KitapIkonu,
+  MesajIkonu,
+  RoketIkonu,
+  ToplulukIkonu,
+} from '../src/components/Ikonlar'
+import { MetinSayfasi } from '../src/components/MetinSayfasi'
 import { Button, Card } from '../src/components/ui'
 
 /*
   HAKKIMIZDA — web'deki pages/Hakkimizda.jsx'in portu.
 
-  YAPI KORUNDU: üç değer kartı (Misyon / Vizyon / Topluluk) + tek geniş "Nasıl işliyor"
-  kartı + kapanış cümlesi. Üçüncü kart doldurma değil — bu ürünün taşıyıcı fikri
-  akranlık ve o fikrin misyon/vizyon ikilisinde yeri yok; ikisi de "biz ne yapıyoruz"
-  derken topluluk "bunu kim yapıyor" diyor.
+  METİN BU DOSYADA DEĞİL (2026-09-26): src/lib/hakkimizdaMetni.js, web'dekiyle bayt bayt
+  aynı dosya. Bu sayfa yalnızca düzeni ve anahtar → ikon çevirisini taşıyor. Metni
+  değiştirmek isteyen önce web'deki kaynağı değiştirir, sonra kopyalar.
+
+  YAPI: üç değer kartı (Misyon / Vizyon / Topluluk) → tek "Nasıl işliyor" kartı (altı
+  adım, bildirim dipnotu, çağrı, üç güvence) → kapanış cümlesi → alt bilgi.
+
+  • Değer kartları kendi aralarında gap-4: aile gibi okunsunlar; sonraki bölümle
+    araları kabuğun gap-8'i kadar.
+  • Adımlar KUTULU ikonla, güvenceler KUTUSUZ: birincil liste (ne yaparsın) ile ikincil
+    liste (neye güvenirsin) aynı kartta ayrışsın. Adım ikonları çekmecedeki
+    (Cekmece.jsx → OGELER) ikonların AYNISI: kullanıcı simgeyi menüden tanır ve metin
+    "çekmece" demeden menüyü anlatmış olur. Menüde ikon değişirse burada da değişmeli.
+  • "Nasıl işliyor" etiketi ikonsuz. ArtanIkonu puan güvencesine geçti; iki yerde
+    olsaydı anlamı bulanırdı.
 
   WEB'DEN SAPMALAR:
 
@@ -25,151 +57,99 @@ import { Button, Card } from '../src/components/ui'
     bir doku olmayınca /80 opaklık da anlamını yitiriyor: kartlar ui.jsx'in standart
     beyaz kartı, zemin slate-50. Sayfa kendi yüzey dilini icat etmiyor.
 
-  • IZGARA DEĞİL YIĞIN: telefonda üç sütun yok; kartlar alt alta.
+  • IZGARA DEĞİL YIĞIN: telefonda üç sütun yok; kartlar ve adımlar alt alta.
 
-  • HOVER YOK (kartların kalkması, ikon kutusunun dolması). Dokunmatikte hover diye bir
-    durum yok ve bu kartlar TIKLANMIYOR — active: vermek de yanlış olurdu: basıldığında
-    tepki veren ama hiçbir yere götürmeyen kutu, kırık bağlantı gibi okunur.
+  • HOVER YOK ve HİÇBİR KUTU TIKLANMIYOR (kartlar, adımlar). active: vermek de yanlış
+    olurdu: basıldığında tepki veren ama hiçbir yere götürmeyen kutu, kırık bağlantı gibi
+    okunur. Sayfadaki tek eylem çağrı düğmesi.
 
-  • ÇAĞRI DÜĞMESİ OTURUMA GÖRE: web'de sabit "Keşfet'e göz at" bağlantısı vardı çünkü
-    sayfa zaten giriş duvarının arkasındaydı. Mobilde bu sayfaya kayıt öncesi de
-    geliniyor (giriş ekranı altbilgisi, mağaza bağlantısı) ve oturumsuz kullanıcı
-    /kesfet'e basınca guard onu giriş ekranına atardı — düğme bozuk hissettirirdi.
-    Oturumsuzken çağrı "Hesap oluştur".
+  • ÇAĞRI DÜĞMESİ OTURUMA GÖRE: web'de sabit "Keşfet'e göz at" bağlantısı var çünkü
+    sayfa giriş duvarının arkasında. Mobilde bu sayfaya oturumsuz da geliniyor: giriş,
+    kayıt ve parola sıfırlama ekranlarının alt bilgisinden (AltBilgi, 2026-09-26) ve
+    derin bağlantıdan. Oturumsuz kullanıcı /kesfet'e basınca guard onu giriş ekranına
+    atardı, düğme bozuk hissettirirdi. Oturumsuzken çağrı "Hesap oluştur".
 
-  ⚠️ İKON EKSİĞİ: web'in RoketIkonu (Misyon) ve GozIkonu (Vizyon) çizimlerinin mobil
-  karşılığı yok ve ikon eklemek bu dosyanın işi değil — en yakın mevcut çizimler
-  kullanıldı (KitapIkonu, KepIkonu). Güvence maddelerinin ikonları (CuzdansizIkonu,
-  KanitIkonu) da yok; ÜÇÜNÜ DE ikonsuz bırakmak, birini ikonlu ikisini ikonsuz basmaktan
-  iyiydi — üç madde ancak aynı dili konuşurlarsa aynı ailenin üyesi gibi okunuyor.
+  • SAYFA ALTI = ALT BİLGİ. Eski "dersmate’i Corventech geliştiriyor ve işletiyor."
+    imzası kalktı; sayfa, Profil ve giriş ekranlarıyla AYNI alt bilgiyle ve aynı künye
+    satırıyla bitiyor (KunyeSatiri). Yasal künye bloğu (KunyeBlogu) burada DEĞİL:
+    kunye={false}, gerekçe MetinSayfasi'ndaki `kunye` notunda.
 */
 
-const DEGERLER = [
-  {
-    Ikon: KitapIkonu,
-    baslik: 'Misyonumuz',
-    metin:
-      'Bir konuyu gerçekten öğrenmenin en kısa yolu onu birine anlatmaktır. dersmate, ' +
-      'öğrencilerin bildiklerini anlatarak öğrendiği, eksiklerini bir akranından ' +
-      'kapattığı bir alan açıyor — aradaki mesafeyi, ücreti ve aracıyı kaldırıyoruz.',
-  },
-  {
-    Ikon: KepIkonu,
-    baslik: 'Vizyonumuz',
-    metin:
-      'Hiçbir öğrencinin bir konuyu, sırf sorusunu soracak birini bulamadığı için ' +
-      'eksik bırakmadığı bir öğrenme ağı. Bugün YKS müfredatıyla başlıyoruz; hedef, ' +
-      'her öğrencinin hem öğrenci hem öğretmen olabildiği bir topluluk.',
-  },
-  {
-    Ikon: KisilerIkonu,
-    baslik: 'Topluluğumuz',
-    metin:
-      'Öğretmen yok, akran var. Anlatan da öğrenen de aynı sıralarda; bu yüzden sorular ' +
-      'çekinmeden soruluyor, cevaplar aynı dilden geliyor. Her ders iki kişiyi birden ' +
-      'ilerletiyor.',
-  },
-]
+const DEGER_IKONU = { misyon: RoketIkonu, vizyon: GozIkonu, topluluk: ToplulukIkonu }
 
-/*
-  ─────────────────────────────────────────────────────────────────────────────
-  "NASIL İŞLİYOR" MADDELERİ — web'deki kayıt aynen taşınıyor (2026-08-24).
+/* Cekmece.jsx → OGELER ile aynı ikonlar, aynı sırayla. */
+const ADIM_IKONU = {
+  kesfet: AramaIkonu,
+  portfoy: KitapIkonu,
+  arkadaslar: KisilerIkonu,
+  sohbet: MesajIkonu,
+  derslerim: KepIkonu,
+  topluluk: ToplulukIkonu,
+}
 
-  KALDIRILAN madde: "Ders almak ücretsiz" — "Para transferi yok" ile aynı yeri
-  kaplıyordu. İkisi teknik olarak farklı şeyler söylüyor ama okuyan için ayrımı yok.
+const GUVENCE_IKONU = { puan: ArtanIkonu, para: CuzdansizIkonu, kanit: KanitIkonu }
 
-  ⚠️ ÖNCE BAŞKA BİR METİN İSTENMİŞTİ ve yazılmadı; kaydı burada duruyor ki aynı hataya
-  bir daha düşülmesin. İstenen metin "kredi sistemi: ders aldıkça kredi harcarsın"
-  diyordu. SİSTEM BUNU YAPMIYOR: CreditLedgerService yalnızca anlatana puan BASIYOR,
-  öğrenciden hiçbir şey düşmüyor (tek bacaklı işlem). O cümle ekranda dursaydı kullanıcı
-  var olmayan bir mekanizmaya göre karar verirdi: "kredim biterse ders alamam" diye ders
-  almaktan çekinmek gibi. Bir güvence şeridinin yapabileceği en kötü şey, güvence diye
-  yanlış bilgi vermek.
-
-  YERİNE GELEN "Karşılıklı takas" istenen fikrin GERÇEK karşılığı: eşleştirme motoru,
-  senin aradığın konuyu anlatanlar arasından senin anlatabildiğin konuyu arayanları
-  listenin başına alıyor (GetMatchSuggestions → IsCrossMatch). Keşfet'te de aynı rozetle
-  görünüyor; yani bu sayfa ürünle çelişmiyor, onu anlatıyor.
-  ─────────────────────────────────────────────────────────────────────────────
-*/
-const GUVENCELER = [
-  {
-    baslik: 'Karşılıklı takas',
-    metin:
-      'Senin öğrenmek istediğin konuyu anlatan ve senin anlatabildiğin konuyu ' +
-      'öğrenmek isteyen kişiler Keşfet’te listenin başında çıkar.',
-  },
-  {
-    baslik: 'Para transferi yok',
-    metin: 'Kimse kimseye ödeme yapmaz. Platformda para dolaşmaz.',
-  },
-  {
-    baslik: 'Doğrulanmış dersler',
-    metin: 'Her ders kanıtla kapanır; değerlendirmeler yalnızca gerçek derslerden gelir.',
-  },
-]
-
-const VAATLER = ['Akran öğrenmesi', 'Puanla ilerleme', 'Doğrulanmış dersler']
+/* Metin modülüne yeni bir anahtar eklenip ikonu buraya eklenmediyse sayfa düşmesin:
+   ikon kutusu boş kalır, metin yine okunur. */
+function AnahtarIkonu({ tablo, anahtar, boy }) {
+  const Ikon = tablo[anahtar]
+  return Ikon ? <Ikon boy={boy} renk={brand[600]} /> : null
+}
 
 export default function Hakkimizda() {
   const router = useRouter()
   const { isAuthenticated } = useAuth()
 
   return (
-    <MetinSayfasi
-      baslik="Hakkımızda"
-      ozet={
-        'dersmate, öğrencilerin birbirine ders anlattığı bir akran öğrenme platformudur. ' +
-        'İyi bildiğin konuyu anlatır, eksik olduğun konuda başka bir öğrenciden ders alırsın.'
-      }
-      taslak={false}
-      /* Yasal künye burada DEĞİL — gerekçe MetinSayfasi'ndaki `kunye` notunda.
-         Karşılığı sayfanın en altındaki tek cümlelik imza. */
-      kunye={false}
-    >
-      {DEGERLER.map(({ Ikon, baslik, metin }) => (
-        <Card key={baslik}>
-          <View className="h-11 w-11 items-center justify-center rounded-xl bg-brand-50">
-            <Ikon boy={20} renk={brand[600]} />
-          </View>
-          <Text accessibilityRole="header" className="mt-4 text-lg font-semibold text-slate-900">
-            {baslik}
-          </Text>
-          <Text className="mt-2 text-[15px] leading-relaxed text-slate-600">{metin}</Text>
-        </Card>
-      ))}
+    <MetinSayfasi baslik="Hakkımızda" ozet={OZET} taslak={false} kunye={false}>
+      <View className="gap-4">
+        {DEGERLER.map(({ anahtar, baslik, metin }) => (
+          <Card key={anahtar}>
+            {/* px: h-11 cihazda 38.5dp (rem 14), web önizlemesinde 44. */}
+            <View className="h-[44px] w-[44px] items-center justify-center rounded-xl bg-brand-50">
+              <AnahtarIkonu tablo={DEGER_IKONU} anahtar={anahtar} boy={20} />
+            </View>
+            <Text accessibilityRole="header" className="mt-4 text-lg font-semibold text-slate-900">
+              {baslik}
+            </Text>
+            <Text className="mt-2 text-[15px] leading-relaxed text-slate-600">{metin}</Text>
+          </Card>
+        ))}
+      </View>
 
       <Card>
-        <View className="flex-row items-center gap-2">
-          <ArtanIkonu boy={16} renk={brand[600]} />
-          <Text className="text-sm font-medium text-slate-600">Nasıl işliyor</Text>
-        </View>
+        <Text className="text-sm font-medium text-slate-600">{NASIL.etiket}</Text>
         <Text accessibilityRole="header" className="mt-2 text-xl font-bold tracking-tight text-slate-900">
-          Anlat, öğren, ilerle
+          {NASIL.baslik}
         </Text>
+        <Text className="mt-2 text-sm text-slate-600">{NASIL.giris}</Text>
 
-        {/* Vaat şeridi: tarayarak geçen göz için. Detay aşağıdaki üç maddede. */}
-        <View className="mt-4 gap-2">
-          {VAATLER.map((v) => (
-            <View key={v} className="flex-row items-center gap-2">
-              {/*
-                Web'de OnayIkonu (emerald tik) vardı; mobilde o çizim yok. Tik yerine
-                glif kullanılıyor ve ekran okuyucudan GİZLENİYOR: "onay işareti Akran
-                öğrenmesi" diye okunması, listeyi anlatmak yerine gürültü olurdu.
-                Tik marka mavisi (brand-700, beyazda 6.25:1): yeşil marka paletinin
-                dışındaydı (kullanıcı kararı, A düzeni).
-              */}
-              <Text
-                importantForAccessibility="no"
-                accessibilityElementsHidden
-                className="text-sm text-brand-700"
-              >
-                ✓
-              </Text>
-              <Text className="text-sm text-slate-600">{v}</Text>
+        <View className="mt-4 gap-4">
+          {ADIMLAR.map(({ anahtar, baslik, metin }, i) => (
+            /* Satır tek erişilebilir öğe: ekran okuyucu "3. adım, Arkadaşlar: …" diye
+               bir kez okur; ikon kutusu ve numara ayrıca durak olmaz. */
+            <View
+              key={anahtar}
+              accessible
+              accessibilityLabel={`${i + 1}. adım, ${baslik}: ${metin}`}
+              className="flex-row gap-3"
+            >
+              <View className="h-[36px] w-[36px] shrink-0 items-center justify-center rounded-lg bg-brand-50">
+                <AnahtarIkonu tablo={ADIM_IKONU} anahtar={anahtar} boy={18} />
+              </View>
+              <View className="min-w-0 flex-1">
+                {/* Numara dili MetinSayfasi → Bolum'le aynı: slate-400 sayı, koyu başlık. */}
+                <Text className="text-[15px] font-semibold text-slate-900">
+                  <Text className="text-slate-400">{i + 1}.</Text> {baslik}
+                </Text>
+                <Text className="mt-0.5 text-sm leading-relaxed text-slate-600">{metin}</Text>
+              </View>
             </View>
           ))}
         </View>
+
+        {/* 12px px ile: text-xs cihazda 10.5dp. slate-500 beyazda 4.76:1. */}
+        <Text className="mt-4 text-[12px] leading-[18px] text-slate-500">{BILDIRIM_NOTU}</Text>
 
         <View className="mt-5">
           {isAuthenticated ? (
@@ -182,9 +162,16 @@ export default function Hakkimizda() {
         </View>
 
         <View className="mt-6 gap-4 border-t border-slate-200 pt-5">
-          {GUVENCELER.map(({ baslik, metin }) => (
-            <View key={baslik} className="flex-row gap-3">
-              <View className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-500" />
+          {GUVENCELER.map(({ anahtar, baslik, metin }) => (
+            <View
+              key={anahtar}
+              accessible
+              accessibilityLabel={`${baslik}: ${metin}`}
+              className="flex-row gap-3"
+            >
+              <View className="mt-0.5 shrink-0">
+                <AnahtarIkonu tablo={GUVENCE_IKONU} anahtar={anahtar} boy={18} />
+              </View>
               <View className="min-w-0 flex-1">
                 <Text className="text-sm font-semibold text-slate-900">{baslik}</Text>
                 <Text className="mt-1 text-sm leading-relaxed text-slate-600">{metin}</Text>
@@ -196,31 +183,9 @@ export default function Hakkimizda() {
 
       {/* Kapanış: sayfanın tezi, tek cümlede. Kutu yok — burada duracak bir şey değil,
           okunup geçilecek bir cümle. */}
-      <Text className="text-center text-sm italic text-slate-600">
-        Bir konuyu anlatabiliyorsan, onu gerçekten öğrenmişsindir.
-      </Text>
+      <Text className="text-center text-sm italic text-slate-600">{KAPANIS}</Text>
 
-      {/*
-        İMZA (2026-09-21, web'le aynı). Kapanış cümlesinden SONRA ve küçük: burası
-        sayfanın tezi değil, imzası — imza sayfanın altına küçük atılır.
-
-        ⚠️ Bu yasal künye DEĞİL, tanıtım cümlesi. Tescil bilgileri (unvan, adres, MERSIS)
-        buraya EKLENMEZ; yerleri yasal metinlerin altındaki künye bloğu. İkisini
-        karıştırmak, yasal bilgiyi kimsenin aramadığı bir sayfaya gömmek olurdu.
-
-        Bağlantı satır dışında: 44px kuralı (bkz. MetinBaglantisi). Cümle işletmeciyi
-        adıyla söylediği için bağlantı hiç açılmasa da imza eksik kalmıyor.
-      */}
-      <View className="mt-8 items-center border-t border-slate-200 pt-6">
-        <Text className="text-center text-sm leading-relaxed text-slate-600">
-          {MARKA}’i <Text className="font-semibold text-slate-800">{ISLETMECI}</Text>{' '}
-          geliştiriyor ve işletiyor.
-        </Text>
-        <MetinBaglantisi
-          etiket={ISLETMECI_ALAN_ADI}
-          onPress={() => Linking.openURL(ISLETMECI_ADRESI)}
-        />
-      </View>
+      <AltBilgi gizle={['/hakkimizda']} />
     </MetinSayfasi>
   )
 }

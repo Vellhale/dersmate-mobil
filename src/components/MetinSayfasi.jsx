@@ -97,9 +97,10 @@ export function MetinSayfasi({
             aydınlatma metni olurdu.
 
             ⚠️ kunye={false} YALNIZCA HAKKIMIZDA İÇİN. Web'de o sayfa bu kabuğu hiç
-            kullanmıyor (kendi düzeni var) ve künye yerine tek cümlelik bir İMZA taşıyor;
-            oradaki yorum sınırı açıkça çiziyor: "Yasal künye burada DEĞİL — bu bir
-            tanıtım cümlesi, tanıtıcı bilgi yükümlülüğünün karşılığı değil." Mobilde
+            kullanmıyor (kendi düzeni var) ve yasal künye bloğu taşımıyor; sayfa, sitenin
+            alt bilgisindeki künye SATIRIYLA bitiyor. Mobilde de öyle: Hakkımızda, Profil
+            ve giriş ekranlarıyla aynı alt bilgiyle (AltBilgi → KunyeSatiri) bitiyor.
+            (2026-09-26'ya kadar burada tek cümlelik bir İMZA vardı; kaldırıldı.) Mobilde
             Hakkımızda kabuğu paylaştığı için ayrım bir bayrakla yapılıyor. Tescil
             bilgilerini kimsenin yasal metin diye okumadığı bir sayfaya gömmek, onları
             aranacak yerden kaçırmak olurdu.

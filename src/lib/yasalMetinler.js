@@ -86,6 +86,21 @@
   DisclosureShownAtUtc) ve sunucu o damga olmadan cihaz kaydını kabul etmiyor.
 */
 
+/*
+  ─── 2026-09-25 İÇİNDE, YAYINDAN ÖNCE: KOŞULLAR §3 PUAN DÜZELTMESİ (2026-09-26) ──────
+
+  Kullanım koşulları §3 sunucuyla çelişiyordu: "puan yalnızca ders anlatana yazılır"
+  (Topluluk oyları da puan basıyor) ve "kazanılan puan 30 günde yanar" (ders ve topluluk
+  kazancı vadesiz). Metin gerçeğe çekildi (app/kosullar.jsx, web pages/Kosullar.jsx aynı
+  gün, aynı cümleler).
+
+  SÜRÜM ARTMADI ve bu bir istisna değil, kuralın kendisi: sürüm "kullanıcıya hangi metni
+  gösterdim" beyanı. 2026-09-25 bugün HİÇBİR yerde yayında değil (sunucu, web ve mobil
+  main'e birleşmemiş dallarda); bu sürümü kabul etmiş tek bir kullanıcı yok. Yayından
+  önce aynı sürümün metnini düzeltmek, kimseye gösterilmemiş bir metni değiştirmek.
+  2026-09-25 yayına çıktıktan SONRA §3'e dokunan her değişiklik sürümü artırır.
+*/
+
 /** Sunucudaki LegalDocuments.CurrentVersion ile BİREBİR aynı olmalı. */
 export const SOZLESME_SURUMU = '2026-09-25'
 

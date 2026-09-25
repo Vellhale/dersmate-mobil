@@ -16,15 +16,32 @@ import { SOZLESME_TARIHI } from '../src/lib/yasalMetinler'
   kurallar backend'de yaşıyor ve backend iki istemci için de aynı.
 
   Metin ürünün GERÇEK kurallarını anlatıyor, genel bir şablon değil:
-    • Ders almak ücretsiz, puan yalnızca ANLATANA basılıyor ve harcanmıyor
+    • Ders almak ücretsiz, ders puanı yalnızca ANLATANA basılıyor ve harcanmıyor
       (CreditLedgerService — tek bacaklı işlem, escrow yok)
-    • Puan 30 gün sonra yanıyor (EconomyOptions.EarnedCreditValidityDays)
+    • Topluluk'ta net oy eşiği de puan basıyor (CommunityRewardRules,
+      MintCommunityRewardAsync)
+    • Kazanılan puan (ders ve topluluk) YANMIYOR: iki basımda da CreditLot.ExpiresAtUtc
+      = null (CreditLedgerService → MintLessonRewardAsync, MintCommunityRewardAsync)
     • Ders kanıtla kapanıyor, 48 saatte otomatik onaylanıyor (AutoApproveHours)
     • Yaptırım ölçeği: uyarı / süreli askı / kalıcı ban + cihaz banı
       (ApplySanction, BanUser)
 
   ⚠️ TUTULAMAYACAK SÖZ VERME KURALI: bu sayfada anlatılan her mekanizmanın kodda
   karşılığı var. Bir maddeyi değiştirmeden önce kodun hâlâ öyle davrandığını doğrula.
+
+  ⚠️ §3 2026-09-25 SÜRÜMÜNÜN İÇİNDE DÜZELTİLDİ (2026-09-26, yayından önce; web'le aynı
+  metin). Önceki hâli sunucuyla çelişiyordu: "puan YALNIZCA ders anlatana yazılır" (oysa
+  Topluluk oyları da puan basıyor) ve "kazanılan puan 30 günde yanar" (oysa ders kazancı
+  vadesiz açılıyor; EconomyOptions.EarnedCreditValidityDays hâlâ tanımlı ama hiçbir kod
+  onu okumuyor).
+  SOZLESME_SURUMU ARTMADI: 2026-09-25 henüz hiçbir yerde yayında değil (üç yer de main'e
+  birleşmemiş dallarda), bu metni kabul etmiş kullanıcı yok (bkz. src/lib/yasalMetinler.js).
+
+  "Kazandığın puan" bilerek böyle: kayıtta tanımlanan hoş geldin hediyesi
+  (WelcomeBonus) HÂLÂ vadeli (WelcomeCreditValidityDays) ve süresi dolunca yakılıyor.
+  O bir kazanç değil hediye ve unvana da sayılmıyor; ama "puan yanmaz" diye genel bir
+  cümle, kullanıcının kendi puan geçmişindeki eksi satırla çelişirdi. Madde bu yüzden
+  kaynağı adıyla sayıyor.
 
   MOBİLE ÖZGÜ TEK EKLEME §6'da: arkadaşlığı tek taraflı sonlandırma. Web metninde yok ama
   kodda VAR (closeMatch — app/eslesmeler.jsx) ve mağaza incelemesinin kullanıcı üretimli
@@ -85,16 +102,16 @@ export default function Kosullar() {
         </Paragraf>
         <Maddeler>
           <Madde>
-            Puan <Kalin>yalnızca ders anlatana</Kalin> yazılır: her 30 dakikalık blok için
-            50 puan.
+            Puan, onaylanan dersin <Kalin>anlatanına</Kalin> yazılır: her 30 dakikalık blok
+            için 50 puan. Topluluk’ta yeterli net oy toplayan katkıların da puan kazandırır.
           </Madde>
           <Madde>
             Puan <Kalin>harcanmaz</Kalin>. Ders almak için puana ihtiyacın yok; puan yalnızca
             seviyeni ve profilindeki görünürlüğünü belirler.
           </Madde>
           <Madde>
-            Kazanılan puanın geçerlilik süresi <Kalin>30 gündür</Kalin>; süresi dolan puan
-            yanar.
+            Ders anlatarak ve Topluluk katkılarınla kazandığın puanın{' '}
+            <Kalin>süresi dolmaz</Kalin>; bu puan yanmaz.
           </Madde>
           <Madde>Puanın nakit veya başka bir değerle karşılığı yoktur, devredilemez.</Madde>
         </Maddeler>
