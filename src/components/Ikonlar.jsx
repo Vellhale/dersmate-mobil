@@ -361,3 +361,125 @@ export function MenuIkonu(props) {
     </Cizgi>
   )
 }
+
+/*
+  ── PROFİL, AYARLAR VE ALT BİLGİ İKONLARI (2026-09-26) ─────────────────────────
+  Aynı 24'lük ızgara ve çizgi ağırlığı; geometri Lucide'dan (settings, camera,
+  chevron-right, pencil, bell, arrow-up-right), kütüphane yine eklenmedi (dosya başındaki
+  gerekçe geçerli). AyarlarIkonu ve KameraIkonu web'de de AYNI çizimle var (çizimler birebir
+  kuralı); diğer dördü yalnızca mobilde (EvIkonu emsali).
+*/
+
+/** Ayarlar: dişli. Profilim başlığında Ayarlar ekranını açan düğme. */
+export function AyarlarIkonu(props) {
+  return (
+    <Cizgi {...props}>
+      <Path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+      <Circle cx="12" cy="12" r="3" />
+    </Cizgi>
+  )
+}
+
+/** Kamera: profil fotoğrafının köşesindeki "fotoğrafı değiştir" rozeti. */
+export function KameraIkonu(props) {
+  return (
+    <Cizgi {...props}>
+      <Path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z" />
+      <Circle cx="12" cy="13" r="3" />
+    </Cizgi>
+  )
+}
+
+/** Sağ ok ucu (Lucide `chevron-right`): GeriIkonu'nun aynası. Gezinen satırın sonunda
+    "buradan başka ekrana geçilir" işareti; katman açan ya da anında iş yapan satırda YOK. */
+export function SagOkIkonu(props) {
+  return (
+    <Cizgi {...props}>
+      <Path d="m9 18 6-6-6-6" />
+    </Cizgi>
+  )
+}
+
+/** Kalem: düzenleme ("Profili düzenle"). */
+export function KalemIkonu(props) {
+  return (
+    <Cizgi {...props}>
+      <Path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z" />
+      <Path d="m15 5 4 4" />
+    </Cizgi>
+  )
+}
+
+/** Zil: bildirimler ("Bildirim ayarları"). */
+export function ZilIkonu(props) {
+  return (
+    <Cizgi {...props}>
+      <Path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+      <Path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+    </Cizgi>
+  )
+}
+
+/** Dış bağlantı: sağ üste çapraz ok (Lucide `arrow-up-right`). Uygulamadan çıkıp
+    tarayıcıda açılan bağlantının yanında küçük boyutta; ekran okuyucudan gizlenir, anlamı
+    bağlantının erişilebilirlik ipucu taşır. */
+export function DisBaglantiIkonu(props) {
+  return (
+    <Cizgi {...props}>
+      <Path d="M7 7h10v10" />
+      <Path d="M7 17 17 7" />
+    </Cizgi>
+  )
+}
+
+/*
+  ── HAKKIMIZDA SAYFASININ İKONLARI ────────────────────────────────────────────
+  Web'deki components/Ikonlar.jsx'ten BİREBİR taşındı (path'ler harfi harfine aynı).
+  Bu sayfada ikonlar gezinme değil ANLAM taşıyor: her kutucuğun ne anlattığını metni
+  okumadan önce söylüyorlar. Web'deki OnayIkonu (daire içinde tik) bilerek TAŞINMADI:
+  tek çağıranı olan vaat listesi sayfadan kalkıyor, ölü ikon bırakılmaz.
+*/
+
+/** Misyon: fırlatılmış roket (Lucide `rocket`). "Yola çıktık" — duran bir hedef değil. */
+export function RoketIkonu(props) {
+  return (
+    <Cizgi {...props}>
+      <Path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
+      <Path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.9 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
+      <Path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
+      <Path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
+    </Cizgi>
+  )
+}
+
+/** Vizyon: göz. "Oraya bakıyoruz"; iki hattı 20px'te de net kalıyor (web gerekçesi). */
+export function GozIkonu(props) {
+  return (
+    <Cizgi {...props}>
+      <Path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+      <Circle cx="12" cy="12" r="3" />
+    </Cizgi>
+  )
+}
+
+/** Güvence: para dolaşmıyor. Banknot + üzeri çizgi (cüzdan silueti 20px'te bulanıklaşıyordu). */
+export function CuzdansizIkonu(props) {
+  return (
+    <Cizgi {...props}>
+      <Rect x="2.5" y="6" width="19" height="12" rx="2" />
+      <Circle cx="12" cy="12" r="2.5" />
+      <Path d="M3 21 21 3" />
+    </Cizgi>
+  )
+}
+
+/** Güvence: her ders kanıtla kapanır. Kalkan içinde tik; KalkanIkonu'ndan (yönetim rozeti)
+    tik ile ayrışıyor. */
+export function KanitIkonu(props) {
+  return (
+    <Cizgi {...props}>
+      <Path d="M12 3l7 3v5.5c0 4.3-2.9 8.3-7 9.5-4.1-1.2-7-5.2-7-9.5V6z" />
+      <Path d="m9 12 2 2 4-4" />
+    </Cizgi>
+  )
+}
