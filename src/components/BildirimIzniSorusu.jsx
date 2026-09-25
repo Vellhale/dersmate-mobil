@@ -40,10 +40,11 @@ const SEBEPLER = {
 }
 const VARSAYILAN_SEBEP = 'Önemli bir şey olunca haber verelim mi?'
 
-/* Taşıyıcılar ve yükün sınırı — modal ve kart AYNI cümleyi kullanıyor. Metin sunucunun
+/* Taşıyıcılar ve yükün sınırı — modal, kart ve Bildirim ayarları ekranı (app/bildirimler.jsx
+   → Bilgi) AYNI cümleyi kullanıyor; gizlilik §6 aynı olguyu uzun anlatıyor. Metin sunucunun
    gerçek davranışını anlatıyor: mesaj içeriği hiçbir koşulda push'a girmiyor; kişi adı
    yalnızca mesaj ve kabul bildiriminde, o da alıcının kendi arkadaşının adı. */
-const TASIYICI_METNI =
+export const TASIYICI_METNI =
   'Bildirimler Expo, Google ve Apple sunucuları üzerinden iletilir. Bildirimlerde mesaj içeriği yer almaz; istek ve ders bildirimlerinde kimsenin adı geçmez.'
 
 /** Sistem istemi bu dokunuşun ARDINDAN gelecek mi (iOS, hiç sorulmamış)? */

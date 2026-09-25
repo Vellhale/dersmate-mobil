@@ -8,6 +8,7 @@ import { ONIZLEME } from '../src/lib/onizleme'
 import { useBildirim } from '../src/state/BildirimSaglayici'
 import { useInbox } from '../src/state/InboxContext'
 import { Badge, Button, Card, ErrorBox, GeriDugmesi, Loading, Notice } from '../src/components/ui'
+import { TASIYICI_METNI } from '../src/components/BildirimIzniSorusu'
 
 /*
   BİLDİRİM AYARLARI — Profil › "Bildirim ayarları"ndan ve deneme bildirimine dokununca
@@ -95,11 +96,12 @@ export default function BildirimAyarlari() {
         <Card>
           <Text className="mb-2 text-sm font-medium text-slate-700">Bilgi</Text>
           {/* Aydınlatma sorusundaki cümlelerle AYNI içerik (BildirimIzniSorusu): kullanıcı
-              burada, "Aç"a bastığında okuduğundan farklı bir şey görmemeli. */}
+              burada, "Aç"a bastığında okuduğundan farklı bir şey görmemeli. Taşıyıcı cümlesi
+              oradan içe aktarılıyor; elle yazılmış kopyası taşıyıcıları (Expo, Google, Apple)
+              atlamıştı ve gizlilik §6'nın söylediğini bu ekran söylemiyordu. */}
           <Text className="text-sm leading-relaxed text-slate-600">
-            Bildirimlerde mesaj içeriği yer almaz. İstek ve ders bildirimlerinde kimsenin adı
-            geçmez. Gece 22.00–09.00 arasında acil olmayan bildirimler sabaha kalır. Kilit
-            ekranında ne görüneceğini telefonunun ayarları belirler.
+            {TASIYICI_METNI} Gece 22.00–09.00 arasında acil olmayan bildirimler sabaha kalır.
+            Kilit ekranında ne görüneceğini telefonunun ayarları belirler.
           </Text>
           <Pressable
             accessibilityRole="link"

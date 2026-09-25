@@ -29,9 +29,14 @@ import { useAuth } from './AuthContext'
 const IZIN_ANAHTARI = 'peerlearn.izin'
 
 /**
- * Aydınlatma metninin sürümü. IZIN_KATEGORILERI DEĞİŞİRSE bu değer artırılmalıdır: eski
- * metne verilmiş onay, yeni işleme kapsamını meşrulaştırmaz ve izin yeniden sorulmalıdır.
- * Sürüm artınca kullanıcı bildirimi tekrar görür (bkz. gerekiyor).
+ * Aydınlatma metninin sürümü. İZNE TABİ bir kategori (bugün yalnızca analitik) ya da onun
+ * kapsamı DEĞİŞİRSE bu değer artırılmalıdır: eski metne verilmiş onay, yeni işleme
+ * kapsamını meşrulaştırmaz ve izin yeniden sorulmalıdır. Sürüm artınca kullanıcı
+ * bildirimi tekrar görür (bkz. gerekiyor).
+ *
+ * "Zorunlu" kategorinin maddeleri değişince ARTMAZ: orası kapatılamayan, hizmetin gereği
+ * olan saklama ve metni aydınlatmadır, rıza konusu değil. 2026-09-25'te push'un iki cihaz
+ * saklaması oraya bu kuralla eklendi (gerekçe IZIN_KATEGORILERI'nde).
  *
  * Metin ve sürüm bilerek AYNI DOSYADA: web'de ayrı dosyalara düşünce bir kez unutuldu
  * (yeni bir cihaz tercihi eklendi, metin ve sürüm güncellenmedi).
@@ -75,8 +80,10 @@ export const KAPSAYAN_SURUMLER = [IZIN_SURUMU, WEB_IZIN_SURUMU]
  * İZNE TABİ CİHAZ SAKLAMASI — tek liste. ŞU AN BOŞ ve bu bilinçli.
  *
  * Web'de bu listede menü genişliği ve rehber tercihleri vardı; mobilde bu ekranların
- * hiçbiri yok, cihaza yazılan tek şey oturum anahtarı, HWID ve iznin kendisi — üçü de
- * zorunlu kategoride. Liste yine de duruyor, çünkü web'de tam olarak bu liste
+ * hiçbiri yok. Cihaza yazılan oturum anahtarı, HWID, iznin kendisi ve push'un iki kaydı
+ * (bildirim bileşeninin kurulum numarası ile adresi, çevrimdışı çıkışta yazılan unutma
+ * işareti — KEYS.pushUnutulacak) zorunlu kategoride; hizmetin gereği oldukları için buraya
+ * GİRMEZLER. Liste yine de duruyor, çünkü web'de tam olarak bu liste
  * unutulduğu için ısırmış bir hata var: menü tercihi kabuk yenilenirken eklendi, ne
  * kategorilere ne de temizliğe girdi; reddeden kullanıcının cihazına yine de yazılıyordu.
  *
@@ -107,17 +114,38 @@ export const IZIN_KATEGORILERI = [
     anahtar: 'zorunlu',
     baslik: 'Zorunlu veriler',
     zorunlu: true,
+    // "Uygulama çalışmaz" push maddeleri için doğru olmazdı (bildirimsiz uygulama
+    // çalışıyor): cümle her maddenin NEYE gerektiğini söylüyor ve bildirimlerin
+    // ayarının nerede olduğunu gösteriyor. "Orada kapatınca bu kayıtlar silinir"
+    // DEMİYOR, çünkü silinmiyor: bileşenin kurulum numarası en az uygulama kaldırılana
+    // kadar kalıyor (iOS'ta sonrasında da; gizlilik §4).
     aciklama:
-      'Girişin açık kalması ve hesap güvenliği için gerekir. Bunlar olmadan uygulama ' +
-      'çalışmaz, bu yüzden kapatılamaz.',
+      'Girişin açık kalması, hesap güvenliği ve — açtıysan — bildirimlerin telefonuna ' +
+      'ulaşması için gerekir. Bunlar olmadan bu işlevler çalışmaz, bu yüzden burada ' +
+      'kapatılamaz. Hangi bildirimleri alacağını Profil › Bildirim ayarları’ndan seçersin.',
     // Dürüstlük gereği HWID açıkça yazılıyor (web kararı): "sadece oturum bilgisi"
     // demek yanıltıcı olurdu. Reklam kimliği olmadığı da söyleniyor, çünkü "cihaz
     // kimliği" ifadesi mağaza diliyle karışıyor.
+    /*
+      Son iki madde push'la geldi (2026-09-25) ve bilerek BURADA, izne tabi bir
+      kategoride değil: ikisi de hizmetin gereği ve yalnızca kullanıcı bildirim
+      aydınlatmasında "Aç/Devam" dedikten SONRA doğuyor. Kaynaklar gizlilik §4'te
+      (app/gizlilik.jsx) ve metin onunla aynı olguları söylemeli.
+
+      ⚠️ IZIN_SURUMU bu yüzden ARTMADI (kullanıcı kararı). Sürüm, izne TABİ kapsam
+      değişince artar; burası kapatılamayan kategori ve buradaki metin bir aydınlatma,
+      rıza konusu değil. Artırmak izin sayfasını herkese yeniden gösterir ve kullanıcıdan
+      reddedemeyeceği bir şeye "onay" isterdi.
+    */
     maddeler: [
       'Oturum anahtarı — cihazın güvenli anahtar zincirinde saklanır (giriş yapmış kalman için)',
       'Cihaz kimliği (HWID) — banlanan hesabın yeni hesapla dönmesini engellemek için cihaz ' +
         'sinyallerinden üretilir; reklam kimliği DEĞİLDİR, pazarlamada kullanılmaz',
       'Bu izin tercihinin kendisi',
+      'Bildirimleri açtıysan: bildirim bileşeninin rastgele kurulum numarası ve telefonun ' +
+        'bildirim adresi — bildirimlerin bu telefona ulaşması için',
+      'İnternet yokken çıkış yaptıysan: bu telefonun bildirim kaydını bir sonraki açılışta ' +
+        'sunucudan sildirmek için küçük bir işaret (yalnızca çıkış zamanı)',
     ],
   },
   {

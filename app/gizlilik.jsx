@@ -47,6 +47,55 @@ import { SOZLESME_TARIHI } from '../src/lib/yasalMetinler'
      işleniyor. KVKK m.10 "kimlere aktarılabileceğini" soruyor ve cevap yalnızca
      istemci paketine bakarak verilemez. §6 artık sunucu tarafını da sayıyor.
 
+     ⛔ 2026-09-25'ten beri "uygulama doğrudan kimseye bağlanmıyor" YANLIŞ: push
+     bildirimleri açılınca telefon Expo'ya ve işletim sisteminin bildirim hizmetine
+     (Android'de Google FCM, iOS'ta Apple APNs) bağlanıyor. Aşağıdaki push bloğuna bak.
+
+  ─── 2026-09-25: PUSH BİLDİRİMLERİ — SÖZLEŞME SÜRÜMÜ ARTTI ─────────────────
+  §2/§3/§4/§5/§6/§7 push için genişledi; sürüm 2026-09-19 → 2026-09-25 (üç yer birlikte,
+  gerekçe src/lib/yasalMetinler.js). Metin yine KOD OKUNARAK yazıldı:
+    • Sunucuda saklananlar   → Domain/Communication/PushDevice.cs (token, platform, HWID
+                               özeti, kapalı Android kanalları, tarihler),
+                               NotificationPreference.cs (dört tercih, aydınlatma damgası,
+                               erteleme sayacı), Notification.cs (defter: tür, kayıt ve
+                               aktör kimlikleri, zamanlar, sonuç — İÇERİK KOPYALANMIYOR)
+    • Push'un içeriği        → Features/Communication/Bildirimler/BildirimMetni.cs (başlıklar
+                               sabit; ad yalnızca mesaj ve kabulde, istek/ders bildiriminde
+                               konu geçebilir) ve BildirimYuku.cs (data yalnızca tür, url,
+                               alıcı etiketi; etiket HMAC türevi)
+    • Silme noktaları        → Logout, TumOturumlariDusurAsync, DeleteAccount, BanUser,
+                               makbuzdaki DeviceNotRegistered, çevrimdışı çıkıştan sonra forget
+    • Cihazdaki saklama      → src/lib/bildirimler.js (unutma işareti, KEYS.pushUnutulacak) ve
+                               node_modules/expo-notifications ServerRegistrationModule:
+                               rastgele kurulum numarası + son cihaz token'ı; Android'de
+                               noBackupFilesDir, iOS'ta Anahtar Zinciri (ThisDeviceOnly).
+                               "Haftada bir yeniden bildirir": DevicePushTokenAutoRegistration
+                               .fx.ts + utils/updateDevicePushTokenAsync.ts (7 günlük TTL,
+                               exp.host/--/api/v2/push/updateDeviceToken)
+
+  İKİ CÜMLE YANLIŞA DÖNÜŞMÜŞTÜ ve düzeltildi (§6): "uygulamanın konuştuğu tek sunucu
+  dersmate'in kendi sunucusudur" ve "uygulama doğrudan hiçbir üçüncü tarafa bağlanmasa da".
+
+  §2'deki HWID cümlesi ("hiçbir üçüncü tarafa gönderilmez") DOĞRU KALIYOR ve push
+  paragrafı onunla çelişmeyecek biçimde yazıldı: Expo'ya/Google'a/Apple'a giden şey
+  bildirim adresi; HWID özeti yalnızca sunucumuzda, token'ı cihaza bağlamak için duruyor.
+
+  Kilit ekranı cümlesi işletim sisteminin YAPTIĞINDAN FAZLASINI iddia etmiyor: Android
+  kanalları PRIVATE kuruluyor ama kullanıcının telefon ayarı bunu geçersiz kılabilir.
+
+  ⚠️ İKİ DEĞER HENÜZ ÖLÇÜLMEDİ, METİN TASARIMA GÜVENİYOR:
+    1. "Aydınlatmadan önce Firebase'e bağlanılmaz" — plugins/firebase-otomatik-baslatma.js
+       ile sağlanıyor; release APK'da taze kurulumda ağ ölçümüyle doğrulanacak. Ölçüm
+       başka bir şey gösterirse §4 ve §6 düzeltilmeli, Data safety de bu ölçümden sonra.
+    2. Defterin 30 günü ve makbuzların 24 saati sunucunun temizlik işinden
+       (CleanupNotifications / PushReceiptJob) geliyor; iş yazılırken süre değişirse §5
+       burada da değişmeli.
+
+  ⚠️ /gizlilik-uygulama (mağazalara verilecek herkese açık adres) bu turda YOK — ayrı PR.
+  Web'in /gizlilik sayfasına push aynı dalda "mobil uygulamada" kapsamıyla ekleniyor. İki
+  metin aynı olguları söylemeli (taşıyıcılar, süreler, silme noktaları); ifade platforma
+  göre ayrışabilir, olgu ayrışamaz.
+
   ─── 2026-09-22'de DÜZELTİLEN YANLIŞ BEYAN: TELEFON NUMARASI ────────────────
   §2 "isteğe bağlı profil bilgileri" arasında ve §6'da "telefon numaran" yazıyordu.
   TOPLANMIYOR. Ölçüldü: Domain/Identity/User.cs'te PhoneNumber alanı VAR, ama sunucu
@@ -129,8 +178,8 @@ export default function Gizlilik() {
         </Paragraf>
         <Paragraf>
           Verini reklam için kullanmıyoruz, satmıyoruz ve üçüncü taraflara pazarlama
-          amacıyla aktarmıyoruz. Topladığımız her şey ya hesabını çalıştırmak ya da
-          platformu kötüye kullanımdan korumak için.
+          amacıyla aktarmıyoruz. Topladığımız her şey hesabını çalıştırmak, açtıysan sana
+          bildirimle haber vermek ya da platformu kötüye kullanımdan korumak için.
         </Paragraf>
       </Bolum>
 
@@ -166,6 +215,27 @@ export default function Gizlilik() {
           özetini saklıyoruz. Bu özet bir <Kalin>reklam kimliği değildir</Kalin>: reklam için
           kullanılmaz ve hiçbir üçüncü tarafa gönderilmez.
         </Paragraf>
+        {/* HWID cümlesiyle ÇELİŞMEMELİ: dışarı giden bildirim adresi, HWID özeti değil.
+            Özet yalnızca sunucuda, adresi hangi cihaza ait olduğuna bağlamak için duruyor. */}
+        <Paragraf>
+          <Kalin>Bildirim kaydı (yalnızca bildirimleri açarsan):</Kalin> telefonuna bildirim
+          gönderebilmek için telefonunun <Kalin>bildirim adresini</Kalin> (Expo’nun verdiği ve
+          Android’de Google’ın, iPhone’da Apple’ın bildirim adresini taşıyan bir numara),
+          telefonunun türünü (Android ya da iOS), adresin hangi cihazına ait olduğunu bilmek
+          için yukarıdaki cihaz kimliği özetini, Android’de telefon ayarlarından kapattığın
+          bildirim türlerini ve kaydın tarihlerini saklıyoruz. Bildirim adresi bildirimi
+          ileten hizmetlere gider (bkz. §6); cihaz kimliği özeti gitmez.
+        </Paragraf>
+        <Paragraf>
+          <Kalin>Bildirim tercihlerin ve bildirim kayıtları:</Kalin> hangi bildirim türlerini
+          almak istediğin, bildirimlerle ilgili açıklamayı görüp bildirimleri açtığın an,
+          bildirim sorusunu kaç kez ertelediğin ve en son ne zaman ertelediğin (soruyu
+          sık sık tekrarlamamak için). Bildirimleri açmamış olsan da sunucu,
+          sana bildirim gerektiren her olay için kısa bir kayıt tutar: bildirimin türü, olayın
+          ve olayı başlatan kişinin kayıt numaraları, ne zaman gönderildiği ya da neden
+          gönderilmediği. Bildirimin metni ve mesajlarının içeriği bu kayda{' '}
+          <Kalin>kopyalanmaz</Kalin>.
+        </Paragraf>
       </Bolum>
 
       <Bolum no="3" baslik="Neden topluyoruz">
@@ -187,6 +257,15 @@ export default function Gizlilik() {
           <Madde>
             <Kalin>Anlaşmazlıkları çözmek için:</Kalin> ders kanıtları ve şikayet kayıtları.
           </Madde>
+          <Madde>
+            <Kalin>Sana haber vermek için (bildirimler):</Kalin> bildirim adresi, bildirim
+            tercihlerin ve bildirim kayıtları. Yeni mesajı, arkadaş isteğini, ders onayını ve
+            yaklaşan dersi zamanında haber vermek; kapattığın türleri göndermemek; aynı olayı
+            iki kez bildirmemek ve aynı kişinin sana art arda istek bildirimi düşürmesini
+            sınırlamak için. Hukuki sebebi, kullandığın hizmetin parçası olduğu için
+            sözleşmenin ifasıdır (KVKK m.5/2-c). Bildirimler isteğe bağlıdır: açmazsan
+            uygulamanın geri kalanı aynı biçimde çalışır.
+          </Madde>
         </Maddeler>
       </Bolum>
 
@@ -205,6 +284,24 @@ export default function Gizlilik() {
             <Kalin>Arayüz tercihlerin:</Kalin> uygulamanın kendi tercih deposunda tutulur;
             uygulama silinince gider.
           </Madde>
+          {/* İki madde de "zorunlu" kategoride (IzinContext → IZIN_KATEGORILERI) ve orada da
+              yazılı: hizmetin gereği, izne bağlanamaz. IZIN_SURUMU bu yüzden ARTMADI. */}
+          <Madde>
+            <Kalin>Bildirim bileşeninin kayıtları (yalnızca bildirimleri açtıysan):</Kalin>{' '}
+            bildirimlerin bu telefona ulaşabilmesi için bildirim bileşeni rastgele bir kurulum
+            numarası ve telefonun bildirim adresini saklar; adres değiştiğinde ve en geç
+            haftada bir, adresi Expo’ya kendisi yeniden bildirir. Android’de Google’ın
+            bildirim hizmeti de kendi kurulum kimliğini
+            tutar. Android’de bunlar uygulamanın kendi alanında durur ve uygulamayla birlikte
+            silinir; iOS’ta Anahtar Zinciri’nde tutulur ve uygulamayı sildikten sonra da
+            kalabilir. Bildirim tercihlerin cihazda değil, hesabında tutulur.
+          </Madde>
+          <Madde>
+            <Kalin>Bildirim kaydını silme işareti:</Kalin> internet yokken çıkış yaparsan
+            sunucudaki bildirim kaydını o an silemeyiz. Bu durumda cihazın güvenli anahtar
+            deposuna yalnızca çıkış zamanını taşıyan küçük bir işaret yazılır; uygulama bir
+            sonraki açılışta internete ulaşınca kaydı sildirir ve işareti kaldırır.
+          </Madde>
           <Madde>
             <Kalin>Ölçüm ve izleme yok:</Kalin> uygulama hiçbir analitik ya da reklam
             bileşeni içermez. “Yüklenir ama veri göndermez” değil — böyle bir bileşen
@@ -212,7 +309,7 @@ export default function Gizlilik() {
           </Madde>
           <Madde>
             <Kalin>Veri tercihin hesabına ait:</Kalin> Profil ekranındaki “Veri
-            tercihleri”nde yaptığın analitik seçimi dersmate <Kalin>hesabına</Kalin>
+            tercihleri”nde yaptığın analitik seçimi dersmate <Kalin>hesabına</Kalin>{' '}
             kaydedilir ve web sitesinde de geçerli olur. Mobil uygulama bugün hiçbir ölçüm
             yapmadığı için bu tercih burada bir şeyi açıp kapatmaz; ileride ölçüm
             eklenirse, eklenmeden önce senin verdiğin cevaba bakılır.
@@ -233,6 +330,30 @@ export default function Gizlilik() {
           </Madde>
           <Madde>
             <Kalin>Mesajlar:</Kalin> konuşma silinene kadar.
+          </Madde>
+          {/* Süreler ve silme noktaları sunucudan: PushDevice.cs başındaki liste,
+              RefreshToken ömrü (60 gün), temizlik işinin 30 gün / 24 saat değerleri. Son
+              cümledeki sınır BİLEREK yazılı — "çıkınca hemen biter" demek yanlış beyan olurdu. */}
+          <Madde>
+            <Kalin>Bildirim kaydı (telefonunun bildirim adresi):</Kalin> o telefonda çıkış
+            yapana kadar. Çıkış yaptığında, “her yerden çıkış” yaptığında ya da parolanı
+            sıfırladığında, hesabın kalıcı olarak kapatıldığında ya da hesabını sildiğinde
+            hemen silinir. Uygulamayı telefondan kaldırırsan adres geçersizleşir ve kayıt, o adrese
+            bir sonraki bildirim denemesinde silinir. Hesabın geçici olarak askıya alınırsa
+            kayıt silinmez, yalnızca bildirim gönderilmez. İnternet yokken çıkış yaptıysan
+            sunucu çıkışını o an öğrenemez: kayıt, uygulamayı bir sonraki açışında silinir;
+            uygulamayı bir daha hiç açmazsan, o telefondaki oturumunun süresi dolana kadar
+            (en fazla 60 gün) bu telefona bildirim gelmeye devam edebilir.
+          </Madde>
+          <Madde>
+            <Kalin>Bildirim tercihlerin:</Kalin> hesabın açık olduğu sürece.
+          </Madde>
+          <Madde>
+            <Kalin>Bildirim kayıtları: 30 gün.</Kalin> Bildirim gönderildikten ya da
+            gönderilmeyeceği anlaşıldıktan 30 gün sonra silinir. Bildirim hizmetinin teslim
+            makbuzları (bildirimin telefona ulaşıp ulaşmadığını gösteren kısa kayıt) ve aynı
+            sohbetten art arda bildirim gitmesin diye tutulan son gönderim zamanı ise bir
+            gün dolduktan sonraki ilk temizlikte silinir.
           </Madde>
           <Madde>
             <Kalin>Yedekler.</Kalin> Sistemi bir arıza ya da veri kaybından geri
@@ -277,15 +398,20 @@ export default function Gizlilik() {
           sana istek gönderemez ve açık sohbetinize yazamaz. Engellediğin karşı tarafa
           bildirilmez.
         </Paragraf>
+        {/* ⛔ 2026-09-25'e kadar bu paragraf "uygulamanın konuştuğu tek sunucu dersmate'in
+            kendi sunucusudur", altındaki "uygulama doğrudan hiçbir üçüncü tarafa
+            bağlanmasa da" diyordu. Push ile ikisi de YANLIŞ oldu: bildirimler açılınca
+            telefon Expo'ya ve işletim sisteminin bildirim hizmetine bağlanıyor. */}
         <Paragraf>
           Verini pazarlama amacıyla üçüncü taraflara <Kalin>aktarmıyoruz</Kalin> ve
-          satmıyoruz. Mobil uygulama, verini dışarı taşıyan hiçbir üçüncü taraf bileşen
-          (reklam ağı, analitik, çökme raporlama) <Kalin>içermez</Kalin>; uygulamanın
-          konuştuğu tek sunucu dersmate’in kendi sunucusudur.
+          satmıyoruz. Mobil uygulama, verini dışarı taşıyan hiçbir reklam ağı, analitik ya
+          da çökme raporlama bileşeni <Kalin>içermez</Kalin>. Uygulama dersmate’in kendi
+          sunucusuyla konuşur; <Kalin>tek istisna bildirimlerdir</Kalin>: bildirimleri
+          açarsan telefonun, bildirim adresini almak ve güncel tutmak için Expo’ya ve
+          telefonunun bildirim hizmetine (Android’de Google, iPhone’da Apple) bağlanır.
         </Paragraf>
         <Paragraf>
-          <Kalin>Sunucu tarafındaki hizmet sağlayıcılarımız (veri işleyenler).</Kalin>{' '}
-          Uygulama doğrudan hiçbir üçüncü tarafa bağlanmasa da, dersmate’in sunucusu
+          <Kalin>Hizmet sağlayıcılarımız (veri işleyenler).</Kalin> dersmate’in sunucusu
           platformu çalıştırabilmek için birkaç dış hizmetten yararlanıyor. Bunlar verini{' '}
           <Kalin>bizim adımıza ve yalnızca aşağıdaki amaçla</Kalin> işler; kendi amaçları
           için kullanamazlar.
@@ -304,13 +430,43 @@ export default function Gizlilik() {
             <Kalin>Yedek deposu — Google Drive.</Kalin> Yedeklerin sunucu dışındaki kopyası
             burada tutulur (bkz. §5).
           </Madde>
+          {/* Taşıyıcı cümlesi aydınlatma sorusu (BildirimIzniSorusu → TASIYICI_METNI) ve
+              Bildirim ayarları ekranıyla AYNI olguyu söylemeli: kullanıcı "Aç"a basarken
+              okuduğundan farklı bir şeyi burada bulmamalı. */}
+          <Madde>
+            <Kalin>
+              Bildirim iletimi — Expo, Google (Firebase Cloud Messaging) ve Apple (Apple Push
+              Notification service).
+            </Kalin>{' '}
+            Yalnızca bildirimleri açtıysan. Sunucumuz bildirimi Expo’ya verir; Expo onu
+            Android’de Google’ın, iPhone’da Apple’ın bildirim hizmeti üzerinden telefonuna
+            ulaştırır. Onlara giden veri: telefonunun bildirim adresi; bildirimin başlığı ve
+            metni; açıldığında doğru ekrana gidebilmek için bildirimin türü ve{' '}
+            <Kalin>anlamsız, rastgele bir kayıt numarası</Kalin> (sohbetin ya da dersin
+            numarası); aynı telefonda başka bir hesap açıkken bildirimin gösterilmemesi için
+            hesabından türetilen ve geri çözülemeyen kısa bir etiket. Bildirim adresini
+            alırken uygulama Expo’ya ayrıca bildirim bileşeninin rastgele kurulum numarasını
+            gönderir. Mesajlarının içeriği bildirimlere <Kalin>hiçbir zaman</Kalin> girmez;
+            kişi adı yalnızca yeni mesaj ve kabul edilen istek bildiriminde, arkadaşının
+            görünen adı olarak geçer. İstek ve ders bildirimlerinde kimsenin adı geçmez;
+            dersin ya da isteğin konusu geçebilir. E-posta adresin ve cihaz kimliği özetin
+            bu hizmetlere gönderilmez.
+          </Madde>
         </Maddeler>
+        <Paragraf>
+          <Kalin>Kilit ekranı.</Kalin> Telefonunun kilit ekranı ayarına göre bildirimin
+          başlığı görünebilir; içeriğini telefon ayarlarından gizleyebilirsin. iPhone’da:
+          Ayarlar › Bildirimler › Önizlemeleri Göster. Gece 22.00–09.00 arasında acil olmayan
+          bildirimler sabaha kalır; yeni mesaj ve yaklaşan ders bildirimleri beklemez.
+        </Paragraf>
         <Paragraf>
           <Kalin>Yurt dışına aktarım.</Kalin> Bu sağlayıcıların bir kısmı sunucularını{' '}
           <Kalin>Türkiye dışında</Kalin> işletiyor. Bu, KVKK m.9 anlamında yurt dışına
-          aktarım sayılır ve hesap açarken verdiğin onay bunu da kapsar. Aktarılan veri,
+          aktarım sayılır ve hesap açarken verdiğin onay bunu da kapsar; bildirim iletimi
+          için yapılan aktarım ise yalnızca bildirimleri açtığında başlar. Aktarılan veri,
           her sağlayıcı için yalnızca o hizmetin gerektirdiği kadarıdır: e-posta gönderimi
-          için adresin ve iletinin içeriği, yedekleme için yedek dosyalarının kendisi.
+          için adresin ve iletinin içeriği, yedekleme için yedek dosyalarının kendisi,
+          bildirim iletimi için yukarıda sayılan bildirim bilgileri.
         </Paragraf>
         <Paragraf>
           Bu listeyi değiştirdiğimizde metni günceller ve üstteki tarihi değiştiririz
@@ -328,13 +484,24 @@ export default function Gizlilik() {
             <Kalin>Düzeltme:</Kalin> profil bilgilerinin çoğunu doğrudan “Profili düzenle”
             ekranından değiştirebilirsin.
           </Madde>
+          {/* "Profil sekmesi" 2026-09-23'te bayatladı: sekme çubuğu kalktı, Profil'e sol
+              üstteki menüden (çekmece başlığındaki ad) gidiliyor. Silinenler listesi
+              profil/index.jsx → "Silinecekler" ile aynı olmalı. */}
           <Madde>
             <Kalin>Silme:</Kalin> hesabını <Kalin>kendin silebilirsin</Kalin> — Profil
-            sekmesinin en altındaki “Hesabımı sil”. Onay için parolan yeniden sorulur ve
-            işlem geri alınamaz. Kimlik bilgilerin siliniyor; ders geçmişi, kazandırdığın
-            puanlar ve değerlendirmeler karşı tarafa ait olduğu için kalıyor ve orada adın
-            yerine “Silinmiş kullanıcı” görünüyor. Yedeklerdeki kopyaların ne zaman
-            düştüğü §5’te yazılı.
+            ekranının en altındaki “Hesabımı sil” (Profil’e sol üstteki menüden, adına
+            dokunarak gidersin). Onay için parolan yeniden sorulur ve işlem geri alınamaz.
+            Kimlik bilgilerin siliniyor; bildirim ayarların, bildirim kayıtların ve bildirim
+            alan cihazların da siliniyor. Ders geçmişi, kazandırdığın puanlar ve
+            değerlendirmeler karşı tarafa ait olduğu için kalıyor ve orada adın yerine
+            “Silinmiş kullanıcı” görünüyor. Yedeklerdeki kopyaların ne zaman düştüğü §5’te
+            yazılı.
+          </Madde>
+          <Madde>
+            <Kalin>Bildirimleri kapatma:</Kalin> Profil › Bildirim ayarları’ndan bildirim
+            türlerini tek tek kapatabilirsin; kapattığın türler sana hiç gönderilmez.
+            Bildirimleri telefonunun ayarlarından da tamamen kapatabilirsin. Bu telefonun
+            bildirim kaydını sunucudan kaldırmak için çıkış yapman yeterli (bkz. §5).
           </Madde>
           <Madde>
             <Kalin>Erişim ve hesabına giremiyorsan:</Kalin> verinin bir kopyasını alma
