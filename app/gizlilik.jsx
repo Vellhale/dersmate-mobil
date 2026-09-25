@@ -539,7 +539,8 @@ export default function Gizlilik() {
         </Maddeler>
         <MetinBaglantisi
           etiket={ILETISIM_EPOSTA}
-          onPress={() => Linking.openURL(`mailto:${ILETISIM_EPOSTA}`)}
+          /* .catch: posta uygulaması olmayan iPhone'da mailto reddedilir; adres metinde yazılı. */
+          onPress={() => Linking.openURL(`mailto:${ILETISIM_EPOSTA}`).catch(() => {})}
         />
       </Bolum>
 
