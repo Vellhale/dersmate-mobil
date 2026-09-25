@@ -851,9 +851,19 @@ export const api = {
    * Derslerim. Aktif dersler HER ZAMAN tam döner; yalnızca geçmiş sayfalanır
    * (aksiyon bekleyen bir ders sayfanın altında kalmamalı). Mobilde geçmiş,
    * FlatList onEndReached ile 5'erli sayfalarla yüklenir (iş kuralı 4).
+   *
+   * pastStatus ('Completed' | 'Cancelled' | 'Expired') yalnızca GEÇMİŞİ süzer ve
+   * past.totalCount süzülmüş toplam olur; aktif kısım değişmez. Parametre yalnızca
+   * doluysa gönderilir (forumFeed'deki `tag` kuralı); yoksa yanıt bugünküyle aynı.
+   * Geçmiş olmayan bir durum 400 VALIDATION_FAILED. Sunucu parametreyi tanımıyorsa
+   * (eski sürüm) yok sayar ve süzülmemiş geçmiş döner: çağıran öğeleri ayrıca süzmeli.
+   * İmza web'in api.js'iyle aynı; yalnızca sayfa boyutu varsayılanı farklı (web 20).
    */
-  mySessions: (pastPage = 1, pastPageSize = 5) =>
-    request(`/api/v1/sessions?pastPage=${pastPage}&pastPageSize=${pastPageSize}`),
+  mySessions: (pastPage = 1, pastPageSize = 5, pastStatus = null) =>
+    request(
+      `/api/v1/sessions?pastPage=${pastPage}&pastPageSize=${pastPageSize}` +
+        (pastStatus ? `&pastStatus=${encodeURIComponent(pastStatus)}` : ''),
+    ),
   sessionProofs: (sessionId) => request(`/api/v1/sessions/${sessionId}/proofs`),
 
   /** Kanıt görseli için <Image source> nesnesi (uri + Authorization başlığı). */

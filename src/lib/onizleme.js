@@ -388,7 +388,20 @@ const AKTIF_DERSLER = [
     autoApproveDeadlineUtc: null,
     verificationCode: 'DM-7T1N', canComplete: true, canApprove: false, canCancel: false,
   },
+  {
+    // İtirazda: ben öğrenciyim, kanıta itiraz ettim; karar yönetimde. Hiçbir eylem açık
+    // değil ve bekleyen iş sayacına GİRMEZ (dersDurumu.js → eylemBekliyor).
+    sessionId: 's-itiraz', status: 'Disputed', topicName: 'Limit ve Süreklilik', subjectName: 'Matematik',
+    otherUserId: KISILER.mert.userId, otherDisplayName: KISILER.mert.displayName,
+    iAmTutor: false, durationMinutes: 60, mintAmount: 100,
+    scheduledStartUtc: dknOnce(60 * 50), scheduledEndUtc: dknOnce(60 * 49),
+    autoApproveDeadlineUtc: null,
+    verificationCode: 'DM-3R8W', canComplete: false, canApprove: false, canCancel: false,
+  },
 ]
+
+/* Sunucunun geçmiş süzgecinde kabul ettiği durumlar (GetMySessions, pastStatus). */
+const GECMIS_DURUMLARI = ['Completed', 'Cancelled', 'Expired']
 
 const GECMIS_DERSLER = Array.from({ length: 12 }, (_, i) => {
   const konu = KONULAR[i % KONULAR.length]
@@ -532,6 +545,39 @@ const PUAN_HAREKETLERI = Array.from({ length: 27 }, (_, i) => ({
   counterpartDisplayName: i === 26 ? null : Object.values(KISILER)[i % 4].displayName,
   createdAtUtc: dknOnce(60 * 24 * (i + 1)),
 }))
+
+/* ── Topluluk akış tarzı ─────────────────────────────────────────────────── */
+
+/*
+  AKIŞ TARZI — Topluluk kartının görünümü tek bir sabitten geliyor (GonderiKarti.jsx →
+  AKIS_TARZI). Kullanılmayan tarz çürümesin diye önizlemede adres çubuğundan ara sıra
+  açılıp bakılabiliyor:
+
+    ?akis=instagram   kenardan kenara kart, kalın ayraç (varsayılan tarz)
+    ?akis=reddit      ince çizgiyle ayrılan satırlar (eski görünüm)
+    (yok)             null döner; ekran kendi AKIS_TARZI sabitini kullanır
+
+  `?izin=` ile aynı kurallar: açılışta BİR KEZ okunur (sorgu dizesi ilk gezinmede
+  kayboluyor) ve URLSearchParams kullanılmaz. Önizleme dışında her zaman null.
+*/
+const AKIS_TARZLARI = ['instagram', 'reddit']
+
+function adrestenAkisTarzi() {
+  try {
+    const arama = globalThis.location?.search
+    const deger = typeof arama === 'string' ? /[?&]akis=([^&#]*)/.exec(arama)?.[1] : null
+    return AKIS_TARZLARI.includes(deger) ? deger : null
+  } catch {
+    return null
+  }
+}
+
+const ADRES_AKIS_TARZI = ONIZLEME ? adrestenAkisTarzi() : null
+
+/** 'instagram' | 'reddit' | null — Topluluk kartı okur; null ise kendi sabitine düşer. */
+export function onizlemeAkisTarzi() {
+  return ADRES_AKIS_TARZI
+}
 
 /* ── Push bildirimleri ───────────────────────────────────────────────────── */
 
@@ -714,12 +760,23 @@ export const onizlemeApi = {
     }),
   markRead: () => gecikme(null),
 
-  mySessions: (pastPage = 1, pastPageSize = 5) =>
-    gecikme({
+  /* pastStatus sunucudaki gibi: boşsa geçmiş süzülmez (bugünkü davranış); doluysa
+     yalnızca o durum döner ve totalCount SÜZÜLMÜŞ toplamdır; geçmiş olmayan bir durum
+     (Booked, Disputed…) ya da tanımsız değer 400 VALIDATION_FAILED. Aktif kısım hiç
+     etkilenmez. */
+  mySessions: (pastPage = 1, pastPageSize = 5, pastStatus = null) => {
+    if (pastStatus && !GECMIS_DURUMLARI.includes(pastStatus)) {
+      return Promise.reject(
+        sahteHata('Geçmiş süzgeci yalnızca Completed, Cancelled ya da Expired olabilir.', 'VALIDATION_FAILED', 400),
+      )
+    }
+    const gecmis = pastStatus ? GECMIS_DERSLER.filter((s) => s.status === pastStatus) : GECMIS_DERSLER
+    return gecikme({
       active: AKTIF_DERSLER,
       activeTotal: AKTIF_DERSLER.length,
-      past: sayfala(GECMIS_DERSLER, pastPage, pastPageSize),
-    }),
+      past: sayfala(gecmis, pastPage, pastPageSize),
+    })
+  },
   sessionProofs: () =>
     gecikme([{ proofId: 'pr-1', uploadedAtUtc: dknOnce(110), isDuplicateHash: false }]),
   proofImageSource: () => ({ uri: KANIT_GORSELI }),
@@ -830,10 +887,21 @@ export const onizlemeApi = {
   /* ── Forum ────────────────────────────────────────────────────────────────
      Oy ve sayaçlar bellekte tutulur ki önizlemede oy verme gerçekten çalışsın:
      sunucu davranışı (üç durumlu oy + son sayaçların dönmesi) taklit ediliyor. */
-  forumFeed: ({ sort = 'Newest', tag = null, page = 1, pageSize = 20 } = {}) => {
-    let liste = FORUM_GONDERILERI.filter((g) => !tag || g.tag === tag)
-    if (sort === 'Top') liste = [...liste].sort((a, b) => b.upvoteCount - a.upvoteCount)
-    else if (sort === 'Discussed') liste = [...liste].sort((a, b) => b.commentCount - a.commentCount)
+  forumFeed: ({ sort = 'Newest', range = 'All', tag = null, page = 1, pageSize = 20 } = {}) => {
+    /* Sunucu sırası (GetForumFeedHandler): etiket, tarih penceresi, sıralama; eşitlikte
+       yeni olan önce. 'Top' NET oya (artı − eksi) göre, ham artıya göre değil. */
+    const gun = FORUM_PENCERESI_GUN[range]
+    const sinir = gun ? Date.now() - gun * 24 * 60 * 60000 : null
+    const yeniOnce = (a, b) => Date.parse(b.createdAtUtc) - Date.parse(a.createdAtUtc)
+    const olcut = {
+      Top: (a, b) => b.upvoteCount - b.downvoteCount - (a.upvoteCount - a.downvoteCount),
+      Controversial: (a, b) => tartismaPuani(b) - tartismaPuani(a),
+    }[sort]
+    const liste = FORUM_GONDERILERI
+      .filter((g) => !tag || g.tag === tag)
+      .filter((g) => sinir === null || Date.parse(g.createdAtUtc) >= sinir)
+      .sort((a, b) => (olcut ? olcut(a, b) : 0) || yeniOnce(a, b))
+      .map((g) => ({ ...g, firstComment: ilkYorumOnizlemesi(g.postId) }))
     return gecikme(sayfala(liste, page, pageSize))
   },
   createForumPost: () => gecikme('yeni-gonderi'),
@@ -875,14 +943,14 @@ const FORUM_GONDERILERI = [
     myVote: 0, underReview: false, reportCount: 0,
   },
   {
-    postId: 'f-2', tag: 'StudyTips', title: 'Türev çalışırken işe yarayan üç alışkanlık',
+    postId: 'f-2', tag: 'StudyPlan', title: 'Türev çalışırken işe yarayan üç alışkanlık',
     body: 'Bir yıldır türev anlatıyorum ve öğrencilerde en çok işe yarayan üç şeyi yazayım: (1) önce grafik sezgisi, (2) zincir kuralını ayrı bir güne bırakmak, (3) her konu sonunda 10 çıkmış soru.',
     author: { userId: KISILER.elif.userId, displayName: KISILER.elif.displayName, level: 6, isStaff: false },
     createdAtUtc: dknOnce(60 * 8), upvoteCount: 87, downvoteCount: 3, commentCount: 1,
     myVote: 1, underReview: false, reportCount: 0,
   },
   {
-    postId: 'f-3', tag: 'Announcement', title: 'Topluluk kuralları ve moderasyon hakkında',
+    postId: 'f-3', tag: 'Resource', title: 'Topluluk kuralları ve moderasyon hakkında',
     body: 'Merhaba! Forumda kişisel bilgi paylaşımı ve telifli materyal yasak. Üç şikayet alan içerik otomatik olarak incelemeye alınır — silinmez, perdelenir.',
     author: { userId: 'u-yonetim', displayName: 'dersmate ekibi', level: 10, isStaff: true },
     createdAtUtc: dknOnce(60 * 24 * 2), upvoteCount: 142, downvoteCount: 0, commentCount: 0,
@@ -894,6 +962,25 @@ const FORUM_GONDERILERI = [
     author: { userId: KISILER.mert.userId, displayName: KISILER.mert.displayName, level: 4, isStaff: false },
     createdAtUtc: dknOnce(60 * 30), upvoteCount: 3, downvoteCount: 9, commentCount: 0,
     myVote: 0, underReview: true, reportCount: 3,
+  },
+  {
+    // Oturumdaki kullanıcının KENDİ gönderisi: kartta şikayet düğmesi çıkmamalı.
+    postId: 'f-5', tag: 'Question', title: 'Parçalı fonksiyonda türev sorusu',
+    body: 'Kırılma noktasında sağdan ve soldan limit farklı çıkınca "orada türev yok" diyebilir miyiz? Bir örnekle anlatabilecek olan var mı?',
+    author: { userId: BEN.userId, displayName: BEN.displayName, level: 4, isStaff: false },
+    createdAtUtc: dknOnce(60 * 3), upvoteCount: 2, downvoteCount: 0, commentCount: 0,
+    myVote: 0, underReview: false, reportCount: 0,
+  },
+  {
+    /* Uzun, paragraflı metin: akış kartında üç satırda kesilme sınanır. Oylar bilerek
+       ikiye bölünmüş (Tartışmalı sıralamada en üste çıkar) ve 12 gün önce: "Bu hafta"
+       penceresinde yok, "Bu ay"da var. Üç yorumunun ilk ikisi önizlemeye GİRMEZ (biri
+       incelemede, biri engellenen kişinin), yani önizleme üçüncüyü gösterir. */
+    postId: 'f-6', tag: 'Preference', title: 'Tercih listesinde şehir mi, bölüm mü önce gelmeli?',
+    body: 'Puanım iki farklı şehirde aynı bölüme yetiyor. Ailem büyük şehri istiyor, ben ise daha küçük ama bölümü güçlü olan üniversiteyi.\n\nBölümün akreditasyonu, staj imkânları ve yurt durumu arasında nasıl bir sıralama yapmalıyım? Geçen yıl tercih yapanlar neye göre karar verdi, sonradan pişman olduğunuz bir şey oldu mu?\n\nBir de şunu merak ediyorum: ilk tercihleri hayalimdeki bölüme ayırıp alt sıraları garantiye mi bırakmalıyım, yoksa tamamen gerçekçi mi yazmalıyım?',
+    author: { userId: KISILER.zeynep.userId, displayName: KISILER.zeynep.displayName, level: 8, isStaff: false },
+    createdAtUtc: dknOnce(60 * 24 * 12), upvoteCount: 31, downvoteCount: 12, commentCount: 3,
+    myVote: 0, underReview: false, reportCount: 0,
   },
 ]
 
@@ -917,6 +1004,60 @@ const FORUM_YORUMLARI = {
       createdAtUtc: dknOnce(60 * 6), upvoteCount: 3, downvoteCount: 0, myVote: 0, underReview: false,
     },
   ],
+  'f-6': [
+    {
+      // İncelemede (perdeli): ipliğe girer, akış kartındaki önizlemeye GİRMEZ.
+      commentId: 'y-4', body: 'Bunu burada sorma, bana özelden yaz, sana tercih listeni hazırlarım.',
+      author: { userId: KISILER.can.userId, displayName: KISILER.can.displayName, level: 2, isStaff: false },
+      createdAtUtc: dknOnce(60 * 24 * 11), upvoteCount: 0, downvoteCount: 6, myVote: 0, underReview: true,
+    },
+    {
+      // Engellenen kişinin yorumu (ENGELLENENLER): önizlemeye GİRMEZ.
+      commentId: 'y-5', body: 'Büyük şehir her zaman daha iyi, düşünmeye gerek yok.',
+      author: { userId: 'u-burak', displayName: 'Burak Şahin', level: 3, isStaff: false },
+      createdAtUtc: dknOnce(60 * 24 * 11 - 60), upvoteCount: 1, downvoteCount: 4, myVote: 0, underReview: false,
+    },
+    {
+      commentId: 'y-6', body: 'Ben geçen yıl bölümü öne aldım ve iyi ki öyle yapmışım. Staj bağlantıları güçlü olan bölümde ikinci sınıftan itibaren fark hissediliyor; şehre alışılıyor, bölüm değiştirmek ise çok daha zor.',
+      author: { userId: KISILER.mert.userId, displayName: KISILER.mert.displayName, level: 4, isStaff: false },
+      createdAtUtc: dknOnce(60 * 24 * 10), upvoteCount: 9, downvoteCount: 1, myVote: 0, underReview: false,
+    },
+  ],
+}
+
+/*
+  İLK YORUM ÖNİZLEMESİ — sunucudaki ForumPostDto.FirstComment'in taklidi (2026-09-26,
+  sunucuya eklenen alan). Gönderinin EN ESKİ yorumu, ama yalnızca görünür olanı:
+  incelemedeki (perdeli) yorum akışta perdesiz görünmemeli, kaldırılan yorum zaten
+  listede yok. Engellenen kişinin yorumu da atlanır (sunucu engeli iki yönde uyguluyor;
+  önizlemede yalnızca "benim engellediklerim" var). Uygun yorum yoksa null: kart
+  önizleme bloğunu hiç çizmez.
+
+  Biçim ForumCommentPreviewDto: { commentId, body, author, createdAtUtc }. Oy ve durum
+  alanları YOK: önizleme salt okunur, oylama iplikte yapılır. Gövde sunucuda ~200
+  karaktere kısaltılıyor; kart zaten iki satırda kestiği için burada da aynı sınır.
+*/
+const ONIZLEME_GOVDE_SINIRI = 200
+
+function ilkYorumOnizlemesi(postId) {
+  const yorum = (FORUM_YORUMLARI[postId] ?? []).find(
+    (y) => !y.underReview && !engelliMi(y.author.userId),
+  )
+  if (!yorum) return null
+  const body =
+    yorum.body.length > ONIZLEME_GOVDE_SINIRI
+      ? `${yorum.body.slice(0, ONIZLEME_GOVDE_SINIRI).trimEnd()}…`
+      : yorum.body
+  return { commentId: yorum.commentId, body, author: yorum.author, createdAtUtc: yorum.createdAtUtc }
+}
+
+/* Sunucudaki ForumRange penceresi (ForumQueries.cs → PencereBaslangici): 1, 7, 30 gün. */
+const FORUM_PENCERESI_GUN = { Day: 1, Week: 7, Month: 30 }
+
+/* Sunucudaki Tartışmalı formülü: (artı + eksi) × küçük / büyük. Tek yönlü oy 0 alır. */
+function tartismaPuani({ upvoteCount: arti, downvoteCount: eksi }) {
+  if (arti === 0 || eksi === 0) return 0
+  return (arti + eksi) * (Math.min(arti, eksi) / Math.max(1, Math.max(arti, eksi)))
 }
 
 /* Sunucunun üç durumlu oy davranışını taklit eder ve SON sayaçları döndürür —
