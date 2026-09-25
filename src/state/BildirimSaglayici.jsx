@@ -148,6 +148,16 @@ export function BildirimSaglayici({ children }) {
   const [tercihHatasi, setTercihHatasi] = useState(null)
   const [kanallar, setKanallar] = useState(TUM_KANALLAR_ACIK)
   const [alici, setAlici] = useState(null)
+  /*
+    BU CİHAZIN KAYDI — son kayıt denemesinin sonucu: null (bu oturumda henüz sonuç yok) |
+    { kayitli, sebep }. Ayarlar ekranı "Bildirimler açık" rozetini YALNIZCA kayitli:true
+    iken çiziyor: izin + aydınlatma tek başına bildirimin geleceğini göstermiyor (Firebase
+    dosyası yoksa token alınamıyor, sunucu bağlı olmayan oturumu kaydetmiyor) ve ekran
+    eskiden bu durumda da "Bu telefon bildirim alıyor" diyordu.
+  */
+  const [kayit, setKayit] = useState(null)
+  const [kayitSuruyor, setKayitSuruyor] = useState(false)
+  const kayitSayaci = useRef(0)
   // Kök modalın durumu. kip: 'otomatik' (bir eylemden sonra kendiliğinden; kapatmak
   // erteleme sayılır) | 'elle' (ayarlar ekranındaki düğme; kapatmak bir şey saymaz).
   const [soru, setSoru] = useState({ acik: false, kip: null, sebep: null })
@@ -263,16 +273,32 @@ export function BildirimSaglayici({ children }) {
     async (kanalDurumu) => {
       if (!pushDesteklenirMi() || !guncel()) return null
       if (!izinRef.current?.verildi || !tercihRef.current?.aydinlatmaAtUtc) return null
-      if (bekleyenAcildi.current && !(await kararGonder('Acildi'))) return null
-      const kapali = kapaliListe(kanalDurumu ?? (await kanalDurumlari()))
-      const sonuc = await tokenAlVeKaydet({ kapaliKanallar: kapali })
-      if (guncel() && sonuc?.alici) setAlici(sonuc.alici)
-      return sonuc
+      kayitSayaci.current += 1
+      setKayitSuruyor(true)
+      try {
+        // Karar ulaşmadıysa sunucu kaydı zaten almazdı; ekran "kaydedilemedi" desin,
+        // sonuçsuz kalıp sonsuza kadar "kaydediliyor" demesin.
+        const sonuc =
+          bekleyenAcildi.current && !(await kararGonder('Acildi'))
+            ? { kayitli: false, sebep: 'hata' }
+            : await tokenAlVeKaydet({ kapaliKanallar: kapaliListe(kanalDurumu ?? (await kanalDurumlari())) })
+        if (guncel()) {
+          if (sonuc?.alici) setAlici(sonuc.alici)
+          // İptal (hesap değişti, çıkış) bu hesabın sonucu değil: son bilinen korunur.
+          if (sonuc && sonuc.sebep !== 'iptal') setKayit({ kayitli: sonuc.kayitli === true, sebep: sonuc.sebep ?? null })
+        }
+        return sonuc
+      } finally {
+        kayitSayaci.current -= 1
+        if (canli.current) setKayitSuruyor(kayitSayaci.current > 0)
+      }
     },
     [guncel, kararGonder],
   )
   const kaydiDeneRef = useRef(kaydiDene)
   kaydiDeneRef.current = kaydiDene
+  const kayitRef = useRef(kayit)
+  kayitRef.current = kayit
 
   /* ─── Sunulmuş bildirimler → sürüm sayaçları ─────────────────────────────── */
 
@@ -313,6 +339,7 @@ export function BildirimSaglayici({ children }) {
     canli.current = true
     // Önceki hesabın etiketi bu hesabın bildirimlerini süzmesin; yenisi GET ile gelir.
     setAktifAlici(null)
+    setKayit(null)
     let iptal = false
     ;(async () => {
       // İzin isteminden ÖNCE kanallar: Android 13+ kanal yokken istemi hiç göstermiyor.
@@ -454,6 +481,8 @@ export function BildirimSaglayici({ children }) {
   const aydinlatildi = Boolean(tercihler?.aydinlatmaAtUtc)
   useEffect(() => {
     // YALNIZCA aydınlatmadan sonra: dinleyici token üretmez ama kayıt yolunu açar.
+    // ⛔ Olay tokenDinle'de SÜZÜLÜYOR: kaydın kendi token okuması da bu olayı yayıyor ve
+    // süzülmeseydi kayıt kendini sonsuza kadar tetiklerdi (gerekçe bildirimler.js'te).
     if (!aydinlatildi) return undefined
     return tokenDinle(() => kaydiDeneRef.current())
   }, [aydinlatildi])
@@ -682,6 +711,25 @@ export function BildirimSaglayici({ children }) {
     setKanallar(kanal)
   }, [guncel])
 
+  /*
+    Ayarlar ekranı odaktayken: bu oturumda kayıt sonucu yoksa ya da kayıt yenilenmeliyse
+    (öne gelişteki kuralın aynısı) dener. Gerekli, çünkü tercihler bu ekranın odağında
+    okunabiliyor ve o okuma kaydı TETİKLEMİYOR: çevrimdışı açılıp sonra internete bağlanan
+    kullanıcı burada, kayıt hiç denenmemişken sonsuza kadar "kaydediliyor" görürdü.
+    Kapı (izin + aydınlatma) kaydiDene'nin içinde; burada ayrıca bakılmıyor.
+  */
+  const kaydiDenetle = useCallback(async () => {
+    const kanal = await kanalDurumlari()
+    if (!guncel()) return null
+    if (kayitRef.current && !bekleyenAcildi.current && !kayitYenilenmeli(kapaliListe(kanal))) {
+      return kayitRef.current
+    }
+    return kaydiDeneRef.current(kanal)
+  }, [guncel])
+
+  /** "Yeniden dene": koşulsuz kayıt denemesi (kapı yine kaydiDene'de). */
+  const kaydiYenile = useCallback(() => kaydiDeneRef.current(), [])
+
   const deger = useMemo(
     () => ({
       destekleniyor: pushDesteklenirMi(),
@@ -690,6 +738,8 @@ export function BildirimSaglayici({ children }) {
       tercihHatasi,
       kanallar,
       alici,
+      kayit,
+      kayitSuruyor,
       aydinlatmaGerekli: gerekli,
       soru,
       soruGoster,
@@ -703,6 +753,8 @@ export function BildirimSaglayici({ children }) {
       tercihDegistir,
       tercihleriTazele: tercihleriYukle,
       durumuTazele,
+      kaydiDenetle,
+      kaydiYenile,
     }),
     [
       izin,
@@ -710,6 +762,8 @@ export function BildirimSaglayici({ children }) {
       tercihHatasi,
       kanallar,
       alici,
+      kayit,
+      kayitSuruyor,
       gerekli,
       soru,
       soruGoster,
@@ -723,6 +777,8 @@ export function BildirimSaglayici({ children }) {
       tercihDegistir,
       tercihleriYukle,
       durumuTazele,
+      kaydiDenetle,
+      kaydiYenile,
     ],
   )
 
@@ -741,6 +797,8 @@ const BOS = Object.freeze({
   tercihHatasi: null,
   kanallar: TUM_KANALLAR_ACIK,
   alici: null,
+  kayit: null,
+  kayitSuruyor: false,
   aydinlatmaGerekli: false,
   soru: { acik: false, kip: null, sebep: null },
   soruGoster: () => false,
@@ -754,17 +812,20 @@ const BOS = Object.freeze({
   tercihDegistir: () => {},
   tercihleriTazele: () => Promise.resolve(null),
   durumuTazele: () => Promise.resolve(),
+  kaydiDenetle: () => Promise.resolve(null),
+  kaydiYenile: () => Promise.resolve(null),
 })
 
 /**
  * Bildirim bağlamı:
  *  destekleniyor, izin, tercihler, tercihHatasi, kanallar ({ kimlik: 'acik'|'kapali' }),
- *  alici, aydinlatmaGerekli,
+ *  alici, kayit (null | { kayitli, sebep }), kayitSuruyor, aydinlatmaGerekli,
  *  soruGoster(sebep, { gecikme? }) — eylemden sonra kendiliğinden modal (koşullar içeride),
  *  soruAc(sebep?) — ayarlar ekranından elle,
  *  kartGorunur(kimlik) / kartiSahiplen(kimlik) — satır içi kart (BildirimIzniKarti),
  *  aydinlatmayiOnayla({ modalKapat? }), ertele(),
- *  tercihDegistir(kategori, acik), tercihleriTazele(), durumuTazele().
+ *  tercihDegistir(kategori, acik), tercihleriTazele(), durumuTazele(),
+ *  kaydiDenetle() — sonuç yoksa ya da yenilenmeliyse kayıt, kaydiYenile() — koşulsuz.
  */
 export function useBildirim() {
   return useContext(BildirimBaglami) ?? BOS

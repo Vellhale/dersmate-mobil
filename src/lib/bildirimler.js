@@ -1,6 +1,6 @@
 import * as Application from 'expo-application'
 import Constants from 'expo-constants'
-import { isRunningInExpoGo } from 'expo'
+import { isRunningInExpoGo, requireOptionalNativeModule } from 'expo'
 import { Linking, Platform } from 'react-native'
 import { api, loadSession } from './api'
 import { getHwidHash } from './hwid'
@@ -473,9 +473,30 @@ export function gelenDinle(dinleyici) {
  * İşletim sistemi yeni bir cihaz token'ı verdi (FCM/APNs döndürdü). Dinleyici
  * tokenAlVeKaydet'i çağırmalı; Expo token'ı orada yeniden türetilir. YALNIZCA aydınlatma
  * görüldükten sonra kurulmalı. @returns vazgeç
+ *
+ * ⛔ OLAY SÜZÜLMEDEN DİNLEYİCİYE VERİLMEZ — yoksa kayıt kendini sonsuza kadar tetikler.
+ * Yerel modül onDevicePushToken olayını yalnızca token DÖNÜNCE değil, HER
+ * getDevicePushTokenAsync çağrısında yayıyor (Android PushTokenModule.kt: resolve'un hemen
+ * ardından onNewToken; iOS PushTokenModule.swift: didRegister içinde resolve + sendEvent).
+ * Kaydın kendisi o çağrıyı yapıyor: kayıt → olay → dinleyici → kayıt → olay … Uygulama
+ * öndeyken saniyede birkaç tur exp.host + PUT /push/devices demekti (simülasyonda tek
+ * kayıt 2 sn'de 34 PUT üretti). Expo'nun kendi otomatik kaydı da aynı olayı
+ * hasDeviceTokenChangedAsync ile süzmek zorunda kalmış.
+ *
+ * Süzgeç: yalnızca bu süreçte GÖRÜLMEMİŞ bir token dinleyiciye gider. Henüz hiç token
+ * okunmadıysa olay da yok sayılır — sıradaki kayıt güncel token'ı zaten okuyacak.
+ * Kendi çağrımızın yankısı token'ı kaydetmemizden ÖNCE gelirse (olay ile sözün sırası
+ * garanti değil) en fazla BİR fazladan tur olur: o turun yankısında token artık görülmüş.
  */
 export function tokenDinle(dinleyici) {
-  return dinle((d) => N.addPushTokenListener(d), dinleyici)
+  return dinle(
+    (d) => N.addPushTokenListener(d),
+    (olay) => {
+      const yeni = typeof olay?.data === 'string' && olay.data ? olay.data : null
+      if (!yeni || !sonCihazTokeni || yeni === sonCihazTokeni) return
+      dinleyici(olay)
+    },
+  )
 }
 
 /** Uygulamayı AÇAN son dokunuş (soğuk açılış). Senkron biçim: Async olanı SDK 57'de eskidi. */
@@ -579,25 +600,38 @@ const ONIZLEME_TOKENI = 'ExponentPushToken[onizleme]'
 const YENILEME_ARALIGI_MS = 30 * 60 * 1000
 const IPTAL = Object.freeze({ kayitli: false, sebep: 'iptal' })
 
-// Bu süreçte getExpoPushTokenAsync başarılı oldu mu: unutma işareti yalnızca o zaman
-// anlamlı (token yoksa sunucuda bu cihaz adına unutulacak kayıt da olamaz).
+// Bu süreçte getExpoPushTokenAsync başarılı oldu mu: unutma işareti yazmanın bir koşulu
+// (diğeri diskteki kayıt bayrağı, bkz. buKurulumdaKayitliMi).
 let tokenAlindi = false
 
+// Bu süreçte en son okunan CİHAZ token'ı (FCM/APNs). YALNIZCA tokenDinle'nin süzgeci ve
+// kayitYenilenmeli için; sunucuya giden değer bu DEĞİL, diske de yazılmaz.
+let sonCihazTokeni = null
+
 /*
-  Token HER ÇAĞRIDA yeniden okunuyor, hiçbir yerde saklanmıyor (ne bellekte ne diskte):
-  işletim sistemi token'ı döndürebiliyor ve kapanışta tutulan eski değer, sunucuya yanlış
-  cihaz adresi yazdırırdı. Aynı token için ağ maliyeti yok — Firebase/APNs önbelleğinden
-  geliyor, Expo çağrısı idempotent.
+  Expo token'ı HER ÇAĞRIDA yeniden okunuyor ve saklanmıyor (ne bellekte ne diskte):
+  işletim sistemi cihaz token'ını döndürebiliyor ve kapanışta tutulan eski değer, sunucuya
+  yanlış cihaz adresi yazdırırdı. Aynı token için ağ maliyeti yok — Firebase/APNs
+  önbelleğinden geliyor, Expo çağrısı idempotent.
+
+  Cihaz token'ı AYRICA okunup getExpoPushTokenAsync'e veriliyor (paket aynısını içeride
+  yapıyor): değerini bilmek, token dinleyicisinin kendi çağrımızın yankısını ayırt etmesi
+  için gerekli (tokenDinle).
 */
 async function expoTokeniAl() {
-  const { data } = await N.getExpoPushTokenAsync({ projectId: PROJE_KIMLIGI })
+  const cihaz = await N.getDevicePushTokenAsync()
+  if (typeof cihaz?.data === 'string' && cihaz.data) sonCihazTokeni = cihaz.data
+  const { data } = await N.getExpoPushTokenAsync({ projectId: PROJE_KIMLIGI, devicePushToken: cihaz })
   tokenAlindi = true
   return data
 }
 
 let kayitUcusu = null
 let kayitSirada = null // { istek, soz, coz } — uçuş bitince gönderilecek EN SON istek
-let sonKayit = null // { sahip, zaman, kanallar } — son BAŞARILI (kayitli:true) kayıt
+let sonKayit = null // { sahip, zaman, kanallar, cihazTokeni } — son BAŞARILI (kayitli:true) kayıt
+// Kayıt bayrağı (KEYS.pushKayitli) bu oturumda diske yazıldı mı: her 30 dakikalık
+// yenilemede SecureStore'a yeniden yazılmasın. oturumKapandi sıfırlar.
+let kayitBayragiYazildi = false
 
 /**
  * Token'ı al ve PUT /push/devices ile oturumdaki hesaba bağla.
@@ -609,7 +643,8 @@ let sonKayit = null // { sahip, zaman, kanallar } — son BAŞARILI (kayitli:tru
  * yapıldıysa İPTAL edilir (sonuç { sebep: 'iptal' }).
  *
  * ASLA FIRLATMAZ. Dönüş: { kayitli, alici?, sebep? } — sebep: 'oturum-yok' |
- * 'desteklenmiyor' | 'aydinlatma' | 'izin' | 'iptal' | 'hata'.
+ * 'desteklenmiyor' | 'aydinlatma' | 'izin' | 'iptal' | 'hata' | 'sunucu' (sunucu kaydı
+ * almadı: aydınlatma damgası yok ya da bu cihazın en yeni oturumu aktif değil).
  *
  * @param secenekler.kapaliKanallar verilmezse telefon ayarlarından okunur.
  */
@@ -626,6 +661,17 @@ export function tokenAlVeKaydet(secenekler = {}) {
   })
   kayitSirada = { istek, soz, coz }
   return soz
+}
+
+/*
+  İptal edilen uçuş token okumuş olabilir ve getExpoPushTokenAsync Expo'nun otomatik
+  kaydını her çağrıda yeniden AÇIYOR (bkz. otomatikKaydiKapat). Çıkış o sırada
+  kapatmışsa, oturumsuz kalan telefonda yeniden açık kalmasın. Arada başka hesap girdiyse
+  dokunulmaz: onun kaydı açık olmasını istiyor.
+*/
+function iptalEt() {
+  if (!oturumSahibi()) otomatikKaydiKapat()
+  return IPTAL
 }
 
 function kayitBaslat(istek) {
@@ -657,7 +703,7 @@ async function kaydet({ sahip, kapaliKanallar: verilen }) {
     const token = ONIZLEME ? ONIZLEME_TOKENI : await expoTokeniAl()
     const kanallar = [...(verilen ?? (await kapaliKanallar()))].sort()
     const hwidHash = ONIZLEME ? 'onizleme-hwid' : await getHwidHash()
-    if (sahip !== oturumSahibi()) return IPTAL
+    if (sahip !== oturumSahibi()) return iptalEt()
 
     const yanit = await api.registerPushDevice({
       token,
@@ -666,17 +712,23 @@ async function kaydet({ sahip, kapaliKanallar: verilen }) {
       kapaliKanallar: kanallar,
     })
     // Yanıt beklenirken çıkış ya da hesap değişimi: etiket de başarı da artık başkasının.
-    if (sahip !== oturumSahibi()) return IPTAL
+    if (sahip !== oturumSahibi()) return iptalEt()
 
     if (typeof yanit?.alici === 'string') setAktifAlici(yanit.alici)
     const kayitli = yanit?.kayitli === true
     if (kayitli) {
-      sonKayit = { sahip, zaman: Date.now(), kanallar: kanallar.join(',') }
-      // Başarılı kayıt token satırını bu hesaba TAŞIDI: bekleyen unutma artık gereksiz
-      // (ve yapılırsa bu kaydı silerdi).
-      if (!ONIZLEME) await secure.set(KEYS.pushUnutulacak, null)
+      sonKayit = { sahip, zaman: Date.now(), kanallar: kanallar.join(','), cihazTokeni: sonCihazTokeni }
+      if (!ONIZLEME) {
+        // Başarılı kayıt token satırını bu hesaba TAŞIDI: bekleyen unutma artık gereksiz
+        // (ve yapılırsa bu kaydı silerdi).
+        await secure.set(KEYS.pushUnutulacak, null)
+        if (!kayitBayragiYazildi) {
+          await secure.set(KEYS.pushKayitli, String(Date.now()))
+          kayitBayragiYazildi = true
+        }
+      }
     }
-    return { kayitli, alici: yanit?.alici ?? null }
+    return { kayitli, alici: yanit?.alici ?? null, sebep: kayitli ? null : 'sunucu' }
   } catch (hata) {
     // Firebase dosyası yok, ağ yok, Expo erişilemez, sunucu uçları henüz yok… Hepsi
     // "bildirimsiz ama çalışan uygulama" demek; bir sonraki öne gelişte yeniden denenir.
@@ -694,6 +746,9 @@ async function kaydet({ sahip, kapaliKanallar: verilen }) {
 export function kayitYenilenmeli(kapaliKanallarListesi = []) {
   if (!sonKayit || sonKayit.sahip !== oturumSahibi()) return true
   if (Date.now() - sonKayit.zaman >= YENILEME_ARALIGI_MS) return true
+  // Son başarılı kayıttan sonra yeni bir cihaz token'ı görüldü ama kaydı tamamlanamadı:
+  // token dinleyicisi aynı token'ı bir daha tetiklemez (süzgeç), yenilemeyi bu yakalar.
+  if (sonCihazTokeni && sonKayit.cihazTokeni !== sonCihazTokeni) return true
   return [...kapaliKanallarListesi].sort().join(',') !== sonKayit.kanallar
 }
 
@@ -702,16 +757,28 @@ export function kayitYenilenmeli(kapaliKanallarListesi = []) {
 /*
   Çıkışta sunucu (LogoutHandler) bu cihazın push kaydını siliyor. Çıkış isteği ağa
   ulaşmazsa kayıt sunucuda kalır ve telefona önceki hesabın bildirimleri gelmeye devam
-  eder. Bu üçlü o boşluğu kapatıyor: çıkış ulaşmadıysa işaret yazılır, sonraki açılışta
+  eder. Bu bölüm o boşluğu kapatıyor: çıkış ulaşmadıysa işaret yazılır, sonraki açılışta
   (oturumlu ya da oturumsuz) token yeniden okunup POST /push/devices/forget çağrılır.
 
   Mobil AYRI bir silme isteği atmaz; normal yolda silmeyi sunucunun çıkışı yapıyor.
 
-  ⚠️ BİLİNEN SINIR: uygulama çevrimdışı AÇILIP çevrimdışı çıkış yapılırsa bu süreçte token
-  hiç alınamamış olur ve işaret yazılmaz (token yoksa unutma da Firebase'i aydınlatmasız
-  başlatabilirdi). Kayıt, en yeni oturumun ömrü dolana kadar (60 gün) sunucuda kalır;
-  sunucunun gönderim süzgeci "bu cihazın en yeni oturumu aktif mi" diye bakıyor ve
-  çıkış hiç ulaşmadığı için o oturum aktif görünür.
+  İKİ ANAHTAR, İKİ SORU (ikisi de SecureStore, "zorunlu" kategori, gizlilik §4):
+  • KEYS.pushKayitli    — "bu kurulum push'a kaydoldu": ilk başarılı kayıtta yazılır,
+                          kayıt sunucudan silinince (ulaşan çıkış, başarılı forget) gider.
+  • KEYS.pushUnutulacak — "çıkış ulaşmadı, kaydı unuttur": yalnızca çevrimdışı çıkışta.
+
+  Birincisi neden var (2026-09-25 düzeltmesi): işaret eskiden yalnızca BU SÜREÇTE token
+  alındıysa yazılıyordu. Uygulama çevrimdışı AÇILIP çevrimdışı çıkış yapılınca token hiç
+  alınamamış oluyor, işaret yazılmıyor, kayıt sunucuda bağlı kalıyordu (çıkış hiç ulaşmadığı
+  için en yeni oturum aktif) ve çıkış yapılmış telefonun kilit ekranına 60 güne kadar
+  önceki hesabın mesaj bildirimleri gidiyordu — gizlilik §5 ise "bir sonraki açılışta
+  silinir" diyordu. Süreç bayrağı tek başına bu yüzden yetmiyor.
+  Bayrak aynı zamanda AYDINLATMANIN KANITI: unutmak için token istemek Firebase'e/APNs'e ve
+  Expo'ya gitmek demek; bu kurulumda kayıt yapılmışsa o akışa aydınlatmayla çoktan
+  girilmiştir. Kayıt hiç yapılmamışsa sunucuda unutulacak bir satır da yoktur.
+
+  ⚠️ KALAN SINIR: çevrimdışı çıkıştan sonra uygulama bir daha hiç (internetle) açılmazsa
+  kayıt, en yeni oturumun ömrü dolana kadar (60 gün) bağlı kalır — gizlilik §5'te yazılı.
 */
 
 /** İşaret var mı? */
@@ -720,14 +787,58 @@ export async function unutmaBekliyorMu() {
   return Boolean(await secure.get(KEYS.pushUnutulacak))
 }
 
+/*
+  Kayıt bayrağı BU KURULUMA mı ait? iOS Keychain uygulama silinip kurulsa da YAŞIYOR:
+  önceki kurulumun bayrağıyla işaret yazılsaydı, sonraki açılıştaki unutma bu kurulumda
+  aydınlatma görülmeden APNs'e ve Expo'ya giderdi (unutmaCalistir'daki kurulum denetimi
+  işaretin kendi zamanına bakıyor ve o yeni işaret onu geçerdi). Bayat bayrak silinir.
+*/
+async function buKurulumdaKayitliMi() {
+  const zaman = Number(await secure.get(KEYS.pushKayitli))
+  if (!zaman) return false
+  try {
+    const kurulum = await Application.getInstallationTimeAsync()
+    if (kurulum && kurulum.getTime() > zaman) {
+      await secure.set(KEYS.pushKayitli, null)
+      return false
+    }
+  } catch {
+    /* kurulum zamanı okunamadı: bayrağa güvenilir (unutmaCalistir'la aynı tercih) */
+  }
+  return true
+}
+
 /**
  * Çıkışın sunucu çağrısı ulaşmadıysa (oturumuSonlandir → false) çağrılır. İşareti
- * yalnızca bu süreçte token alındıysa yazar. @returns yazıldı mı
+ * yalnızca bu kurulumda kayıt yapıldıysa (diskteki bayrak) ya da bu süreçte token
+ * alındıysa yazar. @returns yazıldı mı
  */
 export async function unutmaIsaretle() {
-  if (!N || !tokenAlindi) return false
+  if (!N) return false
+  if (!tokenAlindi && !(await buKurulumdaKayitliMi())) return false
   await secure.set(KEYS.pushUnutulacak, String(Date.now()))
   return true
+}
+
+/**
+ * Çıkışın sunucu çağrısı sonuçlanınca (AuthContext.logout) çağrılır. Asla fırlatmaz.
+ * @param ulasti oturumuSonlandir'ın sonucu
+ * @param cikisAni çıkışa basıldığı an (ms) — o andan SONRA yazılmış kayıt bayrağı, arada
+ *   giriş yapıp kaydolan başka bir oturuma ait; silinmez.
+ */
+export async function cikisSonuclandi(ulasti, cikisAni) {
+  if (!N) return
+  try {
+    if (!ulasti) {
+      await unutmaIsaretle()
+      return
+    }
+    // Sunucu çıkışta bu cihazın satırını sildi: "kaydoldu" bayrağının da işi bitti.
+    const zaman = Number(await secure.get(KEYS.pushKayitli))
+    if (zaman && zaman <= cikisAni) await secure.set(KEYS.pushKayitli, null)
+  } catch {
+    /* depolama yazılamadı: en kötü ihtimalle bir sonraki çevrimdışı çıkışta fazladan bir forget */
+  }
 }
 
 let unutmaSozu = null
@@ -766,9 +877,16 @@ export function unutmaCalistir() {
     try {
       await api.forgetPushDevice(await expoTokeniAl())
       await secure.set(KEYS.pushUnutulacak, null)
+      // Satır silindi; kayıt bayrağı da gider. Oturumluysak sıradaki kayıt yeniden yazar.
+      await secure.set(KEYS.pushKayitli, null)
+      kayitBayragiYazildi = false
       return true
     } catch {
       return false
+    } finally {
+      // Token okuma Expo'nun otomatik kaydını yeniden açtı (otomatikKaydiKapat). Oturum
+      // yoksa kapatılır; varsa sıradaki kayıt zaten açık istiyor.
+      if (!oturumSahibi()) await otomatikKaydiKapat()
     }
   })().finally(() => {
     unutmaSozu = null
@@ -776,23 +894,76 @@ export function unutmaCalistir() {
   return unutmaSozu
 }
 
+/* ─── Expo'nun otomatik sunucu kaydı ───────────────────────────────────────── */
+
+/*
+  expo-notifications'ın KENDİ kayıt mekanizması: getExpoPushTokenAsync her çağrıda onu
+  kalıcı olarak AÇIYOR (build/getExpoPushTokenAsync.js → setAutoServerRegistrationEnabledAsync
+  (true)) ve açık kaldıkça paket, içe aktarıldığı HER AÇILIŞTA (DevicePushTokenAutoRegistration
+  .fx.js) oturuma bakmadan cihaz token'ını FCM/APNs'ten istiyor, token değişince ya da
+  7 günde bir exp.host/--/api/v2/push/updateDeviceToken'a kurulum numarasıyla POST ediyor.
+
+  Bizim kaydımız ona muhtaç değil: her kayıt getExpoPushTokenAsync'ten geçiyor ve Expo'daki
+  eşlemeyi o çağrı güncelliyor. Ama kapatılmazsa çıkıştan sonra da, aynı kurulumda
+  aydınlatmayı REDDEDEN ikinci bir hesap açıkken de cihaz Google/Apple ve Expo ile
+  konuşmaya devam ederdi — "akış yalnızca Aç/Devam'dan sonra" ilkesinin ve gizlilik §7'deki
+  "çıkış yapman yeterli" cümlesinin tersi. Oturum kapanınca kapatılıyor; bir sonraki
+  başarılı kayıt kendiliğinden yeniden açar.
+
+  ⚠️ iOS'TA PAKETİN KENDİ KAPATMASI ÇALIŞMIYOR: setAutoServerRegistrationEnabledAsync(false)
+  yerel modüle null geçiriyor, iOS'taki imza ise opsiyonel olmayan String
+  (ServerRegistrationModule.swift → setRegistrationInfoAsync) ve Expo Modules null'ı
+  reddediyor (DynamicStringType). Hata olursa aynı yerel modüle "kapalı" kaydı doğrudan
+  yazılıyor: DevicePushTokenAutoRegistration.fx.js isEnabled false'u "kapalı" sayıyor.
+  Kapatma, sakladığı son cihaz token'ını da siliyor; kurulum numarası ayrı kayıtta, kalıyor.
+
+  ⛔ Kayıt AÇIK DEĞİLSE hiçbir şey yazılmaz: iOS yolu Anahtar Zinciri'ne bir öğe
+  yazıyor ve bildirimleri hiç açmamış kullanıcının her çıkışında bu öğe doğardı — gizlilik
+  §4 bileşenin kayıtlarını "yalnızca bildirimleri açtıysan" diye anlatıyor.
+*/
+export async function otomatikKaydiKapat() {
+  if (!N) return
+  let modul = null
+  try {
+    modul = requireOptionalNativeModule('NotificationsServerRegistrationModule')
+    const kayit = JSON.parse((await modul?.getRegistrationInfoAsync?.()) ?? 'null')
+    if (!kayit?.isEnabled) return
+  } catch {
+    /* okunamadı ya da bozuk: kapatmayı yine de dene */
+  }
+  try {
+    await N.setAutoServerRegistrationEnabledAsync(false)
+    return
+  } catch {
+    /* iOS: null geçilemiyor — aşağıdaki yola düş */
+  }
+  try {
+    await modul?.setRegistrationInfoAsync(JSON.stringify({ isEnabled: false }))
+  } catch {
+    /* yut: bir sonraki oturum kapanışında yeniden denenir */
+  }
+}
+
 /* ─── Oturum kapanışı ──────────────────────────────────────────────────────── */
 
 /**
  * Çıkışta ve onAuthExpired'da çağrılır: yerel durumu sıfırlar, sıradaki kaydı iptal
- * eder, bildirim merkezini boşaltır ve rozeti sıfırlar. Kilit ekranında önceki hesabın
- * bildirimleri kalmasın. Ateşle-unut: beklenmez, asla fırlatmaz.
+ * eder, Expo'nun otomatik kaydını kapatır, bildirim merkezini boşaltır ve rozeti
+ * sıfırlar. Kilit ekranında önceki hesabın bildirimleri kalmasın. Ateşle-unut:
+ * beklenmez, asla fırlatmaz.
  */
 export function oturumKapandi() {
   setAktifAlici(null)
   setAktifSohbet(null)
   aydinlatmaTamam = false
   sonKayit = null
+  kayitBayragiYazildi = false
   if (kayitSirada) {
     const sira = kayitSirada
     kayitSirada = null
     sira.coz(IPTAL)
   }
+  otomatikKaydiKapat()
   tumBildirimleriKapat()
 }
 

@@ -35,8 +35,8 @@ const IZIN_ANAHTARI = 'peerlearn.izin'
  * bildirimi tekrar görür (bkz. gerekiyor).
  *
  * "Zorunlu" kategorinin maddeleri değişince ARTMAZ: orası kapatılamayan, hizmetin gereği
- * olan saklama ve metni aydınlatmadır, rıza konusu değil. 2026-09-25'te push'un iki cihaz
- * saklaması oraya bu kuralla eklendi (gerekçe IZIN_KATEGORILERI'nde).
+ * olan saklama ve metni aydınlatmadır, rıza konusu değil. 2026-09-25'te push'un cihaz
+ * saklamaları (iki madde) oraya bu kuralla eklendi (gerekçe IZIN_KATEGORILERI'nde).
  *
  * Metin ve sürüm bilerek AYNI DOSYADA: web'de ayrı dosyalara düşünce bir kez unutuldu
  * (yeni bir cihaz tercihi eklendi, metin ve sürüm güncellenmedi).
@@ -80,12 +80,13 @@ export const KAPSAYAN_SURUMLER = [IZIN_SURUMU, WEB_IZIN_SURUMU]
  * İZNE TABİ CİHAZ SAKLAMASI — tek liste. ŞU AN BOŞ ve bu bilinçli.
  *
  * Web'de bu listede menü genişliği ve rehber tercihleri vardı; mobilde bu ekranların
- * hiçbiri yok. Cihaza yazılan oturum anahtarı, HWID, iznin kendisi ve push'un iki kaydı
- * (bildirim bileşeninin kurulum numarası ile adresi, çevrimdışı çıkışta yazılan unutma
- * işareti — KEYS.pushUnutulacak) zorunlu kategoride; hizmetin gereği oldukları için buraya
- * GİRMEZLER. Liste yine de duruyor, çünkü web'de tam olarak bu liste
- * unutulduğu için ısırmış bir hata var: menü tercihi kabuk yenilenirken eklendi, ne
- * kategorilere ne de temizliğe girdi; reddeden kullanıcının cihazına yine de yazılıyordu.
+ * hiçbiri yok. Cihaza yazılan oturum anahtarı, HWID, iznin kendisi ve push'un kayıtları
+ * (bildirim bileşeninin kurulum numarası ile adresi, kayıt bayrağı — KEYS.pushKayitli —
+ * ve çevrimdışı çıkışta yazılan unutma işareti — KEYS.pushUnutulacak) zorunlu kategoride;
+ * hizmetin gereği oldukları için buraya GİRMEZLER. Liste yine de duruyor, çünkü web'de
+ * tam olarak bu liste unutulduğu için ısırmış bir hata var: menü tercihi kabuk
+ * yenilenirken eklendi, ne kategorilere ne de temizliğe girdi; reddeden kullanıcının
+ * cihazına yine de yazılıyordu.
  *
  * YENİ BİR CİHAZ TERCİHİ EKLEYEN: anahtarı buraya ekle, IZIN_KATEGORILERI'ne karşılık
  * gelen bir kategori yaz ve IZIN_SURUMU'nü artır. Üçü birlikte yapılmazsa iki şeyden biri
@@ -144,8 +145,9 @@ export const IZIN_KATEGORILERI = [
       'Bu izin tercihinin kendisi',
       'Bildirimleri açtıysan: bildirim bileşeninin rastgele kurulum numarası ve telefonun ' +
         'bildirim adresi — bildirimlerin bu telefona ulaşması için',
-      'İnternet yokken çıkış yaptıysan: bu telefonun bildirim kaydını bir sonraki açılışta ' +
-        'sunucudan sildirmek için küçük bir işaret (yalnızca çıkış zamanı)',
+      'Bildirimleri açtıysan: bu telefonun bildirimlere kaydolduğu an ve, internet yokken ' +
+        'çıkış yaptıysan, çıkış zamanı — bildirim kaydını çıkışta ya da bir sonraki ' +
+        'açılışta sunucudan sildirebilmek için',
     ],
   },
   {

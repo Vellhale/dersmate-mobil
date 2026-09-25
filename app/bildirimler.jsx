@@ -45,10 +45,14 @@ export default function BildirimAyarlari() {
     tercihler,
     tercihHatasi,
     kanallar,
+    kayit,
+    kayitSuruyor,
     soruAc,
     tercihDegistir,
     tercihleriTazele,
     durumuTazele,
+    kaydiDenetle,
+    kaydiYenile,
   } = useBildirim()
 
   /*
@@ -57,12 +61,15 @@ export default function BildirimAyarlari() {
     gelişte en fazla 5 dakikada bir okuyor. Kurulumun odağı ATLANMIYOR (useOnePlanaGelince
     değil): sağlayıcının elindeki değer oturum başındaki değer, ekranın ilk hâli de taze
     olmalı.
+
+    Tercihlerden SONRA kayıt denetlenir (kaydiDenetle): aydınlatma damgası bu okumayla
+    gelmiş olabilir ve tercih okuması kaydı kendiliğinden tetiklemiyor. İzin ve damga
+    yoksa kaydiDene hiçbir şey yapmaz.
   */
   useFocusEffect(
     useCallback(() => {
-      durumuTazele()
-      tercihleriTazele()
-    }, [durumuTazele, tercihleriTazele]),
+      Promise.all([durumuTazele(), tercihleriTazele()]).then(() => kaydiDenetle())
+    }, [durumuTazele, tercihleriTazele, kaydiDenetle]),
   )
 
   return (
@@ -81,8 +88,11 @@ export default function BildirimAyarlari() {
           izin={izin}
           tercihler={tercihler}
           tercihHatasi={tercihHatasi}
+          kayit={kayit}
+          kayitSuruyor={kayitSuruyor}
           onSor={() => soruAc('ayarlar')}
           onTazele={tercihleriTazele}
+          onKaydiYenile={kaydiYenile}
         />
 
         <TercihlerKarti
@@ -125,7 +135,10 @@ export default function BildirimAyarlari() {
 /*
   BU CİHAZ — beş hâl, her birinin TEK bir eylemi var:
     desteklenmiyor (Expo Go, web, önizleme, yerel modülü olmayan eski kabuk) → eylem yok
-    izin + aydınlatma                → "Bildirimler açık" rozeti
+    izin + aydınlatma                → cihazın KAYIT sonucu (KayitDurumu):
+                                        kayıtlı → "Bildirimler açık" rozeti; sonuç yok →
+                                        "kaydediliyor"; kaydedilemedi → amber uyarı +
+                                        "Yeniden dene"
     izin var, aydınlatma yok          → "Bildirimleri aç" (Android 7–12'nin ilk hâli; telefon
                                         ayarlarından açanlar da) — aydınlatma modalı
     izin yok, sorulabilir             → "Bildirimlere izin ver" — aydınlatma modalı, ardından
@@ -133,7 +146,17 @@ export default function BildirimAyarlari() {
     izin yok, sorulamaz (reddedildi)  → amber uyarı + "Ayarları aç"
   Modal elle açılıyor (soruAc): kapatmak erteleme SAYILMAZ, kullanıcı kendisi istedi.
 */
-function BuCihazKarti({ destekleniyor, izin, tercihler, tercihHatasi, onSor, onTazele }) {
+function BuCihazKarti({
+  destekleniyor,
+  izin,
+  tercihler,
+  tercihHatasi,
+  kayit,
+  kayitSuruyor,
+  onSor,
+  onTazele,
+  onKaydiYenile,
+}) {
   let icerik
   if (!destekleniyor || izin?.destekleniyor === false) {
     icerik = (
@@ -145,14 +168,7 @@ function BuCihazKarti({ destekleniyor, izin, tercihler, tercihHatasi, onSor, onT
   } else if (izin == null) {
     icerik = <Loading label="Bildirim izni okunuyor…" />
   } else if (izin.verildi && tercihler?.aydinlatmaAtUtc) {
-    icerik = (
-      <View className="gap-2">
-        <Badge tone="success">Bildirimler açık</Badge>
-        <Text className="text-sm leading-relaxed text-slate-600">
-          Bu telefon bildirim alıyor. Hangi durumlarda bildirim alacağını aşağıdan seçebilirsin.
-        </Text>
-      </View>
-    )
+    icerik = <KayitDurumu kayit={kayit} suruyor={kayitSuruyor} onYenidenDene={onKaydiYenile} />
   } else if (izin.verildi && !tercihler) {
     // Aydınlatma damgası sunucuda; okunamadan "açık" da "kapalı" da denemez.
     icerik = tercihHatasi ? (
@@ -203,6 +219,42 @@ function BuCihazKarti({ destekleniyor, izin, tercihler, tercihHatasi, onSor, onT
       <Text className="mb-2 text-sm font-medium text-slate-700">Bu cihaz</Text>
       {icerik}
     </Card>
+  )
+}
+
+/*
+  İZİN VE AYDINLATMA TAMAM — ama bildirimin gelip gelmeyeceğini KAYIT söylüyor. Kayıt
+  sessizce düşebiliyor: Firebase dosyasız derlenmiş Android paketi token alamıyor, Firebase
+  otomatik başlatması kapalıyken token verilip verilmediği henüz ölçülmedi, sunucu bu
+  cihazın en yeni oturumu aktif değilse kaydı almıyor. Bunları kullanıcıya söyleyen başka
+  bir yer yok (Deneme kartı ancak denenirse konuşuyor).
+  Rozet (brand = olumlu durum) YALNIZCA kayitli:true iken; kaydedilemediyse amber (dikkat).
+  Metin sebebe göre iki türlü: sunucu reddettiyse ağ değil oturum sorunudur ve yeniden
+  giriş kaydı yeniler (yeni oturum bu cihaza bağlı doğar); geri kalanı ağ ya da taşıyıcı.
+*/
+function KayitDurumu({ kayit, suruyor, onYenidenDene }) {
+  if (kayit?.kayitli) {
+    return (
+      <View className="gap-2">
+        <Badge tone="success">Bildirimler açık</Badge>
+        <Text className="text-sm leading-relaxed text-slate-600">
+          Bu telefon bildirim alıyor. Hangi durumlarda bildirim alacağını aşağıdan seçebilirsin.
+        </Text>
+      </View>
+    )
+  }
+  if (!kayit) return <Loading label="Bu telefon bildirimlere kaydediliyor…" />
+  return (
+    <View className="gap-3">
+      <Notice tone="warning">
+        {kayit.sebep === 'sunucu'
+          ? 'Bu telefon bildirimlere kaydedilemedi, bu yüzden buraya bildirim gelmiyor. Yeniden dene; sorun sürerse çıkış yapıp yeniden giriş yapmak kaydı yeniler.'
+          : 'Bu telefon bildirimlere kaydedilemedi, bu yüzden buraya bildirim gelmiyor. İnternet bağlantını kontrol edip yeniden dene.'}
+      </Notice>
+      <Button variant="secondary" className="self-start" loading={suruyor} onPress={onYenidenDene}>
+        Yeniden dene
+      </Button>
+    </View>
   )
 }
 

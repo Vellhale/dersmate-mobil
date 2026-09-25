@@ -51,6 +51,13 @@ export const KEYS = {
      kategoride (hizmetin gereği; IzinContext → zorunlu kategori metni ve gizlilik §4'te
      beyan edilir, IZIN_SURUMU ARTMAZ — kullanıcı kararı 2026-09-25). */
   pushUnutulacak: 'peerlearn.pushUnutulacak',
+  /* "Bu kurulum push'a kaydoldu" bayrağı — SecureStore'da, değeri ilk başarılı kaydın
+     anı (ms). Yalnızca unutma işaretinin yazılıp yazılmayacağını söylüyor: işaret eskiden
+     "bu süreçte token alındı mı"ya bağlıydı ve uygulama çevrimdışı açılıp çevrimdışı
+     çıkış yapılınca hiç yazılmıyordu (bildirimler.js → buKurulumdaKayitliMi). Kayıt
+     sunucudan silinince (ulaşan çıkış, başarılı forget) silinir. Aynı kasa ve kategori,
+     aynı gerekçeyle ayrı anahtar: çıkışta oturum kaydıyla birlikte silinmemeli. */
+  pushKayitli: 'peerlearn.pushKayitli',
 }
 
 /* SecureStore anahtarlarında nokta geçersiz ([A-Za-z0-9._-] izinli aslında; nokta

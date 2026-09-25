@@ -65,7 +65,8 @@ import { SOZLESME_TARIHI } from '../src/lib/yasalMetinler'
                                alıcı etiketi; etiket HMAC türevi)
     • Silme noktaları        → Logout, TumOturumlariDusurAsync, DeleteAccount, BanUser,
                                makbuzdaki DeviceNotRegistered, çevrimdışı çıkıştan sonra forget
-    • Cihazdaki saklama      → src/lib/bildirimler.js (unutma işareti, KEYS.pushUnutulacak) ve
+    • Cihazdaki saklama      → src/lib/bildirimler.js (kayıt bayrağı KEYS.pushKayitli, unutma
+                               işareti KEYS.pushUnutulacak; çıkışta otomatikKaydiKapat) ve
                                node_modules/expo-notifications ServerRegistrationModule:
                                rastgele kurulum numarası + son cihaz token'ı; Android'de
                                noBackupFilesDir, iOS'ta Anahtar Zinciri (ThisDeviceOnly).
@@ -292,18 +293,26 @@ export default function Gizlilik() {
           <Madde>
             <Kalin>Bildirim bileşeninin kayıtları (yalnızca bildirimleri açtıysan):</Kalin>{' '}
             bildirimlerin bu telefona ulaşabilmesi için bildirim bileşeni rastgele bir kurulum
-            numarası ve telefonun bildirim adresini saklar; adres değiştiğinde ve en geç
-            haftada bir, adresi Expo’ya kendisi yeniden bildirir. Android’de Google’ın
-            bildirim hizmeti de kendi kurulum kimliğini
-            tutar. Android’de bunlar uygulamanın kendi alanında durur ve uygulamayla birlikte
-            silinir; iOS’ta Anahtar Zinciri’nde tutulur ve uygulamayı sildikten sonra da
-            kalabilir. Bildirim tercihlerin cihazda değil, hesabında tutulur.
+            numarası ve telefonun bildirim adresini saklar; oturumun açıkken adres
+            değiştiğinde ve en geç haftada bir, adresi Expo’ya kendisi yeniden bildirir.
+            Çıkış yaptığında bu yeniden bildirim durur ve bileşenin sakladığı adres silinir;
+            kurulum numarası kalır. Android’de Google’ın bildirim hizmeti de kendi kurulum
+            kimliğini tutar. Android’de bunlar uygulamanın kendi alanında durur ve
+            uygulamayla birlikte silinir; iOS’ta Anahtar Zinciri’nde tutulur ve uygulamayı
+            sildikten sonra da kalabilir. Bildirim tercihlerin cihazda değil, hesabında
+            tutulur.
           </Madde>
+          {/* İki anahtar: KEYS.pushKayitli ve KEYS.pushUnutulacak (storage.js). Birincisi
+              2026-09-25'te eklendi: işaret yalnızca "bu süreçte token alındıysa" yazılıyordu
+              ve uygulama çevrimdışı açılıp çevrimdışı çıkış yapılınca hiç yazılmıyordu —
+              §5'in "bir sonraki açılışta silinir" cümlesi o durumda tutmuyordu. */}
           <Madde>
-            <Kalin>Bildirim kaydını silme işareti:</Kalin> internet yokken çıkış yaparsan
-            sunucudaki bildirim kaydını o an silemeyiz. Bu durumda cihazın güvenli anahtar
-            deposuna yalnızca çıkış zamanını taşıyan küçük bir işaret yazılır; uygulama bir
-            sonraki açılışta internete ulaşınca kaydı sildirir ve işareti kaldırır.
+            <Kalin>Bildirim kaydını silmek için iki küçük işaret (yalnızca bildirimleri
+            açtıysan):</Kalin> bu telefon bildirimlere kaydolunca cihazın güvenli anahtar
+            deposuna kaydın zamanı yazılır. İnternet yokken çıkış yaparsan sunucudaki
+            bildirim kaydını o an silemeyiz; o zaman yanına çıkış zamanı yazılır ve uygulama
+            bir sonraki açılışta internete ulaşınca kaydı sildirir. İki işaret de kayıt
+            sunucudan silindiğinde (çıkışta ya da o sonraki açılışta) kaldırılır.
           </Madde>
           <Madde>
             <Kalin>Ölçüm ve izleme yok:</Kalin> uygulama hiçbir analitik ya da reklam
@@ -335,18 +344,31 @@ export default function Gizlilik() {
             <Kalin>Mesajlar:</Kalin> konuşma silinene kadar.
           </Madde>
           {/* Süreler ve silme noktaları sunucudan: PushDevice.cs başındaki liste,
-              RefreshToken ömrü (60 gün), temizlik işinin 30 gün / 24 saat değerleri. Son
-              cümledeki sınır BİLEREK yazılı — "çıkınca hemen biter" demek yanlış beyan olurdu. */}
+              RefreshToken ömrü (60 gün, her yenilemede baştan), temizlik işinin 30 gün /
+              24 saat değerleri. Son cümledeki sınır BİLEREK yazılı — "çıkınca hemen biter"
+              demek yanlış beyan olurdu.
+
+              ⚠️ 2026-09-25'te düzeltildi: "uygulamayı kaldırırsan kayıt bir sonraki bildirim
+              denemesinde silinir" diyordu. Deneme ancak oturum canlıyken oluyor: dağıtıcı
+              yalnızca BAĞLI cihazları sorguluyor (DispatchNotifications → OturumBagi) ve
+              oturum dolduktan sonra satırı silen bir iş YOK (CleanupNotifications yalnızca
+              defteri ve kısma tablosunu temizliyor). Son cümle bugünkü sunucuyu anlatıyor;
+              "en geç" bir ÜST SINIR: sunucuya bağlı olmayan satırları süreyle silen bir
+              temizlik eklenirse cümle yanlış olmaz ama o süre buraya (ve web §5'e) yazılmalı. */}
           <Madde>
             <Kalin>Bildirim kaydı (telefonunun bildirim adresi):</Kalin> o telefonda çıkış
             yapana kadar. Çıkış yaptığında, “her yerden çıkış” yaptığında ya da parolanı
             sıfırladığında, hesabın kalıcı olarak kapatıldığında ya da hesabını sildiğinde
-            hemen silinir. Uygulamayı telefondan kaldırırsan adres geçersizleşir ve kayıt, o adrese
-            bir sonraki bildirim denemesinde silinir. Hesabın geçici olarak askıya alınırsa
-            kayıt silinmez, yalnızca bildirim gönderilmez. İnternet yokken çıkış yaptıysan
-            sunucu çıkışını o an öğrenemez: kayıt, uygulamayı bir sonraki açışında silinir;
+            hemen silinir. Hesabın geçici olarak askıya alınırsa kayıt silinmez, yalnızca
+            bildirim gönderilmez. İnternet yokken çıkış yaptıysan sunucu çıkışını o an
+            öğrenemez: kayıt, uygulamayı internete bağlıyken bir sonraki açışında silinir;
             uygulamayı bir daha hiç açmazsan, o telefondaki oturumunun süresi dolana kadar
-            (en fazla 60 gün) bu telefona bildirim gelmeye devam edebilir.
+            (en fazla 60 gün) bu telefona bildirim gelmeye devam edebilir. Uygulamayı
+            telefondan kaldırırsan adres geçersizleşir; oturumunun süresi dolmadan sana bir
+            bildirim gönderilirse kayıt o gönderimde silinir. Oturumunun süresi, uygulamayı
+            o telefonda son kullandığın andan 60 gün sonra dolar; bundan sonra o telefona
+            bildirim gönderilmez, kayıt ise sunucuda kullanılmadan durur ve en geç hesabını
+            sildiğinde silinir.
           </Madde>
           <Madde>
             <Kalin>Bildirim tercihlerin:</Kalin> hesabın açık olduğu sürece.
@@ -451,8 +473,9 @@ export default function Gizlilik() {
             alırken uygulama Expo’ya ayrıca bildirim bileşeninin rastgele kurulum numarasını
             gönderir. Mesajlarının içeriği bildirimlere <Kalin>hiçbir zaman</Kalin> girmez;
             kişi adı yalnızca yeni mesaj ve kabul edilen istek bildiriminde, arkadaşının
-            görünen adı olarak geçer. İstek ve ders bildirimlerinde kimsenin adı geçmez;
-            dersin ya da isteğin konusu geçebilir. E-posta adresin ve cihaz kimliği özetin
+            görünen adı olarak geçer. Diğer istek bildirimlerinde ve ders bildirimlerinde
+            kimsenin adı geçmez; dersin ya da isteğin konusu geçebilir. E-posta adresin ve
+            cihaz kimliği özetin
             bu hizmetlere gönderilmez.
           </Madde>
         </Maddeler>

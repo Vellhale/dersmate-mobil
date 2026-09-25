@@ -326,7 +326,7 @@ GEREK KALMADI; varsayılan davranış zaten istediğimiz sonucu veriyor.
 `PrivacyInfo.xcprivacy`'si yalnızca UserDefaults / `CA92.1` beyan ediyor; uygulama
 manifestinde zaten var. Push token'ı `NSPrivacyCollectedDataTypeDeviceID` altında sayılıyor
 (o da zaten beyanlı), yeni kod `Application.getInstallationTimeAsync` (unutma işaretinin
-yeniden kurulum kontrolü) `C617.1` kapsamında. iOS paketinde Firebase YOK (APNs doğrudan),
+ve kayıt bayrağının yeniden kurulum kontrolü) `C617.1` kapsamında. iOS paketinde Firebase YOK (APNs doğrudan),
 yani üçüncü taraf toplama SDK'sı da gelmedi. ⬜ İlk push'lu `.ipa`'da aşağıdaki kontrolle
 doğrulanacak.
 
@@ -470,9 +470,9 @@ METİNLE birlikte taşındı: `app/gizlilik.jsx` §2/§3/§4/§5/§6/§7 ve `Izi
 kategori metni. ⚠️ Mağazaya ilk çıkış bu değerle olacak — ilk yayından SONRAKİ ilk artış,
 yukarıdaki ters sırayı ilk kez gerçekten uygulayacak iş.
 
-`IZIN_SURUMU` (veri izni sayfası) bu turda ARTMADI: push'un iki cihaz saklaması (bildirim
-bileşeninin kurulum numarası/adresi ve çevrimdışı çıkıştaki unutma işareti) izne tabi
-değil, "zorunlu" kategoride. Kural `IzinContext.jsx`'te: sürüm izne TABİ kapsam değişince
+`IZIN_SURUMU` (veri izni sayfası) bu turda ARTMADI: push'un cihaz saklamaları (bildirim
+bileşeninin kurulum numarası/adresi; kayıt bayrağı ve çevrimdışı çıkıştaki unutma
+işareti) izne tabi değil, "zorunlu" kategoride. Kural `IzinContext.jsx`'te: sürüm izne TABİ kapsam değişince
 artar.
 
 ### ⛔ App Store Connect gizlilik politikası ADRESİ istiyor — uygulama içi metin saymaz
@@ -551,6 +551,20 @@ okunmamış toplamından yazılıyor.
   listesinden geçer: `/sohbet/<id>`, `/eslesmeler?sekme=incoming|active`,
   `/dersler?ders=<id>`, `/bildirimler`. Hepsi `dangerouslySingular` (sohbet kimlik
   başına; gerekçe "Korunan iş kuralları" 3).
+- **Token dinleyicisi SÜZÜLMEDEN kayıt tetiklemez** (`tokenDinle`). Yerel modül
+  `onDevicePushToken` olayını her `getDevicePushTokenAsync` çağrısında yayıyor (Android
+  `PushTokenModule.kt` resolve'un hemen ardından, iOS `didRegister`), kaydın kendisi de o
+  çağrıyı yapıyor. Süzgeç kaldırılırsa kayıt kendini sonsuza tetikler: uygulama öndeyken
+  saniyede birkaç tur exp.host + `PUT /push/devices` (28af310'da vardı; simülasyonda tek
+  kayıt 2 sn'de 34 PUT). Derleme sağlaması ve web önizlemesi bunu YAKALAMAZ (önizlemede
+  yerel modül yok). Cihazda doğrulama: açılışta sunucu günlüğünde TEK `PUT /push/devices`.
+- **Çıkışta Expo'nun otomatik kaydı kapatılır** (`otomatikKaydiKapat`, `oturumKapandi`
+  içinde). `getExpoPushTokenAsync` onu her çağrıda kalıcı olarak AÇIYOR ve açık kaldıkça
+  paket her açılışta, oturuma bakmadan FCM/APNs token'ı istiyor, 7 günde bir exp.host'a
+  POST ediyor. ⚠️ iOS'ta paketin kendi kapatması fırlatıyor (`setRegistrationInfoAsync`
+  imzası opsiyonel olmayan `String`, `null` reddediliyor); yedek yol aynı yerel modüle
+  `{"isEnabled":false}` yazıyor. Kayıt açık değilse hiçbir şey YAZILMAZ: yoksa bildirim
+  açmamış kullanıcının her çıkışında Anahtar Zinciri'ne öğe doğardı (gizlilik §4).
 
 ### ⚠️ Tuzaklar ve açık ölçümler
 
@@ -578,15 +592,31 @@ okunmamış toplamından yazılıyor.
   kararı dersin GÜNCEL durumundan verilir (adres türü taşımıyor): onay bekliyorsa
   `ApproveModal`, değilse duruma göre bilgi kutusu. Kökte `IzinSayfasi` ya da bildirim
   sorusu açıkken `ApproveModal` kendiliğinden AÇILMAZ (iOS'ta iki RN Modal üst üste).
-- **Çıkış ve unutma işareti:** `logout` → `oturumKapandi()` → `oturumuSonlandir(rt)`;
-  `false` dönerse `unutmaIsaretle()` (SecureStore, `KEYS.pushUnutulacak`, değeri yalnızca
-  zaman). Cihaz kaydını çıkışta SUNUCU siliyor; mobil ayrı silme isteği atmaz. Açılışta
-  (oturumlu ya da değil) bir kez `unutmaCalistir()` → `POST /push/devices/forget`. iOS
-  Keychain işareti uygulama silinse de taşıdığı için kurulum zamanı işaretten sonraysa
-  işaret ATILIR — yoksa yeni kurulumda aydınlatmasız APNs/Expo çağrısı olurdu.
-  `onAuthExpired`'da işaret yazılmaz (orada oturum zaten ölü). Bilinen sınır: çevrimdışı
-  çıkıştan sonra uygulama bir daha hiç açılmazsa, o cihazın en yeni oturumu dolana kadar
-  (60 gün) bildirim gidebilir — gizlilik §5'te yazılı.
+- **Çıkış ve unutma işareti:** `logout` → `oturumKapandi()` → `oturumuSonlandir(rt)` →
+  `cikisSonuclandi(ulasti, cikisAni)`. Ulaşmadıysa `unutmaIsaretle()`
+  (`KEYS.pushUnutulacak`, değeri yalnızca zaman); ulaştıysa kayıt bayrağı silinir. Cihaz
+  kaydını çıkışta SUNUCU siliyor; mobil ayrı silme isteği atmaz. Açılışta (oturumlu ya da
+  değil) bir kez `unutmaCalistir()` → `POST /push/devices/forget`.
+  İşaret, **kalıcı kayıt bayrağına** bağlı (`KEYS.pushKayitli`, ilk başarılı kayıtta
+  yazılır): eskiden yalnızca "bu süreçte token alındı mı"ya bakılıyordu ve uygulama
+  çevrimdışı açılıp çevrimdışı çıkış yapılınca işaret hiç yazılmıyordu. Bayrak aynı
+  zamanda aydınlatmanın kanıtı: kayıt yapılmamış kurulumda unutmak için token istenmez.
+  iOS Keychain ikisini de uygulama silinse de taşıdığı için kurulum zamanından ESKİ bayrak
+  ve işaret ATILIR — yoksa yeni kurulumda aydınlatmasız APNs/Expo çağrısı olurdu.
+  `onAuthExpired`'da işaret yazılmaz (orada oturum zaten ölü). Kalan sınır: çevrimdışı
+  çıkıştan sonra uygulama bir daha hiç (internetle) açılmazsa, o cihazın en yeni oturumu
+  dolana kadar (60 gün) bildirim gidebilir — gizlilik §5'te yazılı.
+- **Oturumu dolmuş cihazın satırını SUNUCU silmiyor** (2026-09-25 ölçümü, sunucu açığı):
+  dağıtıcı yalnızca bağlı cihazları sorguluyor (`OturumBagi`), `CleanupNotifications`
+  `PushDevices`'a dokunmuyor. Uygulamayı silip 60 gün içinde bildirim almayan kullanıcının
+  satırı hesap silinene kadar kalıyor. Gizlilik §5 bunu "en geç hesabını sildiğinde"
+  diye bugünkü hâliyle söylüyor; sunucuya süreli bir temizlik eklenince süre §5'e (mobil
+  ve web birlikte) yazılmalı.
+- **Bildirim ayarları "Bildirimler açık" rozetini YALNIZCA `kayit.kayitli` iken çizer.**
+  İzin + aydınlatma tek başına yetmiyor (Firebase dosyası yoksa token alınamıyor, sunucu
+  bağlı olmayan oturumu kaydetmiyor); sağlayıcı son kayıt sonucunu (`kayit`,
+  `kayitSuruyor`) bağlama koyuyor, ekran odakta `kaydiDenetle()` çağırıyor ve
+  kaydedilemediyse amber uyarı + "Yeniden dene" gösteriyor.
 - **`useBildirim()` sağlayıcı dışında FIRLATMAZ**, no-op nesne döner (`useAuth` /
   `useInbox` kalıbından bilinçli ayrılış: push isteğe bağlı katman, istek gönderen
   bileşeni düşürmemeli).
@@ -625,7 +655,9 @@ Sessiz saat 22:00–09:00 TR (UTC+3 sabit); mesaj ve yaklaşan ders hatırlatmas
 etkilenmez. Günlük istek özeti 10:00 TR. Ders başına hatırlatmalar: yaklaşan ders 60 ve
 10 dk, otomatik onay 24 ve 2 sa. **İsteğin reddi BİLDİRİLMEZ** (engeli sızdırırdı).
 **Mesaj içeriği push'a HİÇ girmez**; kişi adı yalnızca mesaj ve kabul bildiriminde
-(alıcının kendi arkadaşı), istek ve ders bildiriminde ad yok, konu olabilir. Bunlardan
+(alıcının kendi arkadaşı), diğer istek (yeni istek, düşecek istek özeti) ve ders
+bildiriminde ad yok, konu olabilir. ⚠️ Kabul de `istekler` kanalında: "istek
+bildiriminde ad geçmez" diye kestirme yazmak yanlış (`TASIYICI_METNI` bir kez öyleydi). Bunlardan
 biri değişirse aydınlatma metni, ayarlar ekranı ve gizlilik metni birlikte değişir — ve
 yeni bir ifşaysa `SOZLESME_SURUMU` da.
 
@@ -680,7 +712,11 @@ otomatik onaylanmış dersin eski bildirimi → "tamamlandı ve onaylandı" · i
 "Bu ders iptal edildi." · kabul/ret sonrası son istek de gidince istek bildirimleri
 kalkıyor · Android'de kanal kapatınca ayarlar ekranında amber satır ve "Aç" kanal
 ayarına gidiyor · `__DEV__` yerel deneme düğmeleriyle dört türün yönlendirmesi ·
-Firebase ağ ölçümü (yukarıda) · ilk push'lu `.ipa`'da privacy manifest kontrolü.
+Firebase ağ ölçümü (yukarıda) · ilk push'lu `.ipa`'da privacy manifest kontrolü ·
+açılışta sunucu günlüğünde TEK `PUT /push/devices` (dinleyici döngüsü) · uçak modunda
+aç → çıkış → internetle aç → `forget` geliyor · çıkıştan sonraki soğuk açılışta
+exp.host'a `updateDeviceToken` GİTMİYOR (iOS dahil: yedek kapatma yolu) · Firebase
+dosyasız pakette ayarlar ekranı "kaydedilemedi" diyor.
 
 ---
 

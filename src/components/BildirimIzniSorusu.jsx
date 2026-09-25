@@ -19,7 +19,8 @@ import { Button, Card, Modal } from './ui'
   (Firebase/APNs token'ı, Expo, dersmate sunucusu) BAŞLAMADAN ne olacağı anlatılıyor.
   "Aç/Devam"dan önce hiçbir token alınmıyor; sunucu da aydınlatma damgası olmadan cihaz
   kaydını kabul etmiyor. Metin bu yüzden kısaltılamaz: dört olay türü, taşıyıcılar ve
-  bildirimde NE OLMADIĞI (mesaj içeriği, istek/ders bildiriminde ad) burada söylenmeli.
+  bildirimde NE OLDUĞU ve OLMADIĞI (mesaj içeriği yok; ad yalnızca mesaj ve kabul
+  bildiriminde) burada söylenmeli.
 
   iOS'TA TEK DÜĞME ("Devam") VE KAPATILAMAZ — yalnızca sistem istemi henüz hiç
   görülmemişse (izin belirsiz). Apple'ın izin öncesi ekran kuralı: kendi ekranımızda
@@ -43,9 +44,16 @@ const VARSAYILAN_SEBEP = 'Önemli bir şey olunca haber verelim mi?'
 /* Taşıyıcılar ve yükün sınırı — modal, kart ve Bildirim ayarları ekranı (app/bildirimler.jsx
    → Bilgi) AYNI cümleyi kullanıyor; gizlilik §6 aynı olguyu uzun anlatıyor. Metin sunucunun
    gerçek davranışını anlatıyor: mesaj içeriği hiçbir koşulda push'a girmiyor; kişi adı
-   yalnızca mesaj ve kabul bildiriminde, o da alıcının kendi arkadaşının adı. */
+   yalnızca mesaj ve kabul bildiriminde, o da alıcının kendi arkadaşının adı.
+
+   ⚠️ 2026-09-25'e kadar ikinci cümle "istek ve ders bildirimlerinde kimsenin adı geçmez"
+   diyordu. YANLIŞTI: "Arkadaş isteğin kabul edildi" de bir istek bildirimi (aynı
+   `istekler` kanalı, KANALLAR'daki açıklama "Yeni istek, kabul ve …") ve gövdesinde kabul
+   edenin adı var (sunucu BildirimMetni.IstekKabul). Mesaj bildirimindeki ad da hiç
+   söylenmiyordu. Aydınlatma, veri akışından ÖNCE gösterilen tek metin; olguyu eksik
+   söyleyemez. */
 export const TASIYICI_METNI =
-  'Bildirimler Expo, Google ve Apple sunucuları üzerinden iletilir. Bildirimlerde mesaj içeriği yer almaz; istek ve ders bildirimlerinde kimsenin adı geçmez.'
+  'Bildirimler Expo, Google ve Apple sunucuları üzerinden iletilir. Bildirimlerde mesaj içeriği yer almaz. Kişi adı yalnızca yeni mesaj ve kabul edilen istek bildiriminde, arkadaşının görünen adı olarak geçer; diğer istek ve ders bildirimlerinde ad geçmez.'
 
 /** Sistem istemi bu dokunuşun ARDINDAN gelecek mi (iOS, hiç sorulmamış)? */
 function sistemIstemiGelecek(izin) {
