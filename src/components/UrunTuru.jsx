@@ -93,6 +93,24 @@ const ACILIS_EKRANLARI = ['/', '/kesfet']
 const BOSLUK = 8
 
 /*
+  HALKA PENCERENİN İÇİNDE (2026-09-26, web `ceb18de`'nin karşılığı). Delik = çıpa + BOSLUK
+  ve kenara yapışık çıpada pencerenin DIŞINA taşıyor: hamburger (-ml-2) cihazda x≈7dp'de,
+  delik x≈-1'de başlıyordu. SVG çizgisi (2) kenarın iki yanına 1'er yayıldığı için halkanın
+  sol kenarı tamamen, önizlemede (x=0, y=0) sol ve üst kenarı yarı yarıya görünmüyordu —
+  menü adımında hangi öğenin gösterildiği okunmuyordu (önizlemede ölçüldü). Kutu pencerenin
+  HALKA_PAYI içine kırpılıyor: çıpa kesilmiyor, yalnızca o kenardaki nefes payı daralıyor.
+*/
+const HALKA_PAYI = 2
+
+function pencereIcinde(kutu, genislik, yukseklik) {
+  const sol = Math.max(HALKA_PAYI, kutu.x)
+  const ust = Math.max(HALKA_PAYI, kutu.y)
+  const sag = Math.min(genislik - HALKA_PAYI, kutu.x + kutu.w)
+  const alt = Math.min(yukseklik - HALKA_PAYI, kutu.y + kutu.h)
+  return { x: sol, y: ust, w: Math.max(0, sag - sol), h: Math.max(0, alt - ust) }
+}
+
+/*
   ÇIPA EKRANI — adımın `cipaEkrani` alanı varsa çıpa YALNIZCA o adresteyken okunur
   (tur.js'teki kural; gerekçe orada: monte kalan alttaki ekranın ölçüsü öndekine yanlış
   delik açardı). Alan yoksa ada bakılır; bugün her çıpalı adımda alan var.
@@ -424,12 +442,16 @@ export function UrunTuru() {
     cipa && cipa.y + cipa.height / 2 >= 0 && cipa.y + cipa.height / 2 <= height ? cipa : null
 
   const delik = gorunurDelik
-    ? {
-        x: gorunurDelik.x - BOSLUK,
-        y: gorunurDelik.y - BOSLUK,
-        w: gorunurDelik.width + BOSLUK * 2,
-        h: gorunurDelik.height + BOSLUK * 2,
-      }
+    ? pencereIcinde(
+        {
+          x: gorunurDelik.x - BOSLUK,
+          y: gorunurDelik.y - BOSLUK,
+          w: gorunurDelik.width + BOSLUK * 2,
+          h: gorunurDelik.height + BOSLUK * 2,
+        },
+        width,
+        height,
+      )
     : null
 
   /*

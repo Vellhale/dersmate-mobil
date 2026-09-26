@@ -51,8 +51,10 @@ import { useCallback, useEffect, useRef } from 'react'
  * söylemeye başlar. Anlatılan tek şey mekanizma. "10 basamaklı" istisna: o, ölçeğin
  * kendisi, eşiği değil.
  *
- * EKONOMİ: ders almak ücretsiz, bloke edilen bir şey yok, puan yalnızca ANLATANA
- * yazılır. Yanlış beklenti kuran bir rehber, hiç rehber olmamasından kötüdür.
+ * EKONOMİ: ders almak ücretsiz, bloke edilen bir şey yok, DERS puanı yalnızca ANLATANA
+ * yazılır. Puanın tek kaynağı ders değil: Topluluk'ta yeterli net oy toplayan katkı da
+ * puan getiriyor (Kullanım koşulları §3) — portfolio adımı bu yüzden "tek yol" değil
+ * "asıl kaynak" diyor. Yanlış beklenti kuran bir rehber, hiç rehber olmamasından kötüdür.
  * ─────────────────────────────────────────────────────────────────────────────────
  *
  * ŞEMA: { id, title, body, points, cipa?, cipaEkrani?, yer? }
