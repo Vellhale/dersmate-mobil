@@ -160,7 +160,7 @@ export default function Dersler() {
   // onay sayfasını kendiliğinden AÇMAZ — iOS'ta aynı anda iki RN Modal, biri hiç
   // görünmeyebiliyor (IzinSayfasi → IZIN_KAPANMA_SURESI notu).
   const { mutlakaSor, ayarlarAcik } = useIzin()
-  const { soru } = useBildirim()
+  const { soru, kartGorunur } = useBildirim()
   const ustKatmanAcik = mutlakaSor || ayarlarAcik || soru.acik
 
   const sessionsRef = useRef(sessions)
@@ -645,8 +645,15 @@ export default function Dersler() {
     /* Bildirim kartı — yaklaşan ders varken, sonuç bildiriminin ALTINDA: rezervasyonun
        doğrulama kodu (notice) örtülmez, not alınabilir. Modal değil, çünkü rezervasyon zaten
        bir alt sayfadan dönüyor ve kod tam o an okunmalı. Eğitmen de (dersi o planlamadı)
-       burada görür: "ders yaklaşıyor" en çok onun işine yarıyor. Görünürlük sağlayıcıda. */
-    sekmeUstu = groups.upcoming.length > 0 ? <BildirimIzniKarti kimlik="rezervasyon" /> : null
+       burada görür: "ders yaklaşıyor" en çok onun işine yarıyor. Görünürlük sağlayıcıda.
+
+       kartGorunur BURADA DA sorulur: kart görünmeyecekse null döndürüyor ama öğe yine de
+       dolu sayılıp başlık kabını kuruyordu (baslikDolu). Boş kap liste aralığıyla "Yaklaşan"
+       başlığını 16px aşağı itiyordu (önizlemede ölçüldü: çubuktan 39px, Geçmiş dersler'deki
+       başlık 23px) — bildirimi açmış ya da soruyu bu oturumda görmüş kullanıcıda, yani
+       çoğunlukta. */
+    sekmeUstu =
+      groups.upcoming.length > 0 && kartGorunur('rezervasyon') ? <BildirimIzniKarti kimlik="rezervasyon" /> : null
     bos = aktifYukleniyor ? (
       <Loading />
     ) : sessions.data ? (
@@ -1199,8 +1206,16 @@ function RezervasyonSatiri({ session }) {
         <TarihBlogu utcString={session.scheduledStartUtc} stil={stil} />
 
         <View className="min-w-0 flex-1 gap-1">
-          <View className="flex-row items-start justify-between gap-2">
-            <Text numberOfLines={2} className="min-w-0 shrink text-sm font-semibold leading-snug text-slate-900">
+          {/* SARAR (ders kartındaki başlık satırının kalıbı): dar ekranda ve büyük yazıda rozet
+              konunun ALTINA iner. Sarmasız satırda rozet küçülmüyor, konu sıkışıyordu:
+              320 genişlik ve 1.3 yazıda "Çemberin Analitiği" iki satıra bölünüp "Çe / m…"
+              kalıyordu (önizlemede ölçüldü). Temel genişlik küçük (basis-24): olağan
+              genişlikte rozet yine konunun yanında, satır kısa kalıyor. */}
+          <View className="flex-row flex-wrap items-start justify-between gap-x-2 gap-y-1">
+            <Text
+              numberOfLines={2}
+              className="min-w-0 shrink grow basis-24 text-sm font-semibold leading-snug text-slate-900"
+            >
               {session.topicName}
             </Text>
             <Badge tone={stil.rozet}>{durum}</Badge>
