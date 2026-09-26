@@ -489,6 +489,24 @@ bileşeninin kurulum numarası/adresi; kayıt bayrağı ve çevrimdışı çık�
 işareti) izne tabi değil, "zorunlu" kategoride. Kural `IzinContext.jsx`'te: sürüm izne TABİ kapsam değişince
 artar.
 
+#### ⛔ Birleşme sırası: push PR'ları tasarım dalından önce TEK BAŞINA yayına çıkmaz
+
+`2026-09-25` iki dalda İKİ AYRI METNE karşılık geliyor. `tasarim/profil-dersler-topluluk`
+sürümün içinde, yayından önce düzeltildi (Koşullar §3 puan kaynakları ve hoş geldin puanı,
+Gizlilik §2/§6/§7 Topluluk içeriği, §4/§7 ve HesapSilme yol metinleri); açık push PR'ları
+(mobil #20, sunucu + web #38, ikisi de `main`'e hedefli) aynı sürümü ESKİ metinle taşıyor
+("puan yalnızca ders anlatana", "30 günde yanar", Topluluk yok, "Profil ekranının en
+altı"). Push dalı tek başına birleşip sunucu ya da web yayına çıkarsa, o arada kayıt
+olanın `TermsVersion`'ı `2026-09-25` olur ve tasarım dalı gelince aynı dizge başka bir
+metni anlatır: onayın kanıt değeri kaybolur.
+
+Kural: #20 ve #38 TEK BAŞINA `main`'e alınmaz, dağıtılmaz. Tasarım dalı push dalının
+üstünde, yani onun PR'ı push işini de taşıyor: iki iş aynı birleştirmede ve aynı dağıtımda
+çıkar. Push ayrı çıkarsa tasarım dalı birleşmeden ÖNCE `SOZLESME_SURUMU`'nu üç yerde
+artırır; "sürüm içi düzeltme" gerekçesi o andan itibaren geçersizdir. Tarihçe ve gerekçe
+`src/lib/yasalMetinler.js`'te; aynı kural web `lib/yasalMetinler.js`, sunucu
+`LegalDocuments.cs` notu ve web/sunucu CLAUDE.md'sinde. PR açıklamalarına da eklenmeli.
+
 ### ⛔ App Store Connect gizlilik politikası ADRESİ istiyor — uygulama içi metin saymaz
 
 `app/gizlilik.jsx` mobil gerçeğe göre yazılmış durumda (canvas yerine `hwid.js`, çerez
@@ -753,6 +771,9 @@ dosyasız pakette ayarlar ekranı "kaydedilemedi" diyor.
   ve tabloda olmayan tür Puan geçmişinde ham enum adıyla görünüyor. `CommunityReward`
   2026-09-26'ya kadar eksikti ("CommunityReward" yazıyordu; mobil `a138d97`, web
   `058b53c`). Sunucuya yeni bir tür eklenirse etiketi AYNI GÜN iki istemcide yazılır.
+  `Expiry` "(eski)" DEĞİL (2026-09-27): hoş geldin puanı 14 günde yanıyor ve bu türle
+  yazılıyor, etiket "Süresi dolan puan". "(eski)" yalnızca gerçekten artık yazılmayan
+  `LessonSpending`'de.
 - **BAYT BAYT aynı dosyalar** (2026-09-26; KAYNAK web, mobil `src/lib/` altına kopyalar,
   `diff` / git blob boş fark vermeli, biri değişirse öteki AYNI GÜN):
   - `hakkimizdaMetni.js` — Hakkımızda'nın bütün metni (özet, misyon/vizyon/topluluk, altı
@@ -1172,7 +1193,9 @@ bir KOMUT (okunur ve silinir), tekil ekranda aynı komut ikinci kez de çalış�
    ders anlatana" diyordu ve yanlıştı). Puan harcanmaz; ders ve Topluluk puanı yanmaz
    (`CreditLedgerService`: `ExpiresAtUtc = null`; vadeli olan yalnızca hoş geldin puanı);
    seviye unvanıdır. Arayüz metni puanın kaynağını "yalnızca ders" diye DARALTMAZ
-   (rehberin portfolio adımı "asıl kaynak" der, "tek yol" değil).
+   (rehberin portfolio adımı "asıl kaynak" der, "tek yol" değil; Puan geçmişinin girişi
+   iki kaynağı da sayar). Hoş geldin puanı (1) 14 gün sonra `Expiry` satırıyla yanar ve
+   seviyeye sayılmaz — Koşullar §3 bunu ayrı maddede söylüyor.
 2. **Seviye/rozet hesabı SUNUCUDA.** `seviye.js` eşik taşımaz; `level`/`nextLevelAt`
    hazır gelir. Branş rozetleri (Öğretici 8 sa / Üstad 15 sa) de sunucudan.
 3. **SignalR tek bağlantı** — `InboxProvider` kök kabukta kurulur, sohbet ekranı kendi
@@ -1283,7 +1306,8 @@ bir KOMUT (okunur ve silinir), tekil ekranda aynı komut ikinci kez de çalış�
 - **ADIM 8 (push bildirimleri — kod tamam, cihaz doğrulaması bekliyor):** M1–M8,
   `ozellik/push-bildirimleri` dalında (main'e birleşmedi). Sunucu + web aynı adlı dalda.
   ⬜ M9: kullanıcı adımları ve cihaz senaryoları (bkz. "Push bildirimleri"). Sunucu PR'ı
-  mobil PR'dan önce birleşir.
+  mobil PR'dan önce birleşir. ⛔ Ama push PR'ları tasarım dalından ÖNCE tek başına yayına
+  çıkmaz (sözleşme metni; bkz. "Birleşme sırası").
 - **ADIM 9 (yedi madde — kod tamam, cihaz doğrulaması bekliyor):**
   `tasarim/profil-dersler-topluluk` dalında (push dalının ÜSTÜNDE; web + sunucu aynı adlı
   dalda). M1 ikonlar · M2 önizleme verisi + `mySessions` süzgeci · M3 `AltBilgi` + künye ·
@@ -1350,7 +1374,7 @@ Baseline'a bu üçü yüzünden dokunulmaz: ileri çekmek yukarıdaki iki ⬜'yi
 düşürürdü.
 
 ⚠️ `tasarim/profil-dersler-topluluk` (2026-09-26, push dalının ÜSTÜNDE) birleşince
-`frontend/src`'ye dokunan sekiz commit daha görünecek. Bu iş İKİ DEPODA AYNI DALDA ve aynı
+`frontend/src`'ye dokunan on bir commit daha görünecek. Bu iş İKİ DEPODA AYNI DALDA ve aynı
 tasarımla yapıldı (plan ve ortak metinler tek); hiçbiri tek yönlü bir port değil, mobile
 taşınacak bir şey YOK (web'in `a21f3f3` ve `524b12d` commit'leri yalnızca CLAUDE.md):
 
@@ -1364,6 +1388,9 @@ taşınacak bir şey YOK (web'in `a21f3f3` ve `524b12d` commit'leri yalnızca CL
 | `738f10c` | alt bilgi tek bileşende | `a8bf7bf` |
 | `ceb18de` | rehber halkası hiç çizilmiyordu (satır içi `boxShadow` `ring`'i eziyordu) ve pencere dışına taşıyordu | ezilme web'e özgü (mobilde halka ayrı bir SVG `Rect`); taşma mobilde de vardı → `UrunTuru.jsx` → `pencereIcinde` (aynı dal) |
 | `058b53c` | Puan geçmişi: `CommunityReward` etiketi (`format.js` → `TRANSACTION_LABELS`) | `a138d97` (aynı satır, aynı gün) |
+| `7c48468` | Puanın iki kaynağı (Puan geçmişi girişi, boş durum, alt satır), Koşullar §3 hoş geldin puanı, `Expiry` etiketi | `f64aa3b` (aynı cümleler; `format.js` yorumu web'den bayt bayt) |
+| `1266b31` | Gizlilik §2/§6/§7 ve silme penceresinde Topluluk içeriği, birleştirme sırası kuralı | `f64aa3b` (aynı cümleler); web'e özgü: §4 çerez yolu, HesapSilme §3 |
+| `f2e66b2` | kesik TEK ilk yorumda "Yorumun tamamını gör", iplikte yazar adı 44px | karşılığı yok: mobilde önizlemenin kendisi basılabilir ve ipliği açıyor; `YazarSatiri` basılabilir değil |
 
 (Sunucu commit'leri `473680b` `pastStatus`, `d479327` `FirstComment` — en baştaki "İkinci
 istisna".) BASELINE'A DOKUNULMAZ: yukarıdaki iki ⬜ (`ac0a6bf`, `8dfad75`) hâlâ açık.
