@@ -794,7 +794,26 @@ export const onizlemeApi = {
   userProfile: (userId) => gecikme(PROFILLER[userId] ?? VARSAYILAN_PROFIL(userId)),
   userFriends: (userId) => gecikme(arkadasBolumu(userId)),
   myProfile: () => gecikme(PROFILLER[BEN.userId]),
-  updateProfile: () => gecikme({}),
+  /*
+    Sunucu gibi YAZIYOR (UpdateProfileHandler): ad kırpılıp 2-100 karakter aranıyor, diğer
+    alanlar kırpılıyor ve boşsa null. Değişiklik yalnızca bu sekmenin belleğinde. Eskiden
+    hiçbir şey yazmıyordu: Ayarlar'da düzenlenen profil Profilim'e dönüşte yeniden kuruluyor
+    (profilSurumu) ama aynı eski veriyi okuyordu, yani o tazeleme önizlemede sınanamıyordu.
+  */
+  updateProfile: ({ displayName, bio, university, department } = {}) => {
+    const ad = displayName?.trim()
+    if (!ad || ad.length < 2 || ad.length > 100) {
+      return Promise.reject(sahteHata('Görünen ad 2-100 karakter olmalı.', 'VALIDATION_FAILED', 400))
+    }
+    const kirp = (deger, sinir) => deger?.trim().slice(0, sinir) || null
+    Object.assign(PROFILLER[BEN.userId], {
+      displayName: ad,
+      bio: kirp(bio, 1000),
+      university: kirp(university, 150),
+      department: kirp(department, 150),
+    })
+    return gecikme(null)
+  },
   uploadTeacherDocument: () => gecikme({}),
   /* Önizlemede hesap SİLİNMİYOR: demo oturumu bellekte duruyor ve silinmiş gibi yapmak,
      sonraki ekranlarda var olmayan bir kullanıcıyla gezinmek demek olurdu. */
