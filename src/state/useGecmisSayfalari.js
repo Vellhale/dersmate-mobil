@@ -41,6 +41,9 @@ import { api } from '../lib/api'
   BOS_SAYFA_SINIRI kez; sonra `durdu` olur ve çağıran bir düğme gösterir (istek yağmuru
   olmasın: her yanıt aktif listeyi de yeniden taşıyor).
 
+  Kart EKLEYEN ama ekranı doldurmayan sayfa ayrı bir tuzak ve kancanın bilgisi dışında
+  (yerleşime bağlı): onu çağıran liste karşılıyor — app/dersler.jsx → kisaListeyseDevamEt.
+
   SÜZGEÇ İSTEMCİDE DE UYGULANIR (`durum`): sunucu ?pastStatus='ı tanımıyorsa süzülmemiş
   liste döner. Sayfada durumu tutmayan tek kayıt görülürse `suzgecTutmadi` olur ve
   `toplam` null döner: o toplam süzülmemiş kümeye ait, göstermek yanlış sayı yazmak olurdu.

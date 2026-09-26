@@ -125,6 +125,10 @@ const VARSAYILAN_DURUM_STILI = DURUM_STILI.Expired
    (useGecmisSayfalari ofseti sayfa × boy diye hesaplıyor). Web: Geçmiş 5, Rezerve 10. */
 const PAST_PAGE_SIZE = 5
 
+/* Liste sonu eşiği (görünür yüksekliğin oranı): FlatList onEndReachedThreshold ve kısa liste
+   devamı (kisaListeyseDevamEt) aynı değeri kullanır. */
+const SONA_ESIK = 0.4
+
 /* Sekmeler — adlar kullanıcının, değiştirilmeden (web SEKMELER ile aynı anahtarlar). */
 const SEKMELER = [
   { anahtar: 'aksiyon', etiket: 'Senden aksiyon bekleyenler' },
@@ -354,6 +358,8 @@ export default function Dersler() {
   */
   const [tazeleniyor, setTazeleniyor] = useState(false)
   const listeRef = useRef(null)
+  // Listenin görünür yüksekliği ve içerik yüksekliği (kısa liste devamı, FlatList'in yanında).
+  const listeOlcusu = useRef({ icerik: 0, gorunur: 0 })
 
   /*
     YUKARI KAYDIRMA İSTEĞİ — refresh() içinde doğrudan değil, commit'ten SONRA koşan efektte.
@@ -732,6 +738,31 @@ export default function Dersler() {
     </View>
   ) : null
 
+  /*
+    KISA LİSTE DEVAMI — liste ekranı doldurmuyorsa ve sayfa kalmışsa sonraki sayfa, kaydırma
+    beklenmeden istenir. onEndReached bunu TEK BAŞINA yapamıyor (önizlemede ölçüldü): veri
+    büyüdüğü anda VirtualizedList'in hücre penceresi eski uzunlukta kalıyor
+    (_constrainToItemCount → last = min(yeni sayı − 1, eski last)), içerik boyu değişince
+    yapılan kontrol "son hücre çizildi mi" koşuluna takılıyor ve pencere sonradan
+    güncellenince kontrol bir daha yapılmıyor. Ekrandan kısa listede kaydırma da olmadığı
+    için sonraki sayfa HİÇ istenmiyordu.
+
+    Nerede ısırıyordu: Geçmiş dersler süzgeci tanımayan sunucuya çarptığında ilk sayfadan
+    1-4 kart çıkarsa liste o kartlarda kalıyor, "Daha eski dersleri yükle" düğmesi de
+    çıkmıyordu (düğme yalnızca art arda boş sayfa sınırında). Aynı şey ekranı doldurmayan
+    her birikintide (büyük ekran, az kayıt) olabilirdi.
+
+    Ölçüt onEndReached'inkiyle aynı (SONA_ESIK), liste tepedeyken: içerik görünür alanı
+    eşik payından fazla aşmıyorsa sona gelinmiş sayılır. sonaGelince boş sayfa sınırına
+    uyuyor ve dahaGetir uçuş kilitli, yani çifte tetik zararsız. Kart ekleyen her sayfa
+    içeriği uzattığı için zincir ekran dolunca kendiliğinden durur.
+  */
+  function kisaListeyseDevamEt() {
+    const { icerik, gorunur } = listeOlcusu.current
+    if (!sonaGelince || gorunur <= 0 || icerik <= 0) return
+    if (icerik - gorunur <= gorunur * SONA_ESIK) sonaGelince()
+  }
+
   const hapSekmeleri = SEKMELER.map((t) =>
     t.anahtar === 'aksiyon' && aksiyonSayisi > 0
       ? { ...t, sayac: aksiyonSayisi, erisimAdi: `${t.etiket}, ${aksiyonSayisi} ders` }
@@ -774,7 +805,15 @@ export default function Dersler() {
         ListEmptyComponent={bos}
         ListFooterComponent={alt}
         onEndReached={sonaGelince}
-        onEndReachedThreshold={0.4}
+        onEndReachedThreshold={SONA_ESIK}
+        onLayout={(e) => {
+          listeOlcusu.current.gorunur = e.nativeEvent.layout.height
+          kisaListeyseDevamEt()
+        }}
+        onContentSizeChange={(_genislik, yukseklik) => {
+          listeOlcusu.current.icerik = yukseklik
+          kisaListeyseDevamEt()
+        }}
       />
 
       {bookOpen && (
