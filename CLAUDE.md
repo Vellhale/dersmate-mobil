@@ -744,7 +744,15 @@ dosyasız pakette ayarlar ekranı "kaydedilemedi" diyor.
   web tarafı; palet değişirse iki dosya birden güncellenir. #0088CC bilerek 500'de:
   buton zeminleri 600/700'den gelir (WCAG ölçümleri web dosyasındaki yorumda).
 - **`format.js`, `seviye.js`, `useAsync.js`, `useDebounced.js` birebir kopya** — saf JS,
-  platform bağımsız. Web'de değişirlerse buraya da taşı.
+  platform bağımsız. Web'de değişirlerse buraya da taşı. (`format.js`'te iki depo arasında
+  yalnızca bir yorum farklı: rapor sebeplerinin hangi formlarda kullanıldığını anlatan
+  satırlar.)
+
+  ⚠️ `format.js` → `TRANSACTION_LABELS` sunucunun BÜTÜN `CreditTransactionType`
+  değerlerini karşılamalı: sunucu `StatementEntryDto.Type`'ı `ToString()` ile gönderiyor
+  ve tabloda olmayan tür Puan geçmişinde ham enum adıyla görünüyor. `CommunityReward`
+  2026-09-26'ya kadar eksikti ("CommunityReward" yazıyordu; mobil `a138d97`, web
+  `058b53c`). Sunucuya yeni bir tür eklenirse etiketi AYNI GÜN iki istemcide yazılır.
 - **BAYT BAYT aynı dosyalar** (2026-09-26; KAYNAK web, mobil `src/lib/` altına kopyalar,
   `diff` / git blob boş fark vermeli, biri değişirse öteki AYNI GÜN):
   - `hakkimizdaMetni.js` — Hakkımızda'nın bütün metni (özet, misyon/vizyon/topluluk, altı
@@ -1239,6 +1247,10 @@ bir KOMUT (okunur ve silinir), tekil ekranda aynı komut ikinci kez de çalış�
   - Anlamsız etiket / kategori (yön, forum kategorisi): `bg-brand-50 text-brand-800` ile
     `bg-slate-100 text-slate-700` sırayla.
   - Yeşil, mor (violet) ve gök mavisi (sky) YOK — kategori ya da avatar rengi olarak da.
+    **Bekçi:** `grep -rnE "emerald|violet|sky-" app src` BOŞ çıkmalı. Bu yüzden o adlar
+    YORUMDA da yazılmaz, Türkçesi yazılır ("yeşil", "mor", "gök mavisi"): yorumda geçen bir
+    ad grep'i gürültüyle doldurur ve yeni bir sınıf kullanımı onun arasında görünmez olur
+    (2026-09-26, `d06b5d4`; gerekçe `src/lib/forum.js`'te).
   - İstisna, malzeme rengi: değerlendirme yıldızları ve madalya/rozet altın-bronzu amber kalır.
 
 ## Adım planı
@@ -1338,7 +1350,7 @@ Baseline'a bu üçü yüzünden dokunulmaz: ileri çekmek yukarıdaki iki ⬜'yi
 düşürürdü.
 
 ⚠️ `tasarim/profil-dersler-topluluk` (2026-09-26, push dalının ÜSTÜNDE) birleşince
-`frontend/src`'ye dokunan yedi commit daha görünecek. Bu iş İKİ DEPODA AYNI DALDA ve aynı
+`frontend/src`'ye dokunan sekiz commit daha görünecek. Bu iş İKİ DEPODA AYNI DALDA ve aynı
 tasarımla yapıldı (plan ve ortak metinler tek); hiçbiri tek yönlü bir port değil, mobile
 taşınacak bir şey YOK (web'in `a21f3f3` ve `524b12d` commit'leri yalnızca CLAUDE.md):
 
@@ -1351,6 +1363,7 @@ taşınacak bir şey YOK (web'in `a21f3f3` ve `524b12d` commit'leri yalnızca CL
 | `acf6479` | Profil: dişli menü, kamera rozeti, Arkadaşlarım hapı, silme yolu metinleri | `9b2e546` |
 | `738f10c` | alt bilgi tek bileşende | `a8bf7bf` |
 | `ceb18de` | rehber halkası hiç çizilmiyordu (satır içi `boxShadow` `ring`'i eziyordu) ve pencere dışına taşıyordu | ezilme web'e özgü (mobilde halka ayrı bir SVG `Rect`); taşma mobilde de vardı → `UrunTuru.jsx` → `pencereIcinde` (aynı dal) |
+| `058b53c` | Puan geçmişi: `CommunityReward` etiketi (`format.js` → `TRANSACTION_LABELS`) | `a138d97` (aynı satır, aynı gün) |
 
 (Sunucu commit'leri `473680b` `pastStatus`, `d479327` `FirstComment` — en baştaki "İkinci
 istisna".) BASELINE'A DOKUNULMAZ: yukarıdaki iki ⬜ (`ac0a6bf`, `8dfad75`) hâlâ açık.
