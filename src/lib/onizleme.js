@@ -541,9 +541,19 @@ const DEGERLENDIRMELER = {
 /* Puan defteri. Sunucudaki üç kazanç türü de var (StatementEntryDto.Type enum ADIYLA
    geliyor): ders kazancı, Topluluk katkısı (CommunityRewardRules: 300 net oy → 100 puan;
    ders bilgisi yok) ve hoş geldin puanı (AppOptions.WelcomeCreditAmount = 1). Topluluk
-   satırı etiketsiz türün ham adla görünmesini önizlemede yakalamak için. */
-const PUAN_HAREKETLERI = Array.from({ length: 27 }, (_, i) => {
-  const tur = i === 26 ? 'WelcomeBonus' : i === 2 ? 'CommunityReward' : 'LessonEarning'
+   satırı etiketsiz türün ham adla görünmesini önizlemede yakalamak için.
+   Hoş geldin puanı VADELİ (WelcomeCreditValidityDays = 14): 28 gün önce verilen puan 14
+   gün sonra Expiry satırıyla yanmış (14 gün önce). Cüzdandaki bakiye (1850) de onu
+   saymıyor. Satır "Süresi dolan puan" etiketini ve Koşullar §3'teki yanmayı önizlemede
+   görünür kılıyor. */
+const PUAN_HAREKETLERI = Array.from({ length: 28 }, (_, i) => {
+  if (i === 13) {
+    return {
+      type: 'Expiry', amount: -1, topicName: null, counterpartDisplayName: null,
+      createdAtUtc: dknOnce(60 * 24 * (i + 1)),
+    }
+  }
+  const tur = i === 27 ? 'WelcomeBonus' : i === 2 ? 'CommunityReward' : 'LessonEarning'
   const dersli = tur === 'LessonEarning'
   return {
     type: tur,
@@ -768,17 +778,21 @@ export const onizlemeApi = {
     }),
   markRead: () => gecikme(null),
 
-  /* pastStatus sunucudaki gibi: boşsa geçmiş süzülmez (bugünkü davranış); doluysa
-     yalnızca o durum döner ve totalCount SÜZÜLMÜŞ toplamdır; geçmiş olmayan bir durum
-     (Booked, Disputed…) ya da tanımsız değer 400 VALIDATION_FAILED. Aktif kısım hiç
-     etkilenmez. */
+  /* pastStatus sunucudaki gibi (DersGecmisi.SuzgeciCoz): boşsa ya da yalnızca boşluksa
+     geçmiş süzülmez (bugünkü davranış); doluysa kırpılır ve ADA büyük/küçük harf
+     duyarsız eşlenir ('completed', ' Completed ' geçerli), yalnızca o durum döner ve
+     totalCount SÜZÜLMÜŞ toplamdır; geçmiş olmayan bir durum (Booked, Disputed…), sayı
+     ("2") ya da tanımsız değer 400 VALIDATION_FAILED. Değer api.js'teki gibi dizgeye
+     çevrilir: falsy değer parametre olarak hiç gitmez. Aktif kısım hiç etkilenmez. */
   mySessions: (pastPage = 1, pastPageSize = 5, pastStatus = null) => {
-    if (pastStatus && !GECMIS_DURUMLARI.includes(pastStatus)) {
+    const ad = pastStatus ? String(pastStatus).trim() : ''
+    const durum = ad ? GECMIS_DURUMLARI.find((d) => d.toLowerCase() === ad.toLowerCase()) : null
+    if (ad && !durum) {
       return Promise.reject(
         sahteHata('Geçmiş süzgeci yalnızca Completed, Cancelled ya da Expired olabilir.', 'VALIDATION_FAILED', 400),
       )
     }
-    const gecmis = pastStatus ? GECMIS_DERSLER.filter((s) => s.status === pastStatus) : GECMIS_DERSLER
+    const gecmis = durum ? GECMIS_DERSLER.filter((s) => s.status === durum) : GECMIS_DERSLER
     return gecikme({
       active: AKTIF_DERSLER,
       activeTotal: AKTIF_DERSLER.length,

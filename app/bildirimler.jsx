@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { Platform, Pressable, ScrollView, Text, View } from 'react-native'
-import { useFocusEffect, useRouter } from 'expo-router'
+import { useFocusEffect, useNavigation, useRouter } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { api } from '../src/lib/api'
 import { KANALLAR, ayarlariAc, kanalAyarlariniAc, yerelTestBildirimi } from '../src/lib/bildirimler'
@@ -39,6 +39,7 @@ const TEST_TURU = { mesajlar: 'mesaj', istekler: 'istek', 'ders-onayi': 'onay', 
 
 export default function BildirimAyarlari() {
   const router = useRouter()
+  const navigation = useNavigation()
   const guvenli = useSafeAreaInsets()
   const {
     destekleniyor,
@@ -73,11 +74,25 @@ export default function BildirimAyarlari() {
     }, [durumuTazele, tercihleriTazele, kaydiDenetle]),
   )
 
+  /* Geri düğmesinin erişilebilir adı gideceği yeri söyler: altta Ayarlar varsa ya da
+     yığında geri yoksa (yedek /ayarlar) "Ayarlar'a dön"; deneme bildirimine başka bir
+     ekrandan dokunularak gelindiyse o ekrana dönülür, ad genel "Geri" kalır. */
+  const yigin = navigation.getState?.()
+  const onceki = yigin?.routes?.[yigin.index - 1]
+  const geriEtiketi = !onceki || onceki.name === 'ayarlar' ? 'Ayarlar’a dön' : 'Geri'
+
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
       <View className="flex-row items-center gap-3 border-b border-slate-200 bg-white px-4 py-2">
-        <GeriDugmesi onPress={() => (router.canGoBack() ? router.back() : router.replace('/ayarlar'))} />
-        <Text className="min-w-0 flex-1 text-lg font-bold text-slate-900">Bildirimler</Text>
+        <GeriDugmesi
+          accessibilityLabel={geriEtiketi}
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/ayarlar'))}
+        />
+        {/* Başlık, Ayarlar'daki satırın ve metinlerin ("Profil › Ayarlar › Bildirim ayarları")
+            adıyla AYNI: satıra dokunan kullanıcı adıyla vardığı ekranı eşleyebilmeli. */}
+        <Text accessibilityRole="header" className="min-w-0 flex-1 text-lg font-bold text-slate-900">
+          Bildirim ayarları
+        </Text>
       </View>
 
       <ScrollView

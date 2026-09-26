@@ -56,6 +56,10 @@ export const AKIS_TARZI = 'instagram'
 
 /* ─── ORTAK PARÇALAR ──────────────────────────────────────────────────────── */
 
+/* Küçük yazılar px ile (text-[12px], yorum rayında text-[11px]), text-xs DEĞİL: NativeWind
+   cihazda rem'i 14 saydığı için text-xs 10.5dp çiziliyor, Apple'ın 11pt alt sınırının
+   altında. Web önizlemesi rem 16 aldığından fark ancak cihazda görünür (bkz. Kunye.jsx). */
+
 /** Etiket pili. `className` yerleşim içindir (varsayılan self-start: sütunda sola yaslı). */
 export function EtiketPili({ etiket, className = 'self-start' }) {
   const ton = ETIKET_TONU[etiket] ?? VARSAYILAN_ETIKET_TONU
@@ -81,7 +85,7 @@ export function IncelemeSeridi({ sikayetSayisi, kutu = false }) {
       }`}
     >
       <UyariIkonu renk={amber[800]} boy={16} />
-      <Text className="flex-1 text-xs font-medium text-amber-900">
+      <Text className="flex-1 text-[12px] font-medium leading-[16px] text-amber-900">
         İncelemede — {sikayetSayisi} şikayet aldı, moderasyon sürüyor.
       </Text>
     </View>
@@ -117,9 +121,11 @@ export function IncelemePerdesi({ gonderi, onGizliAc }) {
               onPress={onGizliAc}
               className="min-h-[44px] justify-center rounded-lg border border-amber-300 bg-white px-3 active:bg-amber-100"
             >
-              <Text className="text-xs font-semibold text-amber-900">Yine de göster</Text>
+              <Text className="text-[12px] font-semibold leading-[16px] text-amber-900">Yine de göster</Text>
             </Pressable>
-            <Text className="text-xs text-slate-600">Etiket: {ETIKET_ADI[anahtar] ?? anahtar}</Text>
+            <Text className="text-[12px] leading-[16px] text-slate-600">
+              Etiket: {ETIKET_ADI[anahtar] ?? anahtar}
+            </Text>
           </View>
         </View>
       </View>
@@ -210,14 +216,14 @@ export function YazarSatiri({ yazar, damga, kucuk = false }) {
       <Avatar userId={yazar?.userId} name={yazar?.displayName ?? 'Kullanıcı'} size="sm" />
       <Text
         numberOfLines={1}
-        className={`max-w-[45%] font-medium text-slate-700 ${kucuk ? 'text-[11px]' : 'text-xs'}`}
+        className={`max-w-[45%] font-medium text-slate-700 ${kucuk ? 'text-[11px]' : 'text-[12px]'}`}
       >
         {yazar?.displayName ?? 'Kullanıcı'}
       </Text>
       {/* isStaff SUNUCUDAN gelir, istemci türetmez. */}
       {yazar?.isStaff ? <YonetimRozeti kucuk /> : null}
       <SeviyeRozeti kaynak={{ level: yazar?.level }} boyut="sm" ton="acik" etiketli={false} />
-      <Text className="text-xs text-slate-500">· {goreliZaman(damga)}</Text>
+      <Text className={`text-slate-500 ${kucuk ? 'text-[11px]' : 'text-[12px]'}`}>· {goreliZaman(damga)}</Text>
     </View>
   )
 }
@@ -241,6 +247,12 @@ export function YazarSatiri({ yazar, damga, kucuk = false }) {
     (web önizlemesi hitSlop uygulamıyor), aradaki sayı iki bölgenin çakışmasını engelliyor.
   • `yatay`: Instagram kartının eylem satırı ve iplikteki gönderi. Orada gövde tam
     genişlikte akıyor; solda dikey bir ray okuma genişliğini boşuna daraltırdı.
+  • `yatay` kipte sayının EN AZ GENİŞLİĞİ 28px ve ortalı: yoksa aşağı ok ve yorum balonu
+    puanın basamak sayısına göre kayıyor, alt alta kartlarda ikonlar zikzak çiziyordu
+    (ölçüldü: 23'lü kartta aşağı ok x=72, 2'li kartta x=64). 28px, üç basamağı ve eksili
+    iki basamağı ("142", "-12") kaydırmadan taşıyor; daha uzun sayı yine genişler. Web'in
+    aynı raydaki karşılığı min-w-[2ch]; px çünkü rem cihazda 14 sayılıyor ve `ch` RN'de yok.
+    Dikey rayda gerek yok: sütunun genişliğini 44px'lik düğmeler belirliyor.
 */
 export function OyRayi({ arti, eksi, oy = 0, onOy, kucuk = false, yatay = false }) {
   const olcu = kucuk ? 'h-[36px] w-[36px]' : 'h-[44px] w-[44px]'
@@ -266,7 +278,7 @@ export function OyRayi({ arti, eksi, oy = 0, onOy, kucuk = false, yatay = false 
 
       <Text
         accessibilityLabel={`Puan: ${puan}`}
-        className={`text-sm font-bold ${sayiRengi}`}
+        className={`text-sm font-bold ${sayiRengi} ${yatay ? 'min-w-[28px] text-center' : ''}`}
         style={{ fontVariant: ['tabular-nums'] }}
       >
         {puan}
@@ -356,7 +368,7 @@ export function SikayetDugmesi({ onPress, kucuk = false, yalnizIkon = false }) {
                   ${kucuk ? 'min-h-[36px]' : 'min-h-[44px]'}`}
     >
       <BayrakIkonu renk={slate[500]} boy={kucuk ? 12 : 14} />
-      <Text className={`font-medium text-slate-500 ${kucuk ? 'text-[11px]' : 'text-xs'}`}>
+      <Text className={`font-medium text-slate-500 ${kucuk ? 'text-[11px]' : 'text-[12px]'}`}>
         Şikayet et
       </Text>
     </Pressable>
@@ -553,7 +565,7 @@ function RedditSatiri({ gonderi, benimUserId, onOy, onAc, onSikayet }) {
             className="min-h-[44px] flex-row items-center gap-2 self-start rounded-lg px-2.5 active:bg-slate-100"
           >
             <MesajIkonu renk={slate[600]} boy={16} />
-            <Text className="text-xs font-semibold text-slate-600">
+            <Text className="text-[12px] font-semibold leading-[16px] text-slate-600">
               {gonderi.commentCount > 0 ? `${gonderi.commentCount} yorum` : 'Yorumlar'}
             </Text>
           </Pressable>
