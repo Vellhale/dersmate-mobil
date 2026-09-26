@@ -956,8 +956,9 @@ function FiltreSeridi({ sira, zaman, etiket, onEtiket, onAyarAc, siraAdi, zamanA
   "hangisi önce gelsin", tarih "hangileri hiç görünmesin". Tek listede birleştirmek
   seçenek sayısını 3'ten 12'ye çıkarırdı, o yüzden burada da ayrı duruyorlar.
 
-  Bölüm başlıkları UstEtiket ile BÜYÜK: `uppercase` sınıfı RN'de dil bilgisiz büyütüyor
-  ve cihazda "TARIH" yazıyordu (CLAUDE.md, Web'den bilinçli sapmalar).
+  Bölüm başlıkları UstEtiket ile BÜYÜK: Tailwind'in büyük harf sınıfı RN'de dil bilgisiz
+  büyütüyor ve cihazda "TARIH" yazıyordu (CLAUDE.md, Web'den bilinçli sapmalar). Sınıfın
+  adı bu dosyada yorumda bile geçmiyor: planın doğrulama grep'i dosyada BOŞ çıkmalı.
 */
 function FiltreAltSayfasi({ sira, onSira, zaman, onZaman, aciklama, sonuc, yukleniyor, onClose }) {
   return (
