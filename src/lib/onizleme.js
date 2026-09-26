@@ -538,13 +538,21 @@ const DEGERLENDIRMELER = {
   },
 }
 
-const PUAN_HAREKETLERI = Array.from({ length: 27 }, (_, i) => ({
-  type: i === 26 ? 'WelcomeBonus' : 'LessonEarning',
-  amount: i === 26 ? 100 : i % 2 === 0 ? 100 : 50,
-  topicName: i === 26 ? null : KONULAR[i % KONULAR.length].topic,
-  counterpartDisplayName: i === 26 ? null : Object.values(KISILER)[i % 4].displayName,
-  createdAtUtc: dknOnce(60 * 24 * (i + 1)),
-}))
+/* Puan defteri. Sunucudaki üç kazanç türü de var (StatementEntryDto.Type enum ADIYLA
+   geliyor): ders kazancı, Topluluk katkısı (CommunityRewardRules: 300 net oy → 100 puan;
+   ders bilgisi yok) ve hoş geldin puanı (AppOptions.WelcomeCreditAmount = 1). Topluluk
+   satırı etiketsiz türün ham adla görünmesini önizlemede yakalamak için. */
+const PUAN_HAREKETLERI = Array.from({ length: 27 }, (_, i) => {
+  const tur = i === 26 ? 'WelcomeBonus' : i === 2 ? 'CommunityReward' : 'LessonEarning'
+  const dersli = tur === 'LessonEarning'
+  return {
+    type: tur,
+    amount: tur === 'WelcomeBonus' ? 1 : tur === 'CommunityReward' ? 100 : i % 2 === 0 ? 100 : 50,
+    topicName: dersli ? KONULAR[i % KONULAR.length].topic : null,
+    counterpartDisplayName: dersli ? Object.values(KISILER)[i % 4].displayName : null,
+    createdAtUtc: dknOnce(60 * 24 * (i + 1)),
+  }
+})
 
 /* ── Topluluk akış tarzı ─────────────────────────────────────────────────── */
 
