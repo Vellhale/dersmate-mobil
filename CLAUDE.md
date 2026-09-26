@@ -1083,6 +1083,19 @@ bir KOMUT (okunur ve silinir), tekil ekranda aynı komut ikinci kez de çalış�
 - Ders geçmişi sayfa boyutu **5** ve FlatList `onEndReached` ile BİRİKİR (mobil iş
   kuralı; Geçmiş dersler ve Rezerve geçmişi sekmeleri); web 20'lik NUMARALI sayfa
   kullanıyor ("Daha eski rezervasyonlar (x/y)").
+
+  ⚠️ **Ekranı doldurmayan birikintide `onEndReached` bir daha GELMEZ** (2026-09-26,
+  `09527dc`). Veri büyüdüğü anda `VirtualizedList` hücre penceresini eski uzunlukta
+  bırakıyor (`_constrainToItemCount`), içerik boyu değişince yapılan uç kontrolü "son hücre
+  çizildi mi" koşuluna takılıyor ve pencere güncellenince kontrol tekrarlanmıyor. Liste
+  ekrandan kısaysa kaydırma da olmadığı için zincir kopuyor. Web önizlemesi ve yerel RN
+  aynı hesabı yapıyor. Görüldüğü yer: Geçmiş dersler eski sunucuya çarpıp (`?pastStatus`
+  yok sayılır, istemci süzer) ilk sayfadan 1-4 kart çıkınca liste orada kalıyor, "Daha
+  eski dersleri yükle" de çıkmıyordu. Derslerim bunu `kisaListeyseDevamEt` ile karşılıyor
+  (`onLayout` + `onContentSizeChange`, ölçüt `SONA_ESIK` = `onEndReachedThreshold`); boş
+  sayfa sınırı ve uçuş kilidi aynı kalıyor. `onEndReached`'le biriken YENİ bir liste de
+  aynı önlemi almalı. Topluluk ve Keşfet'in birikintileri bu açıdan İNCELENMEDİ; ilk sayfa
+  ekranı doldurduğu sürece sorun çıkmaz.
 - **Derslerim beş sekmede** (2026-09-26; adlar kullanıcının, iki platformda aynı: Senden
   aksiyon bekleyenler · Planlanmış · Geçmiş dersler · Puan geçmişi · Rezerve geçmişi).
   Sekme çubuğu `HapSekmeCubugu` (ui.jsx). Mobilde üç fark:
@@ -1253,7 +1266,7 @@ bir KOMUT (okunur ve silinir), tekil ekranda aynı komut ikinci kez de çalış�
   dalda). M1 ikonlar · M2 önizleme verisi + `mySessions` süzgeci · M3 `AltBilgi` + künye ·
   M4 Hakkımızda yeni metin (`hakkimizdaMetni.js`) + Koşullar §3 · M5 Profil vitrin +
   `/ayarlar` · M6 Topluluk Instagram tarzı kart + ilk yorum önizlemesi · M7 Derslerim beş
-  sekme · M8 rehber 9 adım + yer çipleri · M9 bu belge. İki sunucu eki en baştaki "İkinci
+  sekme (+ `09527dc` kısa liste devamı) · M8 rehber 9 adım + yer çipleri · M9 bu belge. İki sunucu eki en baştaki "İkinci
   istisna"da. `SOZLESME_SURUMU` (2026-09-25) ve `IZIN_SURUMU` ARTMADI: Koşullar §3 ve
   gizlilik §4/§7 yol metinleri henüz yayınlanmamış sürümün içinde düzeltildi (tarihçe
   `yasalMetinler.js`'te).
@@ -1262,7 +1275,8 @@ bir KOMUT (okunur ve silinir), tekil ekranda aynı komut ikinci kez de çalış�
   `HapSekmeCubugu` kaydırması, büyük yazıda (1.3) haplar ve rehber kartı, rehber açıkken
   bildirim dokunuşu (delik kalkmalı), Ayarlar'dan rehber → geri tuşu Profil'e, eski
   sunucuya karşı Geçmiş dersler yedek yolu (VirtualizedList boş sayfa davranışı), iplikten
-  profile geçişin iOS'ta çakışmaması.
+  profile geçişin iOS'ta çakışmaması, kart ekleyip ekranı doldurmayan sayfada
+  `kisaListeyseDevamEt`'in yerel RN'de de zinciri sürdürmesi (web önizlemesinde ölçüldü).
 
 ## Web ile senkron tutma
 
