@@ -59,11 +59,10 @@ export const ETIKET_ADI = Object.fromEntries(ETIKETLER.map((e) => [e.key, e.labe
   text-brand-800` ile `bg-slate-100 text-slate-700` SIRAYLA. Forum etiketi bir kategori;
   "sınav stresi" bir uyarı, "motivasyon" bir tehlike değil.
 
-  ⚠️ ESKİDEN ALTI AYRI RENKTİ ve dördü A düzenini çiğniyordu: kaynak yeşil (emerald),
-  program mor (violet), tercih gök mavisi (sky) — üçü de paletten çıkarılmış renkler —
-  stres amber (amber YALNIZCA bekleyen iş ve dikkat), motivasyon rose (rose YALNIZCA
-  tehlike ve sayaç). Uygulamada emerald/violet/sky'ı sınıf olarak kullanan TEK yer
-  burasıydı.
+  ⚠️ ESKİDEN ALTI AYRI RENKTİ ve dördü A düzenini çiğniyordu: kaynak yeşil, program
+  mor, tercih gök mavisi — üçü de paletten çıkarılmış renkler — stres amber (amber
+  YALNIZCA bekleyen iş ve dikkat), motivasyon rose (rose YALNIZCA tehlike ve sayaç).
+  Uygulamada yeşili, moru ve gök mavisini sınıf olarak kullanan TEK yer burasıydı.
 
   Bedeli bilinçli: altı etiket iki tona indi, yani etiketler artık RENKTEN değil ADINDAN
   ayırt ediliyor. Pilin içinde ad zaten yazılı; renk yalnızca "burası bir etiket" diyor.
@@ -75,7 +74,11 @@ export const ETIKET_ADI = Object.fromEntries(ETIKETLER.map((e) => [e.key, e.labe
   Kontrast: brand-800 / brand-50 7.16:1, slate-700 / slate-100 9.45:1.
 
   ⚠️ WEB RENKLİ KALIYOR (web frontend/src/pages/Topluluk.jsx). Bir sonraki web portunda
-  emerald/violet/sky buraya GERİ TAŞINMAZ; bilinçli sapma.
+  yeşil, mor ve gök mavisi sınıfları buraya GERİ TAŞINMAZ; bilinçli sapma.
+
+  Üç renk bu dosyada (ve theme.js ile Avatar.jsx yorumlarında) BİLEREK Türkçe adıyla
+  yazılı: Tailwind adlarıyla app/ ve src/ üzerinde yapılan grep, sınıf kullanımını
+  yakalayan bekçi ve BOŞ çıkmalı. Yorumda geçen bir ad o bekçiyi kör ederdi.
 */
 const NOTR = { kutu: 'bg-slate-100', yazi: 'text-slate-700' }
 const MARKA = { kutu: 'bg-brand-50', yazi: 'text-brand-800' }

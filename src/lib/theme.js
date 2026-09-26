@@ -33,7 +33,7 @@ export const slate = {
   (SVG renk prop'u, tab bar rozeti) için. Yalnızca KULLANILAN basamaklar tutuluyor:
   tam ölçek kopyalamak, hiç okunmayan satırlarla paleti şişirirdi.
 
-  YEŞİL (emerald) YOK: olumlu durum marka mavisi, değeri `brand`'den okunur. Yeşil marka
+  YEŞİL YOK: olumlu durum marka mavisi, değeri `brand`'den okunur. Yeşil marka
   paletinin dışındaydı (kullanıcı kararı, A düzeni). amber yalnızca bekleyen/dikkat, yıldız
   ve madalya altın-bronzu (SubjectBadges, Topluluk/UniversiteRozetleri), rose tehlike ve sayaç.
 */
