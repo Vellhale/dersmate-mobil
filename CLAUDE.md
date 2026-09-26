@@ -5,7 +5,7 @@ Web sürümü ve backend `C:\projeler\dersmate` içinde; backend .NET 8 + Postgr
 ve **değişmez** — mobil yalnızca istemcidir. **İletişim dili Türkçe** — kod yorumları,
 commit mesajları ve kullanıcıya görünen her metin Türkçe.
 
-⚠️ **Tek bilinçli istisna: push bildirimleri (2026-09-25, kullanıcı onayıyla).** Push
+⚠️ **İlk bilinçli istisna: push bildirimleri (2026-09-25, kullanıcı onayıyla).** Push
 sunucusuz yapılamazdı; sunucu + web + mobil aynı iş olarak, aynı adlı dalda
 (`ozellik/push-bildirimleri`) değişti. Sunucuya eklenenler: `comms` şemasında
 `PushDevices`, `Notifications` (defter + outbox), `PushTickets`,
@@ -836,6 +836,11 @@ delik kalkıyor, `/`'e dönünce geri geliyor.)
 karşısındaki bölgeyle sınırlı ve sığmazsa metin kısmı kendi içinde kayar (320×568'de kart
 yazma kutusunu örtüyordu, ölçüldü). Tur kaydırma YAPMAZ.
 
+⚠️ Delik ve halkası pencerenin 2px İÇİNE kırpılır (`pencereIcinde`, web `halkaKutusu`
+ile aynı kural). Kenara yapışık çıpada delik = çıpa + 8 pencereden taşıyor ve SVG
+çizgisi kenarın iki yanına yayıldığı için o kenar görünmüyordu: hamburgerin halkası
+önizlemede (0, 0)'da yarım, cihazda (x≈-1) sol kenarsızdı.
+
 **Yer çipi** (`UrunTuru.jsx` → `YerCipi`): gövde cümlesiyle maddeler arasında, çekmecenin
 AKTİF satırının küçük kopyası ("Menüde" + ink zeminde brand-300 ikon ve etiket) ya da
 "Profilim'de" + dişli + "Ayarlar". Etiket ve ikon `Cekmece.jsx` → `OGELER`'den (dışa açık)
@@ -1152,8 +1157,14 @@ bir KOMUT (okunur ve silinir), tekil ekranda aynı komut ikinci kez de çalış�
 
 ## Korunan iş kuralları (backend'de yaşar, arayüz ihlal etmez)
 
-1. **Ders almak ücretsiz** — kredi düşme/harcama arayüzü YOK. Puan yalnızca anlatana
-   basılır (30 dk = 50, 60 dk = 100) ve harcanmaz; seviye unvanıdır.
+1. **Ders almak ücretsiz** — kredi düşme/harcama arayüzü YOK. Ders puanı yalnızca anlatana
+   basılır (30 dk = 50, 60 dk = 100); ders alan tarafa puan yok. Puanın ikinci kaynağı
+   Topluluk: yeterli net oy toplayan katkı da puan getirir (sunucuda
+   `CommunityRewardRules`, Kullanım koşulları §3 — 2026-09-26'ya kadar metin "yalnızca
+   ders anlatana" diyordu ve yanlıştı). Puan harcanmaz; ders ve Topluluk puanı yanmaz
+   (`CreditLedgerService`: `ExpiresAtUtc = null`; vadeli olan yalnızca hoş geldin puanı);
+   seviye unvanıdır. Arayüz metni puanın kaynağını "yalnızca ders" diye DARALTMAZ
+   (rehberin portfolio adımı "asıl kaynak" der, "tek yol" değil).
 2. **Seviye/rozet hesabı SUNUCUDA.** `seviye.js` eşik taşımaz; `level`/`nextLevelAt`
    hazır gelir. Branş rozetleri (Öğretici 8 sa / Üstad 15 sa) de sunucudan.
 3. **SignalR tek bağlantı** — `InboxProvider` kök kabukta kurulur, sohbet ekranı kendi
@@ -1273,7 +1284,8 @@ bir KOMUT (okunur ve silinir), tekil ekranda aynı komut ikinci kez de çalış�
   ⬜ Cihazda: 44dp hedefler ve 12/13px yazılar (web önizlemesi rem'i 16 sayıyor), TalkBack/
   VoiceOver (avatar tek durak, rehber adım duyurusu, yazar başlığı), Fabric'te
   `HapSekmeCubugu` kaydırması, büyük yazıda (1.3) haplar ve rehber kartı, rehber açıkken
-  bildirim dokunuşu (delik kalkmalı), Ayarlar'dan rehber → geri tuşu Profil'e, eski
+  bildirim dokunuşu (delik kalkmalı), menü adımında halkanın dört kenarı (cihazda
+  hamburger x≈7dp), Ayarlar'dan rehber → geri tuşu Profil'e, eski
   sunucuya karşı Geçmiş dersler yedek yolu (VirtualizedList boş sayfa davranışı), iplikten
   profile geçişin iOS'ta çakışmaması, kart ekleyip ekranı doldurmayan sayfada
   `kisaListeyseDevamEt`'in yerel RN'de de zinciri sürdürmesi (web önizlemesinde ölçüldü).
@@ -1326,9 +1338,9 @@ Baseline'a bu üçü yüzünden dokunulmaz: ileri çekmek yukarıdaki iki ⬜'yi
 düşürürdü.
 
 ⚠️ `tasarim/profil-dersler-topluluk` (2026-09-26, push dalının ÜSTÜNDE) birleşince
-`frontend/src`'ye dokunan altı commit daha görünecek. Bu iş İKİ DEPODA AYNI DALDA ve aynı
+`frontend/src`'ye dokunan yedi commit daha görünecek. Bu iş İKİ DEPODA AYNI DALDA ve aynı
 tasarımla yapıldı (plan ve ortak metinler tek); hiçbiri tek yönlü bir port değil, mobile
-taşınacak bir şey YOK:
+taşınacak bir şey YOK (web'in `a21f3f3` ve `524b12d` commit'leri yalnızca CLAUDE.md):
 
 | commit | iş | mobil karşılığı |
 |---|---|---|
@@ -1338,6 +1350,7 @@ taşınacak bir şey YOK:
 | `991c5ad` | rehber 8 adım (mobil 9 — bilinçli fark) | `60ff7ba` |
 | `acf6479` | Profil: dişli menü, kamera rozeti, Arkadaşlarım hapı, silme yolu metinleri | `9b2e546` |
 | `738f10c` | alt bilgi tek bileşende | `a8bf7bf` |
+| `ceb18de` | rehber halkası hiç çizilmiyordu (satır içi `boxShadow` `ring`'i eziyordu) ve pencere dışına taşıyordu | ezilme web'e özgü (mobilde halka ayrı bir SVG `Rect`); taşma mobilde de vardı → `UrunTuru.jsx` → `pencereIcinde` (aynı dal) |
 
 (Sunucu commit'leri `473680b` `pastStatus`, `d479327` `FirstComment` — en baştaki "İkinci
 istisna".) BASELINE'A DOKUNULMAZ: yukarıdaki iki ⬜ (`ac0a6bf`, `8dfad75`) hâlâ açık.
