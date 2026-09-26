@@ -372,10 +372,14 @@ function HesabiSilModali({ open, onClose, onDeleted }) {
 
         <View className="gap-1.5">
           <Text className="text-sm font-semibold text-slate-900">Kalacaklar</Text>
+          {/* Topluluk cümlesi 2026-09-27: DeleteAccount forum içeriğine dokunmuyor, yalnızca
+              adı "Silinmiş kullanıcı" yapıyor. Gizlilik §7 "Silme" ile aynı olgu. */}
           <Text className="text-sm leading-relaxed text-slate-600">
             Yaptığın dersler, kazandırdığın puanlar ve yazdığın değerlendirmeler karşı
             tarafın geçmişine ait olduğu için siliniyor değil — orada adın yerine
-            "Silinmiş kullanıcı" görünecek.
+            "Silinmiş kullanıcı" görünecek. Topluluk’taki gönderilerin, yorumların ve
+            oyların da kalacak; gönderi ve yorumlarında da adın yerine "Silinmiş kullanıcı"
+            görünecek.
           </Text>
         </View>
 

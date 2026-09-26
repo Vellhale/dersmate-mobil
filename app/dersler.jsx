@@ -2173,11 +2173,14 @@ function PuanPaneli({ defter, toplamPuan }) {
 
   return (
     <View className="gap-3">
-      {/* Derslerim'in eski açıklama cümlesi: puanın nereden geldiğini anlatıyor, bu yüzden
-          her sekmenin üstünde değil puan defterinin başında (web'le aynı). */}
+      {/* Puanın nereden geldiğini anlatıyor, bu yüzden her sekmenin üstünde değil puan
+          defterinin başında (web Sessions.jsx ile aynı cümle). İKİ KAYNAK sayılıyor
+          (2026-09-27): eski cümle "her hareketin hangi dersten geldiği burada" diyordu, oysa
+          defterde dersle ilgisi olmayan Topluluk katkı puanı ve hoş geldin satırları da var
+          (Kullanım koşulları §3). Puanın kaynağı "yalnızca ders" diye daraltılmaz. */}
       <Text className="text-sm text-slate-600">
-        Ders almak ücretsizdir. Ders onaylandığında anlatan tarafa puan yazılır; her hareketin
-        hangi dersten geldiği burada.
+        Ders almak ücretsizdir. Puan, onaylanan dersin anlatanına ve Topluluk’ta oy toplayan
+        katkılara yazılır; her hareketin kaynağı burada.
       </Text>
 
       {/* Cüzdan bağlamından, ek istek yok (profildeki puan ve seviye rozetiyle aynı sayı). */}
@@ -2199,7 +2202,8 @@ function PuanPaneli({ defter, toplamPuan }) {
       ) : satirlar.length === 0 ? (
         <Card>
           <Text className="text-sm text-slate-600">
-            Henüz puan hareketin yok. Bir ders anlatıp onaylandığında ilk kaydın burada belirir.
+            Henüz puan hareketin yok. Bir ders anlatıp onaylandığında ya da Topluluk katkın puan
+            kazandığında ilk kaydın burada belirir.
           </Text>
         </Card>
       ) : (
@@ -2224,6 +2228,12 @@ function PuanPaneli({ defter, toplamPuan }) {
   )
 }
 
+/*
+  Alt satır YALNIZCA dersten gelen harekette (konu · karşı taraf). Dersle bağı olmayan
+  harekette (Topluluk katkısı, hoş geldin, yönetim) alt satır ÇİZİLMEZ: eskiden yedek
+  olarak tarih yazılıyordu ve sağ sütundaki aynı tarih satırda iki kez görünüyordu;
+  kaynağı zaten başlık ("Topluluk katkı puanı") söylüyor. Web Sessions.jsx ile aynı kural.
+*/
 function HareketSatiri({ row, ilk }) {
   const kazanc = row.amount > 0
 
@@ -2233,11 +2243,11 @@ function HareketSatiri({ row, ilk }) {
         <Text numberOfLines={1} className="text-sm font-medium text-slate-900">
           {TRANSACTION_LABELS[row.type] ?? row.type}
         </Text>
-        <Text numberOfLines={1} className="text-xs text-slate-600">
-          {row.topicName
-            ? `${row.topicName}${row.counterpartDisplayName ? ` · ${row.counterpartDisplayName}` : ''}`
-            : formatDateTime(row.createdAtUtc)}
-        </Text>
+        {row.topicName ? (
+          <Text numberOfLines={1} className="text-xs text-slate-600">
+            {`${row.topicName}${row.counterpartDisplayName ? ` · ${row.counterpartDisplayName}` : ''}`}
+          </Text>
+        ) : null}
       </View>
 
       <View className="shrink-0 items-end">

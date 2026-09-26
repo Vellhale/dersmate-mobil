@@ -43,6 +43,15 @@ import { SOZLESME_TARIHI } from '../src/lib/yasalMetinler'
   cümle, kullanıcının kendi puan geçmişindeki eksi satırla çelişirdi. Madde bu yüzden
   kaynağı adıyla sayıyor.
 
+  Hoş geldin puanının yanması AYRI MADDEDE ve açıkça (2026-09-27, yine 2026-09-25 içinde,
+  yayından önce; web'le aynı cümle): 2026-09-26 düzeltmesi eski "puan yanar" cümlesini
+  kaldırınca bu yanmayı anlatan tek söz de gitmişti. Kullanıcı puan geçmişinde "Hoş geldin
+  puanı +1" ve 14 gün sonra "Süresi dolan puan −1" görüyor; metin ikisini de karşılamalı.
+  Sayılar sunucudan: WelcomeCreditAmount (1), WelcomeCreditValidityDays (14,
+  appsettings.json → Economy); unvana sayılmaması CreditLedgerService.GrantWelcomeCreditAsync
+  ("UNVANA SAYILMAZ": TotalEarnedCredits yalnızca ders ve Topluluk kazancıyla artar). Biri
+  değişirse bu madde de değişir.
+
   MOBİLE ÖZGÜ TEK EKLEME §6'da: arkadaşlığı tek taraflı sonlandırma. Web metninde yok ama
   kodda VAR (closeMatch — app/eslesmeler.jsx) ve mağaza incelemesinin kullanıcı üretimli
   içerik için aradığı "rahatsız eden kişiyle iletişimi kesebilme" şartının karşılığı bu.
@@ -112,6 +121,10 @@ export default function Kosullar() {
           <Madde>
             Ders anlatarak ve Topluluk katkılarınla kazandığın puanın{' '}
             <Kalin>süresi dolmaz</Kalin>; bu puan yanmaz.
+          </Madde>
+          <Madde>
+            E-posta doğrulamasında verilen hoş geldin puanı 14 gün sonra silinir; seviyene
+            sayılmaz.
           </Madde>
           <Madde>Puanın nakit veya başka bir değerle karşılığı yoktur, devredilemez.</Madde>
         </Maddeler>
