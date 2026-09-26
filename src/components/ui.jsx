@@ -1,4 +1,4 @@
-import { Children, cloneElement, isValidElement, useEffect, useState } from 'react'
+import { Children, cloneElement, isValidElement, useEffect, useRef, useState } from 'react'
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -230,6 +230,128 @@ export function SayacRozeti({ sayi, className = '' }) {
       >
         {sayi > 9 ? '9+' : sayi}
       </Text>
+    </View>
+  )
+}
+
+/**
+ * Hap sekme çubuğu — yatay kayan, SABİT (listeyle kaymaz) sekme dizisi. İlk kullanıcı
+ * Derslerim (beş sekme); yüzey dili tek yerde kalsın diye burada.
+ *
+ * NEDEN HAP, NEDEN KAYAN: Arkadaşlar'daki gri segment rayı üç kısa etiket için. Derslerim'in
+ * beş etiketi kullanıcının adları ve değiştirilmiyor ("Senden aksiyon bekleyenler" tek başına
+ * dar ekranın yarısı): eşit dilimde sığmıyor, iki satırda üçe kırılıyordu. Kayan dizide ad
+ * tam kalıyor ve yazı büyütmede de bozulmuyor; kenarda kesik görünen hap "daha var" ipucu.
+ *
+ * RENK: beşi de mavi ailede (kullanıcı kararı). Seçili dolu brand-600 + beyaz (4.90:1),
+ * seçili olmayan brand-50 zemin + brand-200 kenar + brand-800 metin (~7.2:1). Seçili olmayanı
+ * gri yapmıyoruz: A düzeninde gri "anlamsız etiket" rengi. Seçilide kenar zeminle aynı renk,
+ * yani iki hâlin boyu eşit ve seçim değişince haplar kıpırdamıyor.
+ *
+ * SAYAÇ yalnızca `sayac` verilen hapta (SayacRozeti, rose; sıfırken çizilmez). Sayıyı ekran
+ * okuyucuya hapın erişim adı taşır (`erisimAdi`): rozet ondan gizli.
+ *
+ * SEÇİLİ HAP GÖRÜNÜR TUTULUR: seçim değişince (adres, bildirim, rezervasyon sonrası) ya da
+ * seçili hap yer değiştirince (aksiyon sayacı ilk veriyle gelince arkasındaki haplar sağa
+ * kayar) çubuk yalnızca hap görünür alanın dışındaysa kaydırılır. Kullanıcının dokunduğu hap
+ * zaten görünür; onu kenara çekmek çubuğu boşuna zıplatırdı.
+ *
+ * ERİŞİLEBİLİRLİK: kap tablist, hap tab. Seçim hem accessibilityState hem aria-selected ile:
+ * RN Web 0.21 accessibilityState'i DOM'a yazmıyor (dersler.jsx'teki aria-checked notu).
+ *
+ * @param sekmeler [{ anahtar, etiket, sayac?, erisimAdi? }]
+ * @param secili   seçili anahtar; null iken hiçbiri seçili değil (ilk veri gelmeden)
+ */
+export function HapSekmeCubugu({ sekmeler, secili, onSec, accessibilityLabel }) {
+  const kaydirma = useRef(null)
+  const sira = useRef(null) // hapları taşıyan satır: ölçüm bunun içindeki konum
+  const haplar = useRef({}) // anahtar → hapın görünümü
+  const gorunum = useRef({ x: 0, genislik: 0 })
+  const PAY = 16
+
+  /*
+    KONUM KAYDIRMA ANINDA ÖLÇÜLÜR, onLayout'tan SAKLANMAZ. RN Web onLayout'u ResizeObserver
+    ile üretiyor: yalnızca YER DEĞİŞTİREN hap (aksiyon sayacı gelince sağa kayan
+    "Rezerve geçmişi") yeni konumunu hiç bildirmiyor. Saklanan x sayacın genişliği kadar
+    (~24px) geride kalıyordu ve seçilen son hap ekranın kenarında kesik duruyordu
+    (önizlemede ölçüldü). measureLayout iki platformda da o anki konumu veriyor.
+  */
+  function gorunurYap(anahtar) {
+    const hap = haplar.current[anahtar]
+    if (!hap?.measureLayout || !sira.current || !gorunum.current.genislik) return
+    hap.measureLayout(
+      sira.current,
+      (x, _y, genislik) => {
+        const { x: bakis, genislik: alan } = gorunum.current
+        if (x - PAY < bakis) {
+          kaydirma.current?.scrollTo({ x: Math.max(0, x - PAY), animated: true })
+        } else if (x + genislik + PAY > bakis + alan) {
+          kaydirma.current?.scrollTo({ x: x + genislik + PAY - alan, animated: true })
+        }
+      },
+      () => {},
+    )
+  }
+
+  useEffect(() => {
+    if (secili) gorunurYap(secili)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [secili])
+
+  // Seçim ölçüden önce geldiyse (soğuk açılışta ?sekme=rezerve) ya da satır genişlediyse
+  // (sayaç rozeti belirdi, haplar kaydı) ölçü gelince yeniden bakılır.
+  const yenidenBak = () => {
+    if (secili) gorunurYap(secili)
+  }
+
+  return (
+    <View className="border-b border-slate-200 bg-white">
+      <ScrollView
+        ref={kaydirma}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        accessibilityRole="tablist"
+        accessibilityLabel={accessibilityLabel}
+        className="grow-0"
+        scrollEventThrottle={16}
+        onScroll={(e) => {
+          gorunum.current.x = e.nativeEvent.contentOffset.x
+        }}
+        onLayout={(e) => {
+          gorunum.current.genislik = e.nativeEvent.layout.width
+          yenidenBak()
+        }}
+      >
+        <View ref={sira} onLayout={yenidenBak} className="flex-row gap-2 px-4 py-2">
+          {sekmeler.map(({ anahtar, etiket, sayac = 0, erisimAdi }) => {
+            const bu = secili === anahtar
+            return (
+              <Pressable
+                key={anahtar}
+                ref={(el) => {
+                  haplar.current[anahtar] = el
+                }}
+                accessibilityRole="tab"
+                accessibilityLabel={erisimAdi ?? etiket}
+                accessibilityState={{ selected: bu }}
+                aria-selected={bu}
+                onPress={() => onSec(anahtar)}
+                onLayout={bu ? yenidenBak : undefined}
+                className={`min-h-[44px] flex-row items-center gap-1.5 rounded-full border px-4 ${
+                  bu
+                    ? 'border-brand-600 bg-brand-600 active:bg-brand-700'
+                    : 'border-brand-200 bg-brand-50 active:bg-brand-100'
+                }`}
+              >
+                <Text className={`text-sm ${bu ? 'font-semibold text-white' : 'font-medium text-brand-800'}`}>
+                  {etiket}
+                </Text>
+                <SayacRozeti sayi={sayac} />
+              </Pressable>
+            )
+          })}
+        </View>
+      </ScrollView>
     </View>
   )
 }
