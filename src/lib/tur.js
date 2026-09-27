@@ -7,6 +7,28 @@ import { useCallback, useEffect, useRef } from 'react'
  * seçicisiyle (`selector`) DOM'da öğe arıyordu. RN'de document yok — çıpayı öğenin
  * KENDİSİ bildirir (bkz. ölçüm defteri).
  *
+ * ─── 9 → 14 ADIM: AYRINTI YENİ ADIMLARA (2026-09-27) ───────────────────────────────
+ * Kullanıcı kararı: "uygulama biraz karışık, rehberi daha çok detaylandıralım".
+ * Beş adım EKLENDİ — rules, requests, proof, history, safety — ve ayrıntının tamamı
+ * onlara kondu. Kilitli altı adımın (free, discover, portfolio, matches, chat,
+ * sessions) metnine DOKUNULMADI: web'le bayt pariteti böylece kendiliğinden korundu.
+ * Değişen tek eski madde `menu`nun ikincisi (hamburger rozetinin ne saydığı) ve o adım
+ * zaten mobile özgü.
+ *
+ * Beş adım da ÇIPASIZ + yer çipli. Anlattıkları şeyler koddan doğrulandı; ilk taslakta
+ * dokuz iddia yanlış ya da eksikti (doğrulama kodunun kime göründüğü, engellemenin
+ * arkadaşlığı kapatıp kapatmadığı, Rezerve geçmişi'nin kapsamı, Topluluk puan eşiğinin
+ * tek katkıda değil TOPLAM net oyda olması…). Gerekçeler adımların kendi yorumlarında.
+ *
+ * SIRA: mobilde adımlar ARAYA eklendi (anlatım sırası bozulmasın diye), web'de SONA
+ * eklenecek. Sebep `lastStep`: sunucuda tek sayı ve araya ekleme turu yarıda bırakan
+ * kullanıcıyı kaydırıyor. Web CANLIDA, mobil henüz mağazada DEĞİL — bu serbestlik ilk
+ * yayınla kapanır ve sonraki adımlar mobilde de sona eklenir.
+ *
+ * ⚠️ İLERLEME ŞERİDİ yeniden ölçülmeli: dokuz çubuk için ölçülmüştü, on dört için
+ * hesap 320dp'de ~10dp çubuk veriyor (taşma yok, `max-w-[24px] flex-1` küçültüyor) ama
+ * cihazda ve büyük yazıda (1.3) doğrulanmadı. ⛔ Çubuklara min genişlik VERİLMEZ.
+ *
  * ─── 6 → 9 ADIM, WEB'DEN BİLİNÇLİ AYRIŞMA (2026-09-26) ──────────────────────────────
  * Rehber ürünün SON hâlini anlatıyor (kullanıcı kararı). Web 8 adım, mobil 9 ve SIRA
  * farklı; ortak adımların (free, discover, portfolio, matches, chat, sessions) metni iki
@@ -106,6 +128,33 @@ export const TUR_ADIMLARI = [
     ],
   },
   {
+    /*
+      Topluluk'un GERİ ALINAMAZLIĞI ve puan getirmesi hiçbir ekranda yazmıyordu:
+      yazma kipindeki "Paylaşmadan önce" kutusu üç kural sayıyor ama kalıcılığı
+      söylemiyor; sunucuda gönderi/yorum için DELETE ya da PUT ucu YOK, hesap
+      silinse bile içerik kalıyor (ad "Silinmiş kullanıcı" oluyor). İlk kez
+      paylaşan biri bunu ancak silmeyi arayıp bulamayınca öğreniyordu.
+
+      Bağlantı eşiği maddesi "gönderilerde" diyor ve bu BİLİNÇLİ: kapı yalnızca
+      CreateForumPostHandler'da (ForumCommands → BaglantiKapisi), yorumda karşılığı
+      yok. Yorumların serbest olduğunu YAZMIYORUZ — o bir atlatma tarifi olurdu.
+      Kapı yorumlara da konursa ya da Topluluk metni daraltılırsa bu madde de değişir.
+
+      "Topluluk hakkında" diye BİR SAYFA ADI VERİLMEDİ: mobilde o bir alt sayfa,
+      web'de Topluluk sayfasının yan sütunundaki iki kart. Tarafsız ifade sayesinde
+      madde iki platformda BİREBİR aynı kalıyor.
+    */
+    id: 'rules',
+    yer: '/',
+    title: 'Toplulukta neler geçerli',
+    body: 'Paylaştığın gönderi ve yorum geri alınamaz — silme ya da düzenleme yok.',
+    points: [
+      'Yazdıklarının topladığı net oy belli bir düzeye ulaştıkça puan yazılır; puanın ikinci kaynağı burası.',
+      'Kendi gönderine oy veremezsin.',
+      'Dışarıya bağlantı paylaşımı gönderilerde belli bir seviyeden sonra açılıyor; kurallar ve alınan önlemler ayrıca yazılı.',
+    ],
+  },
+  {
     id: 'menu',
     // Menünün KENDİSİ; satırları ortadaki kartlarda yer çipiyle gösteriliyor (yukarıda).
     cipa: 'menu',
@@ -114,7 +163,13 @@ export const TUR_ADIMLARI = [
     body: 'Uygulamanın bütün bölümlerine sol üstteki menüden geçersin.',
     points: [
       'Keşfet, Ders Portföyü, Arkadaşlar, Sohbet, Derslerim ve Topluluk burada.',
-      'Bir satırın yanında sayı görürsen orada seni bekleyen bir iş var.',
+      // Eski hâli yalnızca "bir satırın yanında sayı görürsen …" diyordu ve ÇEKMECE
+      // SATIRLARINI anlatıyordu; hamburgerin ÜSTÜNDEKİ rozet hiç anılmıyordu. Oysa
+      // kullanıcının ilk gördüğü sayı o ve üç şeyin TOPLAMI (Cekmece → parcalar:
+      // okunmamış mesaj + gelenIstek + dersEylem). Mobil alışkanlığıyla "okunmamış
+      // mesaj" sanılıp menüdeki Sohbet sayısıyla çelişkili görünüyordu. Web'de bu
+      // madde YOK: orada hamburgerde sayı değil nokta var ve yalnızca mesaj sayıyor.
+      'Menü düğmesindeki kırmızı sayı üçünün toplamı — okunmamış mesaj, sana gelen istek ve senden iş bekleyen ders; hangisi olduğu menüdeki satırlarda yazıyor.',
       'Menünün en üstündeki adına dokunursan profiline gidersin.',
     ],
   },
@@ -174,6 +229,31 @@ export const TUR_ADIMLARI = [
     ],
   },
   {
+    /*
+      GÖNDERENİN TARAFI hiçbir yerde anlatılmıyordu. Giden istek kartında yalnızca
+      amber "Yanıt bekleniyor" rozeti var: ne tarih, ne geri sayım, ne sonuç.
+      Üç son da gönderende AYNI görünüyor — kart yok olur:
+        kabul   → MatchRequests: Accepted + Conversation açılır, BildirimKuyrugu.IstekKabul
+        ret     → Declined, ⛔ BİLDİRİM YOK (bilinçli: bildirimin gelmemesi engeli ilan ederdi)
+        düşme   → SweepSessions, MatchRules.RequestExpireDays sonunda Expired
+      Kullanıcı bunu hata ya da ağ sorunu sanıyordu. Ret ile engeli AYIRT EDEMEMESİ de
+      bilinçli (engelleme bekleyen isteği Declined yazıyor); rehber bu yüzden ret için
+      ayrı bir vaat VERMİYOR.
+
+      SAYI YAZILMIYOR (dosya kuralı): "bir süre sonra" deniyor, 14 gün değil.
+      Yeniden gönderebilme, mükerrer kontrolünün yalnızca Pending'e bakmasından geliyor.
+    */
+    id: 'requests',
+    yer: '/eslesmeler',
+    title: 'İstek gönderdikten sonra',
+    body: 'Gönderdiğin bir isteğin üç farklı sonu var ve ikisi sessiz.',
+    points: [
+      'Kabul edilirse sohbet açılır ve kişi “Arkadaşlar”da görünür.',
+      'Reddedilirse sana bildirilmez; istek listeden sessizce kalkar.',
+      'Yanıtsız kalan istek bir süre sonra kendiliğinden düşer — aynı kişiye yeniden gönderebilirsin.',
+    ],
+  },
+  {
     id: 'chat',
     yer: '/mesajlar',
     title: 'Sohbet — saati ve linki kararlaştır',
@@ -198,6 +278,83 @@ export const TUR_ADIMLARI = [
       '“Senden aksiyon bekleyenler”, kanıt yüklemen ya da onaylaman gereken dersleri toplar.',
       'Anlatan taraf dersin ekran görüntüsünü yükler, alan taraf onaylar; puan o anda yazılır.',
       'Onay gelmezse ders kendiliğinden onaylanır; sorun varsa itiraz edersin, kararı yönetim verir.',
+    ],
+  },
+  {
+    /*
+      PUAN KAYBINA GİDEN GERÇEK TUZAK. Anlatan, kanıtta doğrulama kodunun görünmesi
+      gerektiğini ilk kez "Dersi tamamladım" kipini açınca okuyordu — o an ders bitmiş,
+      görüşme kapanmış, ekran görüntüsü çoktan alınmış (ya da alınmamış) oluyor.
+
+      ⚠️ KOD BİR SIR DEĞİL, DERSİN KİMLİĞİ. İlk taslak "kodu rezervasyonda alan taraf
+      görür" diyordu; YANLIŞTI: GetMySessions kodu iki role de döndürüyor ve ders kartı
+      rol ayrımı yapmadan çiziyor (dersler.jsx → showCode). Sunucu da görüntüyü OKUMUYOR
+      (SessionRules yalnızca eğitmenin YAZDIĞI kodu karşılaştırıyor; kanıtta tek kontrol
+      tür/boyut). Yani kanıtın gerçekliğini denetleyen tek merci ONA BAKAN öğrenci —
+      kodu bir doğrulama sırrı gibi anlatmak asıl korumayı kaybettirirdi.
+
+      Üçüncü madde otomatik onayın GÖRÜNMEYEN bedelini söylüyor: onay kendiliğinden
+      gelince itiraz yolu da kapanıyor (SessionRules → DisputeViolation yalnızca
+      AwaitingApproval ya da bitişi geçmiş Booked'da açık). Kilitli `sessions` adımı
+      otomatik onayı zaten anıyor, burada EKLENEN şey o bedel.
+    */
+    id: 'proof',
+    yer: '/dersler',
+    title: 'Kanıt ve doğrulama kodu',
+    body: 'Ders bitince anlatan taraf bir ekran görüntüsü yükler; o görüntüde dersin doğrulama kodu ve sistem saati görünmelidir.',
+    points: [
+      'Kod dersin kendisine ait ve Derslerim’de iki tarafta da yazılı; ders başlarken görüşme ekranına yazın.',
+      'Tamamlama, dersin planlanan bitişinden önce açılmaz.',
+      'Onay kendiliğinden geldiğinde itiraz yolu da kapanır — kanıta beklemeden bak.',
+    ],
+  },
+  {
+    /*
+      "Geçmiş dersler" doğal olarak "olup bitmiş her ders" diye okunuyor; oysa yalnızca
+      TAMAMLANANLARI gösteriyor (dersDurumu.js → dersSekmesi; sunucuda ?pastStatus=Completed).
+      İptal edilen ve süresi geçip kapanan ders oraya HİÇ girmiyor. Dersini iptal eden
+      kullanıcı "Geçmiş dersler"e bakıp hiçbir şey bulamıyor ve kaydın silindiğini sanıyordu.
+      ⚠️ "Rezerve geçmişi" yalnızca onların yeri DEĞİL, BÜTÜN rezervasyonların defteri —
+      ilk taslak bunu daraltıyordu.
+
+      Üçüncü madde EN PAHALI BOŞLUĞU kapatıyor: değerlendirme ekranı YALNIZCA öğrencinin
+      ELLE onayının hemen ardından açılıyor (ReviewModal) ve başka girişi yok; kaçıran bir
+      daha yazamıyor, ders otomatik onaylandıysa ekran hiç açılmıyor. Üstelik yazılan
+      değiştirilemiyor ve silinemiyor (sunucuda PUT/DELETE ucu yok), anlatanın profilinde
+      herkese görünüyor. "Sonradan yazarsın" beklentisi kurmak şansı bilmeden harcatırdı.
+    */
+    id: 'history',
+    yer: '/dersler',
+    title: 'Hangi ders hangi sekmede',
+    body: '“Geçmiş dersler” yalnızca tamamlananları gösterir; iptal edilen ve süresi geçip kapanan dersleri bütün rezervasyonların durduğu “Rezerve geçmişi”nde bulursun.',
+    points: [
+      '“Senden aksiyon bekleyenler” kanıt yüklemen ya da onaylaman gereken dersleri toplar; itirazdakiler ayrı başlıkta.',
+      'Anlatan taraf hiç tamamlamazsa rezervasyon bir süre sonra düşer ve kimse puan almaz.',
+      'Onayı verdiğin anda değerlendirme ekranı açılır — tek şansın o an: sonradan yazılamaz, yazdığın da değiştirilemez ve adınla anlatanın profilinde görünür.',
+    ],
+  },
+  {
+    /*
+      ENGELLEMENİN EN ŞAŞIRTICI SONUCU hiçbir metinde yoktu: zaten arkadaş olduğun kişiyi
+      engellersen arkadaşlık AÇIK kalıyor (UserBlocks → kabul edilmiş eşleşmeye
+      dokunulmuyor) ve kişi Arkadaşlar ekranında, "Arkadaşlarım · N" sayısında duruyor.
+      Kullanıcı "engelledim ama hâlâ listemde" deyip engellemenin çalışmadığını sanıyordu.
+
+      ⚠️ İlk taslak "iletişimi bitirmek için ayrıca sonlandır" diyordu; YANLIŞTI: iletişim
+      engellemeyle ZATEN bitiyor (SendMessage 403, BookSession 409). Sonlandırma yalnızca
+      kaydı kaldırıyor — ve AÇIK DERS VARKEN ÇALIŞMIYOR (CloseMatch → AcikDersDurumlari,
+      409). Kullanıcıyı çalışmayacak bir düğmeye göndermemek için sıra böyle kuruldu.
+
+      Engeli kaldırmanın İKİ yolu var; ilk taslak yalnızca birini biliyordu.
+    */
+    id: 'safety',
+    yer: '/kesfet',
+    title: 'Engelleme ve şikayet',
+    body: 'Engellediğin kişi seni aramada bulamaz, sana yazamaz ve yeni ders rezerve edemez.',
+    points: [
+      'Zaten arkadaşsanız engellemek kişiyi arkadaş listenden düşürmez; kaydı da kaldırmak istersen arkadaşlığı ayrıca sonlandır (açık ders varken sonlandırma çalışmaz).',
+      'Engeli Keşfet’in “Arkadaş Ekle” sekmesindeki Engellediklerim listesinden ya da o kişinin profilinden kaldırırsın.',
+      'Kurallara aykırı bir içeriği gördüğün yerden şikayet edersin; kararı yönetim verir.',
     ],
   },
   {
