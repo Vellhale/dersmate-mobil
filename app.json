@@ -107,7 +107,7 @@
     "android": {
       "package": "com.dersmate.app",
       "adaptiveIcon": {
-        "backgroundColor": "#305198",
+        "backgroundColor": "#2B4589",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
