@@ -1,18 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { FlatList, Image, Platform, Pressable, Text, View } from 'react-native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import { api } from '../src/lib/api'
+import { sunulanlariKapat } from '../src/lib/bildirimler'
 import { useYetkiliGorsel } from '../src/components/YetkiliGorsel'
 import { amber, rose, slate } from '../src/lib/theme'
 import { eylemBekliyor } from '../src/lib/dersDurumu'
+import { dersDegisti, dersSurumu, dersSurumuAbone } from '../src/lib/dersSurumu'
 import { ogrenciKonusu } from '../src/lib/iliski'
 import { useAsync } from '../src/state/useAsync'
+import { useBildirim } from '../src/state/BildirimSaglayici'
+import { useIzin } from '../src/state/IzinContext'
+import { useOnePlanaGelince } from '../src/state/useOnePlanaGelince'
 import { useWallet } from '../src/state/WalletContext'
 import { Avatar } from '../src/components/Avatar'
+import { BildirimIzniKarti } from '../src/components/BildirimIzniSorusu'
 import { ReviewModal } from '../src/components/ReviewModal'
 import { OkAsagiIkonu, SaatIkonu, UyariIkonu } from '../src/components/Ikonlar'
 import {
@@ -92,13 +98,63 @@ const PAST_PAGE_SIZE = 5
 
 export default function Dersler() {
   const router = useRouter()
+  const navigation = useNavigation()
   const sessions = useAsync(() => api.mySessions(1, PAST_PAGE_SIZE), [])
   const matches = useAsync(() => api.myMatches(), [])
   const { refreshWallet } = useWallet()
 
   const [notice, setNotice] = useState(null)
+  // Bildirimden gelinen dersin durumu ("artık onay beklemiyor" …) — işlem sonucundan
+  // (notice) ayrı: biri ötekini silmesin.
+  const [bilgi, setBilgi] = useState(null)
   const [bookOpen, setBookOpen] = useState(false)
   const [dialog, setDialog] = useState(null) // { type, session }
+
+  // Kökteki tam ekran katmanlar (veri izni sayfası, bildirim sorusu): açıkken ?ders=
+  // onay sayfasını kendiliğinden AÇMAZ — iOS'ta aynı anda iki RN Modal, biri hiç
+  // görünmeyebiliyor (IzinSayfasi → IZIN_KAPANMA_SURESI notu).
+  const { mutlakaSor, ayarlarAcik } = useIzin()
+  const { soru } = useBildirim()
+  const ustKatmanAcik = mutlakaSor || ayarlarAcik || soru.acik
+
+  const sessionsRef = useRef(sessions)
+  sessionsRef.current = sessions
+  const matchesRef = useRef(matches)
+  matchesRef.current = matches
+
+  /*
+    ARKA PLAN TAZELEMESİ — ders durumu çoğu zaman CİHAZ DIŞINDA değişiyor (eğitmen kanıt
+    yükledi, karşı taraf iptal etti, yeni ders planlandı) ve bu ekran kök yığında KURULU
+    kalıyor. Tetikler:
+    • odağa dönüş ve uygulamanın öne gelişi (useOnePlanaGelince) — kilitli telefona
+      "Dersin onay bekliyor" gelip ikondan dönen kullanıcı onay kartını görsün,
+    • ders sürümü (dersSurumu) — ön planda gelen ders bildirimi odak olayı doğurmuyor;
+      ekran odaktaysa anında, değilse dönüşteki odak tazelemesine bırakılır.
+
+    YALNIZCA AKTİF GRUP DEĞİŞİR: istek yine ilk sayfayı çekiyor ama biriken geçmiş
+    sayfaları (onEndReached) aşağıdaki efekt gereği yalnızca geçmişin TOPLAMI değişince
+    sıfırlanıyor. Her tazeleme birikintiyi silseydi, aşağı kaydırıp sayfa yükleyen
+    kullanıcının listesi her bildirimde 5 kayda inerdi. Kilit (tazeleniyor) ve yukarı
+    kaydırma YOK: kullanıcı bir işlem yapmadı.
+  */
+  function arkaPlanTazele() {
+    sessionsRef.current.reload({ silent: true })
+    // Rezervasyon listesi (arkadaşlar) de aynı anlarda bayatlıyor: yeni kabul edilen istek.
+    matchesRef.current.reload({ silent: true })
+  }
+  useOnePlanaGelince(arkaPlanTazele)
+
+  // Bu ekranın kendi işleminin sürümü: listeyi işlemin kendisi tazeliyor, sayaç yalnızca
+  // DİĞER dinleyiciler (çekmecedeki Derslerim sayacı) için artıyor.
+  const kendiSurumum = useRef(null)
+  useEffect(
+    () =>
+      dersSurumuAbone((surum) => {
+        if (surum === kendiSurumum.current) return
+        if (navigation.isFocused()) arkaPlanTazele()
+      }),
+    [navigation],
+  )
 
   /*
     ?rezerve=<matchId> — REZERVASYON BAĞLAMI ADRESTEN GELİR (Arkadaşlar kartı, Akış ve YKS
@@ -124,6 +180,39 @@ export default function Dersler() {
     const zamanlayici = setTimeout(() => router.setParams({ rezerve: '' }), 0)
     return () => clearTimeout(zamanlayici)
   }, [rezerve, router])
+
+  /*
+    ?ders=<sessionId> — DERS BİLDİRİMİNE DOKUNULDU (onay, otomatik onay, yeni ders, iptal,
+    yaklaşan ders; hepsi aynı adres). ?rezerve= ile aynı kalıp: efektle işlenir ve adresten
+    silinir — ekran tekil ve kurulu kalıyor, router.navigate yalnızca parametreyi değiştiriyor.
+
+    Karar ELDEKİ listeyle VERİLMEZ: o liste bildirimden önceki durumu gösteriyor olabilir.
+    Parametre anındaki veri not ediliyor ve ondan SONRA gelen ilk yanıt bekleniyor (elde
+    veri yoksa ilk yükleme zaten taze). Sonra:
+    • ders hâlâ onay bekliyor ve onaylayacak olan bu kullanıcı → ApproveModal DOĞRUDAN
+      açılır: bildirim "onayla ya da itiraz et" diyor, kullanıcı kartı aramasın. Başka bir
+      sayfa açıksa (rezervasyon, başka bir işlem, kökteki veri izni ya da bildirim sorusu)
+      onun üstüne açılmaz — kart zaten "Senden aksiyon bekleyenler"in başında.
+    • ders aktif ve bekleyen bir iş yok (planlanmış, yaklaşan) → bir şey söylenmez, kart
+      "Planlanmış"ta duruyor.
+    • ders itirazda, geçmişe geçmiş ya da listede hiç yok → durumu söyleyen bir bilgi
+      kutusu. Sessiz kalsaydık kullanıcı bildirimdeki işi arardı.
+
+    ⚠️ Adres bildirimin TÜRÜNÜ taşımıyor (sunucu beş türde de aynı adresi yazıyor), bu
+    yüzden karar dersin GÜNCEL durumundan veriliyor, türden değil. Tasarımdaki tek cümle
+    ("artık onay beklemiyor") yalnızca onay bildirimlerine uyuyordu; iptal ya da yaklaşan
+    ders bildirimine dokunan kullanıcıya yanlış şeyi söylerdi.
+  */
+  const { ders } = useLocalSearchParams()
+  const [hedefDers, setHedefDers] = useState(null) // { id, onceki }
+  useEffect(() => {
+    if (!ders) return
+    setBilgi(null)
+    setHedefDers({ id: String(ders).toLowerCase(), onceki: sessionsRef.current.data })
+    if (sessionsRef.current.data != null) sessionsRef.current.reload({ silent: true })
+    const zamanlayici = setTimeout(() => router.setParams({ ders: '' }), 0)
+    return () => clearTimeout(zamanlayici)
+  }, [ders, router])
 
   /*
     GEÇMİŞİN BİRİKEN KISMI: sessions.data.past ilk 5'i taşır; sonraki sayfalar buraya
@@ -176,18 +265,31 @@ export default function Dersler() {
     if (yukariKaydir) listeRef.current?.scrollToOffset({ offset: 0, animated: true })
   }, [yukariKaydir])
 
+  // Yeni liste geldi: işlem sonrası kilit açılır (kartlar artık taze durumu gösteriyor).
+  useEffect(() => {
+    setTazeleniyor(false)
+  }, [sessions.data])
+
+  /*
+    BİRİKİNTİ SIFIRLAMASI — yalnızca GEÇMİŞİN TOPLAMI değişince (2026-09-25; öncesinde her
+    yeni listede). Geçmişe ders yalnızca EKLENİR (onay, iptal, süre dolumu aktiften geçmişe
+    taşır; geçmişten çıkış yok), yani toplam aynıysa ofsetler de aynı: biriken sayfalar ve
+    uçuştaki "daha getir" hâlâ geçerli. Toplam değiştiyse sayfa sınırları kaydı ve birikinti
+    atılmalı. Bu ayrım, push'la gelen her arka plan tazelemesinin kullanıcının yüklediği
+    sayfaları silmesini önlüyor (bkz. arkaPlanTazele).
+  */
+  const gecmisToplamAnahtari = sessions.data?.past?.totalCount ?? null
   useEffect(() => {
     gecmisNesil.current += 1
     gecmisKilit.current = false
     setEkGecmis([])
     setGecmisSayfa(1)
     setGecmisHata(null)
-    setTazeleniyor(false)
     /* Uçuştaki "daha getir" yanıtı yukarıdaki nesil kuralıyla ATILIYOR ve kendi finally'si
        eski nesle ait olduğu için bayrağı indirmiyor. Burada indirilmezse liste dibindeki
        spinner, isteği çoktan çöpe atılmış bir sayfa için süresiz dönerdi. */
     setGecmisYukleniyor(false)
-  }, [sessions.data])
+  }, [gecmisToplamAnahtari])
 
   // Tazeleme hatayla biterse data değişmez ve yukarıdaki efekt koşmaz: kilit burada açılır,
   // yoksa düğmeler ErrorBox'ın yanında kalıcı olarak pasif kalırdı.
@@ -206,7 +308,7 @@ export default function Dersler() {
     const simdi = Date.now()
 
     /*
-      Aksiyon tanımı Akış başlığındaki Derslerim sayacıyla ORTAK (lib/dersDurumu.js): rozet
+      Aksiyon tanımı çekmecedeki Derslerim sayacıyla ORTAK (lib/dersDurumu.js): rozet
       "2" deyip burada tek kart görünmesin. İtirazdaki dersler eskiden bu grubun içindeydi,
       ama onlarda kullanıcının basabileceği bir düğme yok, karar yönetimde. Ayrı başlığa
       alındılar. Aksi hâlde "Senden aksiyon bekleyenler" yapılamayacak bir iş vaat ediyordu.
@@ -246,6 +348,50 @@ export default function Dersler() {
   const dahaVar = gecmisItems.length < gecmisToplam
   const activeTruncated = (sessions.data?.activeTotal ?? 0) > (sessions.data?.active?.length ?? 0)
 
+  // ?ders= kararı: parametreden SONRA gelen ilk yanıtla (gerekçe yukarıda, ?ders= notunda).
+  useEffect(() => {
+    if (!hedefDers) return
+    // Tazeleme düştüyse karar verilmez: dakikalar sonra başka bir tazelemeyle kendiliğinden
+    // açılan bir onay sayfası, dokunuşla bağını yitirmiş olurdu.
+    if (sessions.error) {
+      setHedefDers(null)
+      return
+    }
+    const veri = sessions.data
+    if (veri == null || veri === hedefDers.onceki) return
+    setHedefDers(null)
+
+    const ayni = (s) => String(s?.sessionId ?? '').toLowerCase() === hedefDers.id
+    const aktif = (veri.active ?? []).find(ayni)
+    if (aktif) {
+      if (aktif.canApprove) {
+        if (!dialog && !bookOpen && !ustKatmanAcik) setDialog({ type: 'approve', session: aktif })
+        return
+      }
+      if (aktif.status === 'Disputed') {
+        setBilgi('Bu ders itirazda; karar yönetimde. Sonuç burada görünecek.')
+        setYukariKaydir((n) => n + 1)
+      }
+      return
+    }
+    const gecmis = gecmisItems.find(ayni)
+    const cumle =
+      gecmis?.status === 'Completed'
+        ? 'Bu ders tamamlandı ve onaylandı; senden beklenen bir şey kalmadı.'
+        : gecmis?.status === 'Cancelled'
+          ? 'Bu ders iptal edildi.'
+          : gecmis?.status === 'Expired'
+            ? 'Bu dersin süresi doldu.'
+            : activeTruncated
+              ? 'Bu ders, listenin gösterilen kısmında değil. Tamamlanan dersleri onayladıkça görünür.'
+              : 'Bu ders artık aktif değil (onaylandı, iptal edildi ya da süresi doldu). Geçmiş derslerinde bulabilirsin.'
+    setBilgi(cumle)
+    setYukariKaydir((n) => n + 1)
+    // dialog/bookOpen/gecmisItems yalnızca karar anında okunuyor; değişimleri kararı
+    // yeniden tetiklememeli.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessions.data, sessions.error, hedefDers])
+
   async function dahaGetir() {
     if (gecmisKilit.current || !dahaVar) return
     const nesil = gecmisNesil.current
@@ -284,17 +430,27 @@ export default function Dersler() {
 
     veriDegisti: false — işlem ders listesini değiştirmiyor (şikayet dersin akışına
     dokunmaz). Listeyi yeniden çekmek yalnızca birikmiş geçmiş sayfalarını 5'e sıfırlardı.
+
+    dersId: işlem o dersin bekleyen işini KAPATTI (onay, itiraz, iptal, tamamlama) — bildirim
+    merkezinde duran "Dersin onay bekliyor" / "Dersin yaklaşıyor" artık yanlış bir iş vaat
+    ediyor ve kaldırılıyor. Sunucu da sonraki hatırlatmaları durum kontrolüyle eliyor.
+
+    Veri değiştiyse ders sürümü artar: çekmecedeki Derslerim sayacı bu işlemi görsün.
   */
-  function refresh(message, { veriDegisti = true } = {}) {
+  function refresh(message, { veriDegisti = true, dersId = null } = {}) {
     setDialog(null)
     setBookOpen(false)
     setOnSecim(null)
+    setBilgi(null)
     if (message) setNotice(message)
     setYukariKaydir((n) => n + 1)
     if (veriDegisti) {
       setTazeleniyor(true)
       sessions.reload({ silent: true })
+      kendiSurumum.current = dersSurumu() + 1
+      dersDegisti()
     }
+    if (dersId) sunulanlariKapat({ grup: 'ders', kayitId: dersId })
     matches.reload({ silent: true })
     // Onay puan basar; seviye rozeti aynı cüzdan ucundan besleniyor.
     refreshWallet()
@@ -329,6 +485,18 @@ export default function Dersler() {
           {notice}
         </Notice>
       )}
+
+      {bilgi && (
+        <Notice tone="info" onDismiss={() => setBilgi(null)}>
+          {bilgi}
+        </Notice>
+      )}
+
+      {/* Bildirim kartı — yaklaşan ders varken, rezervasyon bildiriminin ALTINDA: doğrulama
+          kodu (notice) örtülmez, not alınabilir. Modal değil, çünkü rezervasyon zaten bir alt
+          sayfadan dönüyor ve kod tam o an okunmalı. Eğitmen de (dersi o planlamadı) burada
+          görür: "ders yaklaşıyor" en çok onun işine yarıyor. Görünürlük sağlayıcıda. */}
+      {groups.upcoming.length > 0 ? <BildirimIzniKarti kimlik="rezervasyon" /> : null}
 
       <ErrorBox error={sessions.error} onRetry={sessions.reload} />
 
@@ -476,7 +644,11 @@ export default function Dersler() {
           key={dialog.session.sessionId}
           session={dialog.session}
           onClose={() => setDialog(null)}
-          onDone={() => refresh('Kanıt yüklendi. Ders karşı tarafın onayına gönderildi.')}
+          onDone={() =>
+            refresh('Kanıt yüklendi. Ders karşı tarafın onayına gönderildi.', {
+              dersId: dialog.session.sessionId,
+            })
+          }
         />
       )}
 
@@ -493,7 +665,7 @@ export default function Dersler() {
               credits > 0
                 ? `Ders onaylandı. ${session.otherDisplayName} kişisine ${credits} puan yazıldı.`
                 : 'Ders onaylandı.'
-            refresh(onay)
+            refresh(onay, { dersId: session.sessionId })
             // Değerlendirme onayın hemen ardından: yorum ancak tamamlanmış dersin
             // çıktısı olabilir ve bu an tam olarak o an.
             setDialog({ type: 'review', session, onay })
@@ -511,6 +683,7 @@ export default function Dersler() {
             refresh(
               'İtirazın yönetime iletildi. Karar verilene kadar puan yazılmayacak; ' +
                 'sonucu Derslerim ekranından takip edebilirsin.',
+              { dersId: dialog.session.sessionId },
             )
           }
         />
@@ -555,7 +728,7 @@ export default function Dersler() {
           key={dialog.session.sessionId}
           session={dialog.session}
           onClose={() => setDialog(null)}
-          onDone={() => refresh('Ders iptal edildi.')}
+          onDone={() => refresh('Ders iptal edildi.', { dersId: dialog.session.sessionId })}
         />
       )}
     </SafeAreaView>

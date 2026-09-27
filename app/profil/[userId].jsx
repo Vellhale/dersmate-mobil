@@ -5,7 +5,9 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { api } from '../../src/lib/api'
 import { engelDegisti, engelSurumu } from '../../src/lib/engelSurumu'
 import { ILISKI } from '../../src/lib/iliski'
+import { iliskiDegisti } from '../../src/lib/iliskiSurumu'
 import { useAsync } from '../../src/state/useAsync'
+import { useBildirim } from '../../src/state/BildirimSaglayici'
 import { useIliskiler } from '../../src/state/useIliskiler'
 import { EngellemeModali } from '../../src/components/EngellemeModali'
 import { ProfilGorunumu } from '../../src/components/ProfilGorunumu'
@@ -149,6 +151,7 @@ function BaskaKisiIslemleri({ kisi, onNotice }) {
   const navigation = useNavigation()
   const engeller = useAsync(() => api.myBlocks(), [])
   const iliskiler = useIliskiler()
+  const { soruGoster } = useBildirim()
   const [kipAcik, setKipAcik] = useState(false)
   const [busy, setBusy] = useState(false)
   const [hata, setHata] = useState(null)
@@ -202,6 +205,11 @@ function BaskaKisiIslemleri({ kisi, onNotice }) {
       })
       iliskiler.istekGonderildi(kisi.userId)
       onNotice(`${kisi.displayName} kişisine arkadaş isteği gönderildi. Kabul edilince sohbet açılacak.`)
+      // Alttaki Arkadaşlar ekranı ve çekmece sayaçları tazelensin.
+      iliskiDegisti()
+      /* Bildirim aydınlatması — Keşfet'teki istek modallarıyla aynı an. Burada kapanan
+         bir alt sayfa YOK (istek düğmeden doğrudan gidiyor), beklemeye gerek yok. */
+      soruGoster('istek-gonderildi', { gecikme: 0 })
     } catch (err) {
       setSonIslem('istek')
       setHata(err)

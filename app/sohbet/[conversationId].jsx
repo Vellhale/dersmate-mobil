@@ -9,13 +9,16 @@ import {
   Text,
   View,
 } from 'react-native'
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
+import { Stack, useLocalSearchParams, useNavigation, useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { api } from '../../src/lib/api'
+import { sunulanlariKapat } from '../../src/lib/bildirimler'
 import { useAuth } from '../../src/state/AuthContext'
 import { useInbox } from '../../src/state/InboxContext'
+import { useOnePlanaGelince } from '../../src/state/useOnePlanaGelince'
 import { parseHubError } from '../../src/hooks/useChatHub'
 import { formatTime } from '../../src/lib/format'
+import { BildirimIzniKarti } from '../../src/components/BildirimIzniSorusu'
 import { Badge, Button, ErrorBox, Field, GeriDugmesi, Girdi, Loading, Modal, Notice } from '../../src/components/ui'
 
 /*
@@ -34,6 +37,12 @@ import { Badge, Button, ErrorBox, Field, GeriDugmesi, Girdi, Loading, Modal, Not
   • Kapalı sohbette yazma alanı HİÇ ÇİZİLMEZ: kutuyu gösterip sunucuya reddettirmek,
     kullanıcıya mesajını yazdırıp sonra kaybettirmek olurdu.
 
+  PUSH (bildirimler): "Bu sohbet şu an açık" bilgisi BURADA YAZILMAZ — sağlayıcı onu
+  odaktaki rotanın adresinden okuyor (BildirimSaglayici → setAktifSohbet); burada da
+  yazılsaydı iki doğruluk kaynağı olurdu. Bu ekranın işi, bildirim merkezinde duran bu
+  sohbetin bildirimlerini kaldırmak ve okundu işaretlemek (aşağıda, "ODAKTA VE ÖNE
+  DÖNÜŞTE").
+
   MOBİL FARKI — TERS LİSTE: web en alta scrollIntoView ile atlıyordu; RN'de inverted
   FlatList aynı işi yerleşimle yapar — liste alttan başlar, yeni mesaj geldiğinde
   kaydırma konumu kendiliğinden korunur, "ilk açılışta en alta atla" diye bir sorun
@@ -42,8 +51,11 @@ import { Badge, Button, ErrorBox, Field, GeriDugmesi, Girdi, Loading, Modal, Not
 export default function Konusma() {
   const { conversationId } = useLocalSearchParams()
   const router = useRouter()
+  const navigation = useNavigation()
   const { session } = useAuth()
   const inbox = useInbox()
+  // Bu ekranda bir mesaj gönderildi mi: satır içi bildirim kartının koşulu (aşağıda).
+  const [gonderdi, setGonderdi] = useState(false)
 
   const [messages, setMessages] = useState([])
   const [loadingMessages, setLoadingMessages] = useState(false)
@@ -102,12 +114,37 @@ export default function Konusma() {
       .finally(() => !cancelled && setLoadingMessages(false))
 
     api.markRead(conversationId).then(refreshConversations).catch(() => {})
+    // Bildirim merkezinde bu sohbetin bildirimleri duruyorsa (bildirime dokunmadan listeden
+    // gelindi) artık gereksiz: mesajlar ekranda ve okundu sayıldı.
+    sunulanlariKapat({ grup: 'mesaj', kayitId: conversationId })
 
     return () => {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, tarihce])
+
+  /*
+    (1c) ODAKTA VE ÖNE DÖNÜŞTE: okundu işaretle + bu sohbetin bildirimlerini kaldır.
+
+    İki olay, iki senaryo:
+    • Odağa DÖNÜŞ (sohbet → profil → geri): profil açıkken gelen mesajın bildirimi
+      gösterilmiş olabilir (adres artık sohbet değildi; hub kopuksa mesaj burada okundu
+      da işaretlenmedi) ve merkezde kalırdı.
+    • Uygulama öne dönüyor ve bu ekran ZATEN odakta (sohbet açıkken telefon kilitlendi,
+      arada bu sohbetten bildirim geldi, kullanıcı ikondan döndü): odak olayı HİÇ gelmiyor.
+      Arka planda gelen canlı mesaj okundu işaretlenmiyor (onIncomingMessage yalnızca
+      'active' iken işaretliyor); karşı tarafta "okunmadı", ikonda eski rozet kalırdı.
+
+    Öne dönüş yalnızca ekran ODAKTAYKEN işlenir: üstte profil açıkken dönen kullanıcı bu
+    sohbete bakmıyor, onun adına okundu demek yanlış olurdu. Kurulumun kendi odağı
+    atlanıyor (useOnePlanaGelince): ilk işaretlemeyi (1) zaten yaptı.
+  */
+  useOnePlanaGelince(() => {
+    if (!conversationId || !navigation.isFocused()) return
+    sunulanlariKapat({ grup: 'mesaj', kayitId: conversationId })
+    api.markRead(conversationId).then(refreshConversations).catch(() => {})
+  })
 
   /*
     (1b) YENİDEN BAĞLANINCA GEÇMİŞİ TAZELE.
@@ -160,6 +197,7 @@ export default function Konusma() {
         setMessages((prev) => (prev.some((m) => m.id === message.id) ? prev : [...prev, message]))
       }
       setDraft('')
+      setGonderdi(true)
       refreshConversations()
     } catch (err) {
       setSendError(err.name === 'ApiError' ? err : parseHubError(err))
@@ -234,6 +272,14 @@ export default function Konusma() {
             </Notice>
           </View>
         )}
+
+        {/*
+          BİLDİRİM KARTI — ilk mesaj GÖNDERİLDİKTEN sonra, mesaj listesinin üstünde. Soru tam
+          da "yanıt gelince haber verelim mi?" anında anlamlı. Modal DEĞİL: kullanıcı büyük
+          olasılıkla yazmaya devam ediyor ve modal klavyeyi keserdi. Görünürlük sağlayıcıda
+          (ihtiyaç, geri çekilme, oturum başına tek yüzey); gerekmiyorsa kart null döner.
+        */}
+        {gonderdi && !active?.isClosed ? <BildirimIzniKarti kimlik="ilk-mesaj" className="mx-4 mt-3" /> : null}
 
         {loadingMessages ? (
           <View className="flex-1">

@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { Animated, Linking, Modal as RNModal, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native'
 import { usePathname, useRouter } from 'expo-router'
 import { useTurCipasi } from '../lib/tur'
+import { bekleyenIsleriTazele, useBekleyenIsler } from '../lib/bekleyenIsler'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { brand, ink, slate } from '../lib/theme'
 import { useAuth } from '../state/AuthContext'
@@ -66,12 +67,15 @@ import {
 
    ⚠️ SEKME ÇUBUĞU YOK (2026-09-23): gezinmenin TEK yolu burası. Listeden düşen bir
    hedef, uygulamada ulaşılamaz hâle gelir — web'de sol raydan düşürmekle aynı şey. */
+/* `rozet`: satırdaki sayacın kaynağı (Cekmece içinde çözülüyor). Üç sayaç da AYNI dil —
+   rose-600 hap, beyaz rakam (renk rolleri: sayaç = rose) — ve erişilebilir adda cümle
+   olarak okunuyor; çıplak "2" bağlamsız kalırdı. */
 const OGELER = [
   { yol: '/kesfet', etiket: 'Keşfet', Ikon: AramaIkonu },
   { yol: '/olustur', etiket: 'Ders Portföyü', Ikon: KitapIkonu },
-  { yol: '/eslesmeler', etiket: 'Arkadaşlar', Ikon: KisilerIkonu },
-  { yol: '/mesajlar', etiket: 'Sohbet', Ikon: MesajIkonu, rozet: true },
-  { yol: '/dersler', etiket: 'Derslerim', Ikon: KepIkonu },
+  { yol: '/eslesmeler', etiket: 'Arkadaşlar', Ikon: KisilerIkonu, rozet: 'gelenIstek' },
+  { yol: '/mesajlar', etiket: 'Sohbet', Ikon: MesajIkonu, rozet: 'okunmamis' },
+  { yol: '/dersler', etiket: 'Derslerim', Ikon: KepIkonu, rozet: 'dersEylem' },
   /* Web sol rayının son satırı Topluluk (Layout.jsx:89) — çekmece artık o rayın
      BİREBİR karşılığı. Yol '/akis' değil '/': Topluluk aynı zamanda ana ekran, ayrı
      bir /topluluk adresine gitmek aynı ekranı yığına ikinci kez iterdi. */
@@ -124,12 +128,19 @@ function SosyalSatir({ Ikon, ad, kullanici, href, onGit }) {
   )
 }
 
-function Oge({ Ikon, etiket, aktif, rozet, onPress }) {
+/* Sayacın erişilebilir cümlesi — satırın neyi saydığı rakamla birlikte okunur. */
+const ROZET_CUMLESI = {
+  okunmamis: (n) => `${n} okunmamış`,
+  gelenIstek: (n) => `${n} gelen istek`,
+  dersEylem: (n) => `${n} ders işlem bekliyor`,
+}
+
+function Oge({ Ikon, etiket, aktif, rozet, rozetTuru = 'okunmamis', onPress }) {
   const renk = aktif ? brand[300] : slate[200]
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={rozet ? `${etiket}, ${rozet} okunmamış` : etiket}
+      accessibilityLabel={rozet ? `${etiket}, ${ROZET_CUMLESI[rozetTuru](rozet)}` : etiket}
       onPress={onPress}
       className={`min-h-[48px] flex-row items-center gap-3 rounded-xl px-3 ${
         aktif ? 'bg-brand-300/10' : 'active:bg-white/5'
@@ -157,6 +168,21 @@ export function Cekmece({ acik, onKapat, aktifYol }) {
   const { width } = useWindowDimensions()
   const { session } = useAuth()
   const { unreadTotal } = useInbox()
+  /*
+    BEKLEYEN İŞ SAYAÇLARI (kullanıcı kararı, 2026-09-25) — Arkadaşlar'da yanıt bekleyen
+    gelen istek, Derslerim'de kullanıcının kapatabileceği ders. Push'u REDDEDEN kullanıcıya
+    14 günde düşen isteği ve 48 saatte otomatik onaylanan dersi haber veren tek yol bunlar.
+    Veri ve tazeleme kuralları lib/bekleyenIsler.js'te (tek çekim, bütün tüketicilere aynı
+    anlık görüntü); tanımlar Arkadaşlar'ın "Gelen" sekmesi ve Derslerim'in aksiyon
+    grubuyla aynı, yani rozet ile liste ayrışamaz.
+  */
+  const bekleyen = useBekleyenIsler()
+  const sayaclar = { okunmamis: unreadTotal, gelenIstek: bekleyen.gelenIstek, dersEylem: bekleyen.dersEylem }
+
+  // Menü açılırken sayaçlar tazelenir: kullanıcı tam da onlara bakmak üzere.
+  useEffect(() => {
+    if (acik) bekleyenIsleriTazele()
+  }, [acik])
 
   /* Panel genişliği: ekranın %82'si ama en fazla 320. Dar telefonda menü ekranı
      tamamen kaplamamalı — arkadaki içeriğin bir şeridi görünsün ki "üstte bir katman
@@ -257,7 +283,8 @@ export function Cekmece({ acik, onKapat, aktifYol }) {
                 Ikon={Ikon}
                 etiket={etiket}
                 aktif={aktifYol === yol}
-                rozet={rozet && unreadTotal > 0 ? unreadTotal : null}
+                rozet={rozet && sayaclar[rozet] > 0 ? sayaclar[rozet] : null}
+                rozetTuru={rozet}
                 onPress={() => git(yol)}
               />
             ))}
@@ -355,6 +382,24 @@ export function useCekmece() {
 export function HamburgerDugmesi() {
   const { ac } = useCekmece()
   const { unreadTotal } = useInbox()
+  /*
+    TOPLAM ROZET (kullanıcı kararı, 2026-09-26): okunmamış mesaj + gelen istek + işlem bekleyen
+    ders. Eskiden yalnızca mesajı sayıyordu; istek ve ders sayaçları çekmecenin İÇİNDE kaldığı
+    için menüyü açmayan kullanıcı onları hiç görmüyordu. İkisi de süreli (istek 14 günde düşer,
+    ders 48 saatte kendiliğinden onaylanır) ve push'u reddeden kullanıcıya haber veren tek yer
+    bu düğme. Kural "kırmızı sayı = menüde bekleyen iş var"; hangisi olduğu çekmecenin
+    satırlarında yazıyor, ekran okuyucu için de erişilebilir adda tek tek sayılıyor.
+
+    Veri çekmeceyle AYNI depodan (lib/bekleyenIsler.js): düğme her kabuk ekranında ayrı örnek
+    ama depo tek çekim yapıyor, yani bu abonelik yeni istek doğurmuyor.
+  */
+  const bekleyen = useBekleyenIsler()
+  const parcalar = [
+    [unreadTotal, 'okunmamış mesaj'],
+    [bekleyen.gelenIstek, 'gelen istek'],
+    [bekleyen.dersEylem, 'ders işlem bekliyor'],
+  ].filter(([n]) => n > 0)
+  const toplam = parcalar.reduce((t, [n]) => t + n, 0)
   /* TUR ÇIPASI: 'matches' ve 'sessions' adımları eskiden Akış başlığındaki iki ikona
      ışık tutuyordu. O ikonlar kalktı (hedefleri çekmeceye taşındı), çıpa da buraya
      geldi. İki adım da aynı öğeyi gösteriyor ve bu doğru: ikisinin de yolu menüden
@@ -367,25 +412,26 @@ export function HamburgerDugmesi() {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={unreadTotal > 0 ? `Menüyü aç, ${unreadTotal} okunmamış mesaj` : 'Menüyü aç'}
+      accessibilityLabel={['Menüyü aç', ...parcalar.map(([n, ad]) => `${n} ${ad}`)].join(', ')}
       onPress={ac}
-      className="-ml-2 h-11 w-11 items-center justify-center rounded-lg active:bg-slate-100"
+      // h-[44px]: h-11 rem ve cihazda 38.5dp çiziyordu (NativeWind rem = 14; CLAUDE.md "Dokunma").
+      className="-ml-2 h-[44px] w-[44px] items-center justify-center rounded-lg active:bg-slate-100"
       {...cipa}
     >
       <MenuIkonu renk={slate[700]} boy={24} />
       {/*
-        OKUNMAMIŞ ROZETİ — sekme çubuğundaki tabBarBadge'in yerini alıyor (2026-09-23).
-        Çubuk kalkınca okunmamış sayısı YALNIZCA çekmece açılınca görünür olacaktı:
-        kullanıcı yeni mesajı olduğunu fark edemezdi. Hamburger artık her kabuk
-        ekranında duran tek kalıcı gezinme işareti, rozetin yeri burası.
+        ROZET — sekme çubuğundaki tabBarBadge'in yerini alıyor (2026-09-23). Çubuk kalkınca
+        sayaçlar YALNIZCA çekmece açılınca görünür olacaktı; hamburger her kabuk ekranında
+        duran tek kalıcı gezinme işareti, rozetin yeri burası. 2026-09-26'dan beri toplamı
+        gösteriyor (gerekçe yukarıda).
 
         Rakam rozetin içinde ama erişilebilir ad cümleyi taşıyor (yukarıda): çıplak
         bir sayı ekran okuyucuda bağlamsız kalırdı — sekme çubuğundaki kuralın aynısı.
       */}
-      {unreadTotal > 0 ? (
+      {toplam > 0 ? (
         <View className="absolute right-0.5 top-0.5 min-w-[18px] items-center rounded-full bg-rose-600 px-1 py-px">
           <Text className="text-[10px] font-bold text-white">
-            {unreadTotal > 99 ? '99+' : unreadTotal}
+            {toplam > 99 ? '99+' : toplam}
           </Text>
         </View>
       ) : null}

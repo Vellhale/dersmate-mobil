@@ -1,4 +1,12 @@
 import '../global.css'
+/*
+  YAN ETKİLİ İÇE AKTARMA — bildirim çekirdeği yüklenirken ön plan işleyicisini
+  (setNotificationHandler) kuruyor. İşleyici yokken uygulama açıkken gelen bildirim HİÇ
+  gösterilmiyor ve ilk bildirim herhangi bir bileşen kurulmadan gelebilir; kurulum bu
+  yüzden bir sağlayıcının efektine bırakılmadı. Modül, push'un olmadığı ortamlarda
+  (Expo Go, web, önizleme, yerel modülü olmayan eski kabuk) kendiliğinden no-op.
+*/
+import '../src/lib/bildirimler'
 import { useEffect } from 'react'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
@@ -7,6 +15,8 @@ import { AuthProvider, useAuth } from '../src/state/AuthContext'
 import { WalletProvider } from '../src/state/WalletContext'
 import { InboxProvider } from '../src/state/InboxContext'
 import { IzinProvider } from '../src/state/IzinContext'
+import { BildirimSaglayici } from '../src/state/BildirimSaglayici'
+import { BildirimIzniModali } from '../src/components/BildirimIzniSorusu'
 import { UrunTuru } from '../src/components/UrunTuru'
 import { IzinSayfasi } from '../src/components/IzinSayfasi'
 import { CekmeceSaglayici } from '../src/components/Cekmece'
@@ -89,13 +99,31 @@ function RootNavigator() {
         <Stack.Screen name="eslesmeler" dangerouslySingular />
         <Stack.Screen name="dersler" dangerouslySingular />
         <Stack.Screen name="yonetim" dangerouslySingular />
+        {/* Bildirim ayarları: Profil'den ve bildirim dokunuşundan (/bildirimler) açılıyor.
+            Tekil, çünkü dokunuş router.navigate ile geliyor ve açık ekranı öne almalı.
+            Korunan listede: oturumsuz açılsaydı tercih uçları 401'e koşardı. */}
+        <Stack.Screen name="bildirimler" dangerouslySingular />
         {/* Eski /topluluk adresi: dosya artık yalnızca köke yönlendiriyor ama rota
             KAYITLI kalmalı, yoksa dersmate://topluluk ölür. */}
         <Stack.Screen name="topluluk" />
         {/* Gerçek DETAY ekranları: kayma animasyonu ve kenar kaydırma varsayılan
-            kalıyor, singular DEĞİLLER — farklı kimlikler ayrı ekranlardır. */}
+            kalıyor. Profil singular DEĞİL — farklı kimlikler ayrı ekranlardır. */}
         <Stack.Screen name="profil/[userId]" />
-        <Stack.Screen name="sohbet/[conversationId]" />
+        {/*
+          SOHBET TEKİL — ama KİMLİK BAŞINA: `dangerouslySingular` true iken expo-router
+          kimliği rota parametresinden üretiyor (useScreens.js → getSingularId,
+          "sohbet/<id>"). Farklı sohbetler yine ayrı ekranlar; AYNI sohbetin ikinci ekranı
+          açılamıyor, navigate mevcut olanı en üste taşıyor.
+
+          NEDEN ŞART (push ile geldi): sohbet → karşı tarafın profili → aynı sohbetin
+          bildirimine dokunma, yığına İKİNCİ bir X ekranı itiyordu. Geri basınca sökülen
+          kopya LeaveConversation(X) çağırıyor ve iki ekran AYNI hub bağlantısını
+          paylaştığı için (tek bağlantı kuralı, InboxContext) bağlantı gruptan çıkıyordu.
+          ReceiveMessage yalnızca gruba gittiğinden ekranda kalan sohbet "Canlı bağlantı"
+          yazarken yeni mesaj almazdı. Bildirim yolu router.navigate kullanıyor; tekillik
+          olmadan navigate yalnızca hedef EN ÜSTTEYKEN aynı ekranı yeniden kullanır.
+        */}
+        <Stack.Screen name="sohbet/[conversationId]" dangerouslySingular />
       </Stack.Protected>
       <Stack.Protected guard={!isAuthenticated}>
         <Stack.Screen name="(auth)" />
@@ -118,15 +146,26 @@ function RootNavigator() {
   return (
     <WalletProvider>
       <InboxProvider>
-        {/* ÇEKMECE SAĞLAYICISI BURADA — InboxProvider içinde ve oturumlu dalda.
-            Cekmece hem useAuth hem useInbox okuyor (kimlik satırı, okunmamış rozeti);
-            dışarı alınsaydı oturumsuz açılışta bağlam bulunamaz ve uygulama çökerdi.
-            Ekranların İÇİNDE değil kabukta çiziliyor: RNModal ayrı bir yerel pencere,
-            ekran başına bir kopya olsaydı geçişte takılı kalanlar doğardı. */}
-        <CekmeceSaglayici>{stack}</CekmeceSaglayici>
-        {/* Ürün turu YALNIZCA oturumlu dalda: ilerlemeyi api.myPreferences'tan okuyor
-            ve o uç oturum istiyor. Hiçbir ekranı değiştirmiyor, kökte tek satır. */}
-        <UrunTuru />
+        {/* BİLDİRİM SAĞLAYICISI InboxProvider'ın İÇİNDE: ön planda gelen mesaj
+            bildirimi sohbet listesini tazeliyor ve uygulama ikonundaki rozet okunmamış
+            toplamından yazılıyor. Oturumsuz dalda kurulmuyor — kaydedilecek hesap yok;
+            oturum yokken dokunulan bildirim yerel modülde bekler, girişte işlenir.
+            Ekranları sarıyor: istek gönderen ekranlar aydınlatma sorusunu buradan
+            tetikliyor (useBildirim). */}
+        <BildirimSaglayici>
+          {/* ÇEKMECE SAĞLAYICISI BURADA — InboxProvider içinde ve oturumlu dalda.
+              Cekmece hem useAuth hem useInbox okuyor (kimlik satırı, okunmamış rozeti);
+              dışarı alınsaydı oturumsuz açılışta bağlam bulunamaz ve uygulama çökerdi.
+              Ekranların İÇİNDE değil kabukta çiziliyor: RNModal ayrı bir yerel pencere,
+              ekran başına bir kopya olsaydı geçişte takılı kalanlar doğardı. */}
+          <CekmeceSaglayici>{stack}</CekmeceSaglayici>
+          {/* Ürün turu YALNIZCA oturumlu dalda: ilerlemeyi api.myPreferences'tan okuyor
+              ve o uç oturum istiyor. Hiçbir ekranı değiştirmiyor, kökte tek satır. */}
+          <UrunTuru />
+          {/* Bildirim aydınlatma modalı — tek örnek, çekmeceyle aynı gerekçe (RNModal ayrı
+              pencere). Açılış kararı sağlayıcıda; tur açıkken kendiliğinden açılmaz. */}
+          <BildirimIzniModali />
+        </BildirimSaglayici>
       </InboxProvider>
     </WalletProvider>
   )

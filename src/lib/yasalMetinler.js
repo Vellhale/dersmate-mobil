@@ -65,11 +65,32 @@
   YAYINI demekti ve her yayın mağaza incelemesi kadar gün yiyor.
 */
 
+/*
+  ─── 2026-09-25: 2026-09-19 → 2026-09-25 (PUSH BİLDİRİMLERİ, ÜÇ YER BİRLİKTE) ──────
+
+  Bu artış YENİ BİR İFŞA ve artması ZORUNLUYDU. Push bildirimleri üç şeyi birden
+  getiriyor: yeni bir veri türü (telefonun bildirim adresi, bildirim tercihleri, bildirim
+  kayıtları), yeni alıcılar (Expo, Google FCM, Apple APNs) ve bunlarla birlikte yeni bir
+  yurt dışı aktarım. Gizlilik §2/§3/§4/§5/§6/§7 AYNI turda yazıldı (app/gizlilik.jsx):
+  sayı metinsiz yükselmedi.
+
+  Sunucu (LegalDocuments.CurrentVersion) ve web (frontend/src/lib/yasalMetinler.js) aynı
+  değere AYNI dalda (ozellik/push-bildirimleri) çekiliyor. Yukarıdaki "önce mobil yayın,
+  sonra sunucu" sırası bu kez GEREKMİYOR: mağazada henüz uygulama yok, yani eski sabiti
+  gönderecek kurulu bir paket de yok. Mağazaya ilk çıkış bu değerle olacak; ondan sonraki
+  her artışta sıra yeniden "önce mobil yayın".
+
+  ⚠️ Eski kullanıcılar YENİDEN ONAYLATILMIYOR: sürüm yalnızca yeni kayıtları kapsıyor
+  (Register.cs). Mevcut kullanıcının push'a ilişkin aydınlatması uygulama içinde, veri
+  akışından ÖNCE yapılıyor (BildirimIzniSorusu → "Aç/Devam" → sunucuda
+  DisclosureShownAtUtc) ve sunucu o damga olmadan cihaz kaydını kabul etmiyor.
+*/
+
 /** Sunucudaki LegalDocuments.CurrentVersion ile BİREBİR aynı olmalı. */
-export const SOZLESME_SURUMU = '2026-09-19'
+export const SOZLESME_SURUMU = '2026-09-25'
 
 /** Kullanıcıya gösterilen biçim. Sürümle aynı günü anlatır. */
-export const SOZLESME_TARIHI = '19 Eylül 2026'
+export const SOZLESME_TARIHI = '25 Eylül 2026'
 
 /*
   ⚠️ ILETISIM_EPOSTA BURADAN KALDIRILDI (2026-09-21) → src/lib/kunye.js.

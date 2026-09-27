@@ -382,10 +382,20 @@ const CIKIS_YOLU = '/api/v1/session/logout'
  *     zarar yok — ama o turda üretilen YENİ token istemcide atıldığı hâlde sunucuda
  *     canlı kalır. Dar bir pencere ve kapatılması sunucunun işi (çıkış, kullanıcının
  *     tüm zincirini sebep=SignedOut ile kapatmalı).
+ *
+ * DÖNÜŞ (push bildirimleriyle geldi): söz, sunucu çıkışı 2xx ile ONAYLADIYSA true, aksi
+ * hâlde false ile çözülür — yine ASLA reddedilmez. Sunucu çıkışta bu cihazın push
+ * kaydını da siliyor (LogoutHandler). Çağrı ulaşmadıysa (uçak modu, sunucu kapalı, token
+ * yok) kayıt sunucuda kalır ve telefona önceki hesabın bildirimleri gelmeye devam ederdi;
+ * false dönünce çağıran bildirimler.js → unutmaIsaretle ile bir sonraki açılışa
+ * "unutma" işi bırakır. Yanıtı yolda kaybolmuş başarılı bir çıkış da false görünür:
+ * zararsız, unutma ucu idempotent.
  */
 export function oturumuSonlandir(refreshToken) {
-  // Önizlemede sunucu yok; ağa çıkma.
-  if (ONIZLEME || !refreshToken) return Promise.resolve()
+  // Önizlemede sunucu yok; ağa çıkma. Push kaydı da yok, unutulacak bir şey kalmaz.
+  if (ONIZLEME) return Promise.resolve(true)
+  // Token yoksa sunucu hangi cihazdan çıkıldığını bilemez: kayıt silinmedi sayılır.
+  if (!refreshToken) return Promise.resolve(false)
 
   return axios
     .post(
@@ -394,9 +404,36 @@ export function oturumuSonlandir(refreshToken) {
       { timeout: 15000 },
     )
     .then(
-      () => {},
-      () => {},
+      () => true,
+      () => false,
     )
+}
+
+const PUSH_UNUTMA_YOLU = '/api/v1/push/devices/forget'
+
+/**
+ * Push token'ını sunucudan unutturur (POST /push/devices/forget, 204).
+ *
+ * ⛔ api.request() DEĞİL, HAM AXIOS ve BAŞLIKSIZ — oturumuSonlandir'la aynı sebepten.
+ * Uç [AllowAnonymous]: çevrimdışı çıkıştan SONRAKİ açılışta, yani çoğu zaman oturum
+ * YOKKEN çağrılıyor. İstemci üzerinden gitseydi, arada yeni bir oturum açılmışsa o
+ * oturumun token'ı eklenir ve bu uçtan dönen herhangi bir 401 interceptor'da oturumu
+ * DÜŞÜRÜRDÜ — kullanıcının az önce açtığı oturum, alakasız bir temizlik isteği yüzünden.
+ *
+ * FIRLATIR (oturumuSonlandir'ın tersine): çağıran (bildirimler.js → unutmaCalistir)
+ * işareti yalnızca başarıda siler; hata olursa iş bir sonraki açılışa kalır.
+ */
+function pushKaydiniUnut(token) {
+  if (ONIZLEME) return Promise.resolve(null)
+  return axios.post(`${API_BASE}${PUSH_UNUTMA_YOLU}`, { token }, { timeout: 15000 }).then(
+    () => null,
+    (err) => {
+      const status = err?.response?.status
+      if (!status) throw ulasilamadiHatasi()
+      const data = err.response.data
+      throw new ApiError(data?.detail ?? varsayilanHataMetni(status), data?.title ?? 'UNKNOWN', status)
+    },
+  )
 }
 
 /*
@@ -1056,6 +1093,59 @@ export const api = {
       method: 'PUT',
       body: { lastStep, completed, suppressed },
     }),
+
+  /*
+    ─── PUSH BİLDİRİMLERİ ─────────────────────────────────────────────────────
+    Sunucudaki PushController'ın (api/push) birebir yolları ve gövdeleri. Web'de de aynı
+    altı sarmalayıcı var (parite), arayüzü yalnızca mobil çağırıyor. Bu dosya YALNIZCA
+    uçları tanır: izin, token, kanal ve tek uçuş kuralları src/lib/bildirimler.js'te —
+    ekranlar bu metotları doğrudan değil, o modül üzerinden çağırmalı.
+
+    Tercihler neden /api/v1/preferences'ta DEĞİL: orası rıza satırı (xmin korumalı);
+    her anahtar dokunuşu onun sürümünü oynatır ve rıza kaydını ezme riski doğardı.
+    Push tercihleri ayrı tabloda, alan başına tek sütunluk upsert'le yazılıyor.
+  */
+
+  /**
+   * Bu cihazın push token'ını oturumdaki hesaba bağlar (idempotent upsert).
+   * @param {{ token: string, platform: 'Android'|'Ios', hwidHash: string, kapaliKanallar?: string[] }} kayit
+   *   kapaliKanallar: Android'de telefon ayarlarından kapatılmış kanal kimlikleri.
+   * @returns {Promise<{ kayitli: boolean, alici: string }>} kayitli:false = sunucu HİÇBİR
+   *   ŞEY yazmadı (aydınlatma görülmemiş ya da bu cihazın en yeni oturumu aktif değil).
+   *   alici: bildirim verisindeki alıcı etiketi (hesap kimliğinin HMAC türevi).
+   */
+  registerPushDevice: ({ token, platform, hwidHash, kapaliKanallar = [] }) =>
+    request('/api/v1/push/devices', {
+      method: 'PUT',
+      body: { token, platform, hwidHash, kapaliKanallar },
+    }),
+  /** Token'ı taşıyan cihaz satırını siler; oturum GEREKMEZ, 204 (bulunmasa da). */
+  forgetPushDevice: (token) => pushKaydiniUnut(token),
+  /**
+   * { mesajlar, istekler, dersOnayi, dersPlani: bool, aydinlatmaAtUtc: string|null,
+   *   soruErtelemeSayisi: number, soruErtelendiAtUtc: string|null, alici: string }.
+   * Satır yoksa sunucu varsayılanı döner: dördü açık, damgalar null, sayı 0.
+   */
+  pushPreferences: () => request('/api/v1/push/preferences'),
+  /** @param kategori 'mesajlar' | 'istekler' | 'ders-onayi' | 'ders-plani' — 204; bilinmeyen kategori 404. */
+  setPushPreference: (kategori, acik) =>
+    request(`/api/v1/push/preferences/${encodeURIComponent(kategori)}`, {
+      method: 'PUT',
+      body: { acik },
+    }),
+  /**
+   * Aydınlatma ekranındaki karar — 204.
+   * @param karar 'Acildi' (aydınlatma görüldü, damga ilk kez yazılır) | 'Ertelendi'
+   *   (erteleme sayısı +1). Geri çekilme bu iki alandan hesaplanıyor; cihazda tutulmuyor.
+   */
+  pushPromptDecision: (karar) =>
+    request('/api/v1/push/prompt', { method: 'PUT', body: { karar } }),
+  /**
+   * Çağıranın kendi cihazlarına tek bir deneme bildirimi (kuyruktan geçer, uçtan uca).
+   * @param tur 'mesaj' | 'istek' | 'onay' | 'ders'
+   * @returns {Promise<{ cihaz: number }>} bağlı cihaz sayısı. 10 dakikada 3'ten fazlası 429.
+   */
+  sendTestPush: (tur) => request('/api/v1/push/test', { method: 'POST', body: { tur } }),
 
   /*
     ─── YÖNETİM ───────────────────────────────────────────────────────────────

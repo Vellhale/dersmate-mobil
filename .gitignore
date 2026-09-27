@@ -48,6 +48,14 @@ yarn-error.*
 play-service-account.json
 *-service-account.json
 
+# FCM V1 hizmet hesabı anahtarı (push bildirimleri). Firebase konsolunun verdiği
+# varsayılan ad `<proje>-firebase-adminsdk-<kimlik>.json` ve yukarıdaki
+# *-service-account.json kalıbına UYMUYOR — ayrı kural olmasa herkese açık depoya
+# sızabilirdi. Bu dosya `eas credentials` ile EAS'e yüklenir, depoda hiç durmaz.
+# ⚠️ google-services.json BURADA DEĞİL ve olmamalı: gizli değil, EAS derlemesine gitmesi
+# gerekiyor (app.config.js → googleServicesFile).
+*-firebase-adminsdk-*.json
+
 # Playwright MCP oturum çıktıları
 # Tarayıcı oturumlarının ekran görüntüleri ve konsol dökümleri — her koşuda yeniden
 # üretiliyor, depoda tutulacak bir şey değil. Bu kural olmadan tek bir `git add -A`

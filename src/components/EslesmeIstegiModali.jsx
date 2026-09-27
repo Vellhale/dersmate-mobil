@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { api } from '../lib/api'
 import { ILISKI } from '../lib/iliski'
+import { iliskiDegisti } from '../lib/iliskiSurumu'
+import { useBildirim } from '../state/BildirimSaglayici'
 import { Button, ErrorBox, Modal } from './ui'
 
 /*
@@ -69,6 +71,7 @@ function SecimSatiri({ secili, pasif = false, ek = null, onPress, children }) {
 }
 
 export function EslesmeIstegiModali({ person, myOffers, konuDurumu, kisiIliskisi, onClose, onSent }) {
+  const { soruGoster } = useBildirim()
   const [requestedTopicId, setRequestedTopicId] = useState(null)
   const [offeredTopicId, setOfferedTopicId] = useState(null)
   const [error, setError] = useState(null)
@@ -125,6 +128,14 @@ export function EslesmeIstegiModali({ person, myOffers, konuDurumu, kisiIliskisi
       })
       // Konu da dönüyor: çağıran dokunulan kartı o konu için "istek bekliyor"a çeviriyor.
       onSent(person.displayName, requestedTopicId)
+      // Giden istek listesi değişti: açık Arkadaşlar ekranı ve çekmece sayaçları tazelensin.
+      iliskiDegisti()
+      /* AYDINLATMA SORUSU — isteğin cevabı ancak bildirimle zamanında duyulur; sormanın
+         doğal anı bu. onSent çağıranı sayfayı kapatıyor: soru, sayfa aşağı süzüldükten
+         SONRA açılır (varsayılan gecikme = IZIN_KAPANMA_SURESI; iOS'ta kapanan Modal'la
+         aynı karede açılan ikincisi görünmeyebiliyor). Açılıp açılmayacağına sağlayıcı
+         karar veriyor (izin, geri çekilme, oturumda bir kez, tur). */
+      soruGoster('istek-gonderildi')
     } catch (err) {
       setError(err)
     } finally {
