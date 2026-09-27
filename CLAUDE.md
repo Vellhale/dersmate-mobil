@@ -7,7 +7,8 @@ commit mesajları ve kullanıcıya görünen her metin Türkçe.
 
 ⚠️ **İlk bilinçli istisna: push bildirimleri (2026-09-25, kullanıcı onayıyla).** Push
 sunucusuz yapılamazdı; sunucu + web + mobil aynı iş olarak, aynı adlı dalda
-(`ozellik/push-bildirimleri`) değişti. Sunucuya eklenenler: `comms` şemasında
+(`ozellik/push-bildirimleri`) değişti ve 2026-09-27'de `main`'e birleşti (sunucu + web
+Vellhale/dersmate#38, mobil #20). Sunucuya eklenenler: `comms` şemasında
 `PushDevices`, `Notifications` (defter + outbox), `PushTickets`,
 `NotificationPreferences`, `MessagePushThrottles`; `/api/v1/push/*` uçları; olay
 noktalarında deftere yazım; çıkış/ban/hesap silmede cihaz silme; gönderim işleri. Ayrıntı
@@ -15,9 +16,10 @@ noktalarında deftere yazım; çıkış/ban/hesap silmede cihaz silme; gönderim
 yalnızca istemci.
 
 ⚠️ **İkinci istisna: iki küçük ekleme (2026-09-26, kullanıcı onayıyla, dal
-`tasarim/profil-dersler-topluluk`, iki depoda aynı adla).** İkisi de EKLEMELİ ve geri
-uyumlu: parametresiz istek ve eski istemci bugünkü yanıtı birebir alıyor. Sunucu PR'ı
-istemcilerden ÖNCE birleşip dağıtılır. Sunucu tarafının tuzakları web/sunucu deposunun
+`tasarim/profil-dersler-topluluk`, iki depoda aynı adla; 2026-09-27'de `main`'e birleşti:
+sunucu + web Vellhale/dersmate#39, mobil #21).** İkisi de EKLEMELİ ve geri uyumlu:
+parametresiz istek ve eski istemci bugünkü yanıtı birebir alıyor. Dağıtımda sunucu
+istemcilerden ÖNCE ya da onlarla birlikte çıkar. Sunucu tarafının tuzakları web/sunucu deposunun
 CLAUDE.md'sinde ("Mobil uygulamayla ortak sözleşme").
 
 | ek | neden | mobilde |
@@ -489,23 +491,25 @@ bileşeninin kurulum numarası/adresi; kayıt bayrağı ve çevrimdışı çık�
 işareti) izne tabi değil, "zorunlu" kategoride. Kural `IzinContext.jsx`'te: sürüm izne TABİ kapsam değişince
 artar.
 
-#### ⛔ Birleşme sırası: push PR'ları tasarım dalından önce TEK BAŞINA yayına çıkmaz
+#### Sürüm içi düzeltme ve birleşme sırası (2026-09-27'de kapandı)
 
-`2026-09-25` iki dalda İKİ AYRI METNE karşılık geliyor. `tasarim/profil-dersler-topluluk`
+`2026-09-25` bir süre iki dalda İKİ AYRI METNE karşılık geldi: `tasarim/profil-dersler-topluluk`
 sürümün içinde, yayından önce düzeltildi (Koşullar §3 puan kaynakları ve hoş geldin puanı,
-Gizlilik §2/§6/§7 Topluluk içeriği, §4/§7 ve HesapSilme yol metinleri); açık push PR'ları
-(mobil #20, sunucu + web #38, ikisi de `main`'e hedefli) aynı sürümü ESKİ metinle taşıyor
-("puan yalnızca ders anlatana", "30 günde yanar", Topluluk yok, "Profil ekranının en
-altı"). Push dalı tek başına birleşip sunucu ya da web yayına çıkarsa, o arada kayıt
-olanın `TermsVersion`'ı `2026-09-25` olur ve tasarım dalı gelince aynı dizge başka bir
-metni anlatır: onayın kanıt değeri kaybolur.
+Gizlilik §2/§6/§7 Topluluk içeriği, §4/§7 ve HesapSilme yol metinleri); push PR'ları aynı
+sürümü ESKİ metinle taşıyordu. Push tek başına yayına çıksaydı o arada kayıt olanın
+`TermsVersion`'ı başka bir metni anlatırdı. Bu yüzden dört PR 2026-09-27'de AYNI GÜN ve bu
+sırayla birleşti: Vellhale/dersmate#38 → #39 → mobil #20 → #21. `main`'de artık `2026-09-25`
+TEK metne karşılık geliyor.
 
-Kural: #20 ve #38 TEK BAŞINA `main`'e alınmaz, dağıtılmaz. Tasarım dalı push dalının
-üstünde, yani onun PR'ı push işini de taşıyor: iki iş aynı birleştirmede ve aynı dağıtımda
-çıkar. Push ayrı çıkarsa tasarım dalı birleşmeden ÖNCE `SOZLESME_SURUMU`'nu üç yerde
-artırır; "sürüm içi düzeltme" gerekçesi o andan itibaren geçersizdir. Tarihçe ve gerekçe
-`src/lib/yasalMetinler.js`'te; aynı kural web `lib/yasalMetinler.js`, sunucu
-`LegalDocuments.cs` notu ve web/sunucu CLAUDE.md'sinde. PR açıklamalarına da eklenmeli.
+⚠️ **Kalan kural — dağıtım:** `2026-09-25` hâlâ hiçbir yerde YAYINDA DEĞİL (sunucu dağıtılmadı,
+mağazada uygulama yok). Sunucu (göçlerle birlikte) ve yeni mobil paket AYNI GÜN çıkar; biri
+eski sürüm sabitiyle kalırsa `Register.cs` eşitlik aradığı için o arada kayıt kırılır. İlk
+dağıtımdan SONRA "sürüm içi düzeltme" yolu KAPANIR: yayındaki metin değişirse sürüm artar
+(mağazada uygulama varken sıra için yukarıdaki kurala bak).
+
+`src/lib/yasalMetinler.js`, web `lib/yasalMetinler.js` ve sunucu `LegalDocuments.cs`
+yorumlarındaki "#38 ve #20 tek başına main'e alınmaz" notları bu olayın tarihçesi; kural
+yerine getirildi.
 
 ### ⛔ App Store Connect gizlilik politikası ADRESİ istiyor — uygulama içi metin saymaz
 
@@ -1303,20 +1307,20 @@ bir KOMUT (okunur ve silinir), tekil ekranda aynı komut ikinci kez de çalış�
 - **ADIM 6 (tamam):** hesap silme, itiraz akışı, belge görüntüleyici, `/api/v1` öneki.
 - **ADIM 7 (tamam):** e-posta doğrulama 6 haneli koda geçti, yönetim rozeti profile
   bağlandı, gövdesiz 403/404/5xx'e anlamlı metin, topluluk katkı sayaçları.
-- **ADIM 8 (push bildirimleri — kod tamam, cihaz doğrulaması bekliyor):** M1–M8,
-  `ozellik/push-bildirimleri` dalında (main'e birleşmedi). Sunucu + web aynı adlı dalda.
-  ⬜ M9: kullanıcı adımları ve cihaz senaryoları (bkz. "Push bildirimleri"). Sunucu PR'ı
-  mobil PR'dan önce birleşir. ⛔ Ama push PR'ları tasarım dalından ÖNCE tek başına yayına
-  çıkmaz (sözleşme metni; bkz. "Birleşme sırası").
-- **ADIM 9 (yedi madde — kod tamam, cihaz doğrulaması bekliyor):**
-  `tasarim/profil-dersler-topluluk` dalında (push dalının ÜSTÜNDE; web + sunucu aynı adlı
-  dalda). M1 ikonlar · M2 önizleme verisi + `mySessions` süzgeci · M3 `AltBilgi` + künye ·
+- **ADIM 8 (push bildirimleri — kod tamam ve `main`'de, cihaz doğrulaması bekliyor):** M1–M8,
+  `ozellik/push-bildirimleri` dalında yapıldı, 2026-09-27'de birleşti (mobil #20, sunucu +
+  web Vellhale/dersmate#38). ⬜ M9: kullanıcı adımları ve cihaz senaryoları (bkz. "Push
+  bildirimleri"). ⬜ Dağıtım: sunucu ve yeni paket aynı gün (bkz. "Sürüm içi düzeltme ve
+  birleşme sırası").
+- **ADIM 9 (yedi madde — kod tamam ve `main`'de, cihaz doğrulaması bekliyor):**
+  `tasarim/profil-dersler-topluluk` dalında yapıldı (push dalının ÜSTÜNDE; web + sunucu aynı
+  adlı dalda), 2026-09-27'de birleşti (mobil #21, sunucu + web Vellhale/dersmate#39). M1 ikonlar · M2 önizleme verisi + `mySessions` süzgeci · M3 `AltBilgi` + künye ·
   M4 Hakkımızda yeni metin (`hakkimizdaMetni.js`) + Koşullar §3 · M5 Profil vitrin +
   `/ayarlar` · M6 Topluluk Instagram tarzı kart + ilk yorum önizlemesi · M7 Derslerim beş
   sekme (+ `09527dc` kısa liste devamı) · M8 rehber 9 adım + yer çipleri · M9 bu belge. İki sunucu eki en baştaki "İkinci
   istisna"da. `SOZLESME_SURUMU` (2026-09-25) ve `IZIN_SURUMU` ARTMADI: Koşullar §3 ve
   gizlilik §4/§7 yol metinleri henüz yayınlanmamış sürümün içinde düzeltildi (tarihçe
-  `yasalMetinler.js`'te).
+  `yasalMetinler.js`'te; bkz. "Sürüm içi düzeltme ve birleşme sırası").
   ⬜ Cihazda: 44dp hedefler ve 12/13px yazılar (web önizlemesi rem'i 16 sayıyor), TalkBack/
   VoiceOver (avatar tek durak, rehber adım duyurusu, yazar başlığı), Fabric'te
   `HapSekmeCubugu` kaydırması, büyük yazıda (1.3) haplar ve rehber kartı, rehber açıkken
@@ -1361,8 +1365,8 @@ Kalan iki ⬜ kapanmadan baseline ilerletilmemeli. (`03dc360` 2026-09-21'de kapa
 en eski açık iş artık `ac0a6bf`, yani baseline en fazla oraya kadar düşünülebilir —
 ama o da incelenmeden değil.)
 
-⚠️ `ozellik/push-bildirimleri` main'e birleşince aynı diff'te üç commit daha görünecek.
-Üçü de **ters yönde** (web ← mobil), yani mobile taşınacak bir şey yok:
+⚠️ `ozellik/push-bildirimleri` 2026-09-27'de main'e birleşti; aynı diff'te üç commit daha
+görünüyor. Üçü de **ters yönde** (web ← mobil), yani mobile taşınacak bir şey yok:
 
 | commit | iş | durum |
 |---|---|---|
@@ -1373,8 +1377,8 @@ ama o da incelenmeden değil.)
 Baseline'a bu üçü yüzünden dokunulmaz: ileri çekmek yukarıdaki iki ⬜'yi diff'ten
 düşürürdü.
 
-⚠️ `tasarim/profil-dersler-topluluk` (2026-09-26, push dalının ÜSTÜNDE) birleşince
-`frontend/src`'ye dokunan on bir commit daha görünecek. Bu iş İKİ DEPODA AYNI DALDA ve aynı
+⚠️ `tasarim/profil-dersler-topluluk` (2026-09-26, push dalının ÜSTÜNDE) 2026-09-27'de
+birleşti; `frontend/src`'ye dokunan on bir commit daha görünüyor. Bu iş İKİ DEPODA AYNI DALDA ve aynı
 tasarımla yapıldı (plan ve ortak metinler tek); hiçbiri tek yönlü bir port değil, mobile
 taşınacak bir şey YOK (web'in `a21f3f3` ve `524b12d` commit'leri yalnızca CLAUDE.md):
 
@@ -1421,7 +1425,8 @@ baseline ileri kalırsa gerçek bir fark hiç görünmez.
 
 ⚠️ `api.js` yüzeyini karşılaştırmak için metot adlarını çıkarıp kümeleri karşılaştır
 (`export const api = {` nesnesinin birinci düzey anahtarları). Son ölçüm **2026-09-26,
-iki depo da `tasarim/profil-dersler-topluluk` dalında: web 85, mobil 86 metot**; fark **5
+iki depo da `tasarim/profil-dersler-topluluk` dalında (2026-09-27'den beri `main`'de):
+web 85, mobil 86 metot**; fark **5
 web ↔ 6 mobil** (2026-09-25 ölçümüyle aynı: bu turda yeni metot EKLENMEDİ):
 
 | web | mobil |
@@ -1438,8 +1443,8 @@ Altı push metodu (`registerPushDevice`, `forgetPushDevice`, `pushPreferences`,
 DEĞİL: web onları `9cdccbc`'de (W1) AYNI adla ve AYNI imzayla aldı — `registerPushDevice`
 TEK nesne parametresi, `forgetPushDevice` iki tarafta da ham istek, başlıksız ve fırlatan.
 Web bu metotları ÇAĞIRMIYOR (web'de push yok); sözleşme iki istemcide aynı kalsın diye
-duruyorlar. Bu dal main'e birleşmeden web'in main'i ölçülürse 79 metot görünür ve altısı
-"yalnız mobil" çıkar — o fark dalın birleşmesiyle kapanır, senkron hatası değildir.
+duruyorlar. (Push dalı birleşmeden önce web'in main'i 79 metot gösteriyordu; 2026-09-27'den
+beri main'de 85. Web'de altı push metodu eksik görünürse artık senkron HATASIDIR.)
 
 **Aynı ad, değişen imza (2026-09-26):** `mySessions(pastPage, pastPageSize, pastStatus)` iki
 depoda aynı imza ve aynı sorgu biçimi (`pastStatus` boşsa adrese hiç yazılmaz, doluysa
