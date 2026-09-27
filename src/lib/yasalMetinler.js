@@ -86,6 +86,62 @@
   DisclosureShownAtUtc) ve sunucu o damga olmadan cihaz kaydını kabul etmiyor.
 */
 
+/*
+  ─── 2026-09-25 İÇİNDE, YAYINDAN ÖNCE: KOŞULLAR §3 PUAN DÜZELTMESİ (2026-09-26) ──────
+
+  Kullanım koşulları §3 sunucuyla çelişiyordu: "puan yalnızca ders anlatana yazılır"
+  (Topluluk oyları da puan basıyor) ve "kazanılan puan 30 günde yanar" (ders ve topluluk
+  kazancı vadesiz). Metin gerçeğe çekildi (app/kosullar.jsx, web pages/Kosullar.jsx aynı
+  gün, aynı cümleler).
+
+  SÜRÜM ARTMADI ve bu bir istisna değil, kuralın kendisi: sürüm "kullanıcıya hangi metni
+  gösterdim" beyanı. 2026-09-25 bugün HİÇBİR yerde yayında değil (sunucu, web ve mobil
+  main'e birleşmemiş dallarda); bu sürümü kabul etmiş tek bir kullanıcı yok. Yayından
+  önce aynı sürümün metnini düzeltmek, kimseye gösterilmemiş bir metni değiştirmek.
+  2026-09-25 yayına çıktıktan SONRA §3'e dokunan her değişiklik sürümü artırır.
+
+  ─── 2026-09-25 İÇİNDE, YAYINDAN ÖNCE: GİZLİLİK §4/§7 YOL METİNLERİ (2026-09-26) ────
+
+  Ayarlar Profil ekranından ayrı bir Ayarlar ekranına taşındı (app/ayarlar.jsx). Gizlilik
+  §4 ("Veri tercihleri"nin yeri) ve §7 (Düzeltme, Silme, Bildirimleri kapatma) artık
+  "Profil › Ayarlar › …" diyor; izin sayfasındaki zorunlu kategori metni (IzinContext) ve
+  bildirim aydınlatması da. Yeni bir ifşa yok, yalnızca yol tarifi; aynı gerekçeyle sürüm
+  ARTMADI. IZIN_SURUMU da artmadı: izne tabi kapsam değişmedi (IzinContext kuralı).
+
+  ─── 2026-09-25 İÇİNDE, YAYINDAN ÖNCE: HOŞ GELDİN PUANI VE TOPLULUK İÇERİĞİ (2026-09-27) ─
+
+  • Koşullar §3'e ayrı madde: hoş geldin puanı 14 gün sonra silinir, seviyeye sayılmaz
+    (sunucu: WelcomeCreditValidityDays, ExpireCredits). 2026-09-26 düzeltmesi eski "puan
+    yanar" cümlesini kaldırınca bu yanmayı anlatan tek söz de gitmişti.
+  • Gizlilik §2 (İçerik), §6 (görünürlük) ve §7 (Silme) Topluluk'u sayıyor: gönderi, yorum,
+    oy ve şikayet işleniyor; gönderi ve yorum adla giriş yapmış herkese açık; hesap
+    silinince Topluluk içeriği "Silinmiş kullanıcı" adıyla kalıyor (DeleteAccount forum
+    tablolarına dokunmuyor). Ayarlar → HesabiSilModali "Kalacaklar" aynı gün.
+  İkisi de gerçeğe çekme, sunucu davranışı değişmedi; yukarıdaki gerekçeyle sürüm ARTMADI.
+  Web (pages/Kosullar.jsx, Gizlilik.jsx, HesapSilme.jsx §3, Profile.jsx Kalacaklar) aynı
+  olguları aynı gün yazmalı.
+
+  ─── ⛔ BİRLEŞME SIRASI: PUSH PR'LARI TASARIM DALINDAN ÖNCE TEK BAŞINA ALINMAZ ─────────
+
+  Yukarıdaki üç "sürüm içi" düzeltme YALNIZCA tasarim/profil-dersler-topluluk dalında.
+  ozellik/push-bildirimleri dalı (mobil PR #20, sunucu + web PR #38; ikisi de main'e
+  hedefli ve açık) AYNI sürümü ('2026-09-25') ESKİ metinle taşıyor: Koşullar §3 "Puan
+  yalnızca ders anlatana yazılır" ve "kazanılan puanın geçerlilik süresi 30 gündür;
+  süresi dolan puan yanar", Gizlilik'te Topluluk yok, yol metinleri "Profil ekranının en
+  altı". O dal tek başına birleşip dağıtılırsa (sunucu ya da web yayına çıkarsa) o arada
+  kayıt olan kullanıcının TermsVersion'ı '2026-09-25' olur (Register.cs), tasarim dalı
+  gelince aynı dizge BAŞKA bir metne karşılık gelir ve onayın kanıt değeri kaybolur.
+
+  Kural: #20 ve #38 TEK BAŞINA main'e alınmaz, dağıtılmaz. Bu dal push dalının üstünde
+  (push dalı atası), yani bu dalın PR'ı push işini de taşıyor: iki iş aynı birleştirmede
+  ve aynı dağıtımda çıkar. Push dalı ayrı birleşip YAYINA çıkarsa (ör. bu dal gecikir),
+  tasarim dalı birleşmeden önce SOZLESME_SURUMU'nu ARTIRIR (üç yer birlikte: sunucu
+  LegalDocuments.CurrentVersion, web ve mobil yasalMetinler.js) — 2026-09-25 o zaman
+  "yayında" sayılır ve yukarıdaki sürüm içi gerekçe geçersizleşir. Aynı kural web
+  lib/yasalMetinler.js'te, sunucu LegalDocuments.cs notunda ve iki CLAUDE.md'de yazılı;
+  PR açıklamalarına da eklenmeli.
+*/
+
 /** Sunucudaki LegalDocuments.CurrentVersion ile BİREBİR aynı olmalı. */
 export const SOZLESME_SURUMU = '2026-09-25'
 

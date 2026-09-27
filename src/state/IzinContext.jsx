@@ -123,7 +123,7 @@ export const IZIN_KATEGORILERI = [
     aciklama:
       'Girişin açık kalması, hesap güvenliği ve — açtıysan — bildirimlerin telefonuna ' +
       'ulaşması için gerekir. Bunlar olmadan bu işlevler çalışmaz, bu yüzden burada ' +
-      'kapatılamaz. Hangi bildirimleri alacağını Profil › Bildirim ayarları’ndan seçersin.',
+      'kapatılamaz. Hangi bildirimleri alacağını Profil › Ayarlar › Bildirim ayarları’ndan seçersin.',
     // Dürüstlük gereği HWID açıkça yazılıyor (web kararı): "sadece oturum bilgisi"
     // demek yanıltıcı olurdu. Reklam kimliği olmadığı da söyleniyor, çünkü "cihaz
     // kimliği" ifadesi mağaza diliyle karışıyor.

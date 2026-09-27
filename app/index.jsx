@@ -1,19 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useFocusEffect } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
 import { FlatList, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { EkranBasligi } from '../src/components/EkranBasligi'
 import { HamburgerDugmesi } from '../src/components/Cekmece'
 import { api } from '../src/lib/api'
 import { forumSurumu } from '../src/lib/forumSurumu'
+import { ETIKET_ENUM, ETIKETLER, etiketAnahtari, oyUygula } from '../src/lib/forum'
+import { useTurCipasi } from '../src/lib/tur'
 import { useAuth } from '../src/state/AuthContext'
-import { amber, brand, rose, slate } from '../src/lib/theme'
+import { amber, brand } from '../src/lib/theme'
 import { Avatar } from '../src/components/Avatar'
-import { SeviyeRozeti } from '../src/components/SeviyeRozeti'
-import { BayrakIkonu, MesajIkonu, OyOkuIkonu, UyariIkonu } from '../src/components/Ikonlar'
-import { YonetimRozeti } from '../src/components/YonetimRozeti'
+import { UyariIkonu } from '../src/components/Ikonlar'
+import { IZIN_KAPANMA_SURESI } from '../src/components/IzinSayfasi'
 import {
-  Badge,
+  AkisAyraci,
+  GonderiKarti,
+  IncelemeSeridi,
+  OyRayi,
+  SikayetDugmesi,
+  YazarBasligi,
+  YazarSatiri,
+} from '../src/components/GonderiKarti'
+import {
   Button,
   EmptyState,
   ErrorBox,
@@ -23,6 +32,7 @@ import {
   Modal,
   Notice,
   Spinner,
+  UstEtiket,
 } from '../src/components/ui'
 
 /*
@@ -46,7 +56,8 @@ import {
   ─── MODERASYON ARAYÜZÜ İKİNCİL DEĞİL, DÜZENİN PARÇASI ────────────────────────
   Aktif bir öğrenci forumunda spam, argo, izinsiz PDF ve trollemenin OLUP OLMAYACAĞI
   sorusu yok; ne zaman olacağı sorusu var. Önlemler akışın kendisine yerleştirildi:
-    • Her gönderide ve her yorumda "Şikayet et" — tek dokunuş uzakta, ama sessiz.
+    • Her gönderide ve her yorumda "Şikayet et" — tek dokunuş uzakta, ama sessiz
+      (akış kartında yalnız bayrak ikonu; iplikte ve yorumlarda metinli).
     • Şikayet formu SEBEP ve YAZILI AÇIKLAMA soruyor.
     • Eşiği geçen içerik AKIŞTA PERDELENİR (silinmez): sebep + sayı yazar, "Yine de
       göster" duruyor. Sessiz silme, moderasyonu görünmez ve tartışılamaz yapar.
@@ -68,29 +79,24 @@ import {
   4. TEK SÜTUN: web'in yan sütunundaki kurallar/önlemler kartları listenin ALTINA
      düşüyor (web de lg altında bunu yapıyordu — mobilde forumdan önce dört maddelik
      kural duvarı okutmak, kimsenin okumadığı bir duvar üretir).
+  5. AKIŞ KARTI AYRI DOSYADA (src/components/GonderiKarti.jsx, 2026-09-26): Instagram
+     tarzı kenardan kenara kart + 8px ayraç; tarz tek sabitten (AKIS_TARZI), Reddit tarzı
+     satır geri dönüş olarak duruyor. Kartta yazar başlığı profile götürüyor, şikayet
+     yalnız ikon, sunucudan gelen ilk yorum (firstComment) iki satırlık önizleme.
+  6. ETİKET RENKLERİ A DÜZENİNDE (src/lib/forum.js): altı etiket iki tona (brand-50 /
+     slate-100) iniyor; web'in yeşil/mor/gök mavisi pilleri buraya taşınmaz.
   ══════════════════════════════════════════════════════════════════════════════
 */
 
 /* ─── SUNUCU SÖZLEŞMESİ ────────────────────────────────────────────────────────
 
    Arayüz Türkçe anahtarlarla çalışıyor ('yeni', 'stres'), sunucu enum adlarıyla
-   ('Newest', 'ExamStress'). Çeviri TEK YERDE, burada: iki tarafın da kendi doğal
-   sözlüğünü kullanabilmesi için.                                                */
+   ('Newest', 'ExamStress'). Çeviri her sözlük için TEK YERDE: sıralama, tarih ve
+   şikayet sebebi burada (yalnızca bu ekran kullanıyor); ETİKET sözlüğü akış kartıyla
+   ortak olduğu için src/lib/forum.js'te.                                          */
 
 const SIRA_ENUM = { yeni: 'Newest', oy: 'Top', tartismali: 'Controversial' }
 const ZAMAN_ENUM = { hepsi: 'All', gun: 'Day', hafta: 'Week', ay: 'Month' }
-const ETIKET_ENUM = {
-  stres: 'ExamStress',
-  soru: 'Question',
-  kaynak: 'Resource',
-  program: 'StudyPlan',
-  motivasyon: 'Motivation',
-  tercih: 'Preference',
-}
-/** Ters yön: sunucudan gelen etiketi arayüz anahtarına çevirir. */
-const ETIKET_ANAHTARI = Object.fromEntries(
-  Object.entries(ETIKET_ENUM).map(([anahtar, enumAdi]) => [enumAdi, anahtar]),
-)
 
 /*
   ŞİKAYET SEBEBİ → SUNUCU ENUM'U. Dördü (Spam, Copyright, PersonalInfo, OffTopic) forum
@@ -169,35 +175,7 @@ const ZAMAN_ARALIKLARI = [
   { key: 'ay', label: 'Bu ay', kisa: 'Ay' },
 ]
 
-const ETIKETLER = [
-  { key: 'hepsi', label: 'Tümü' },
-  { key: 'stres', label: 'Sınav Stresi' },
-  { key: 'soru', label: 'Soru Sor' },
-  { key: 'kaynak', label: 'Kaynak' },
-  { key: 'program', label: 'Ders Programı' },
-  { key: 'motivasyon', label: 'Motivasyon' },
-  { key: 'tercih', label: 'Tercih' },
-]
-
-/*
-  Etiket renkleri: 100/700-800 çiftleri — ui.jsx'teki Badge tonlarıyla aynı aile, yani
-  forum kendi renk dilini kurmuyor. (Badge doğrudan kullanılamıyor: tonları violet ve
-  sky taşımıyor, altı etiket ise birbirinden ayrışmak zorunda.)
-
-  Marka mavisi SORU etiketine verildi: bu üründe soru sormak ana eylem.
-*/
-const ETIKET_TONU = {
-  stres: { kutu: 'bg-amber-100', yazi: 'text-amber-800' },
-  soru: { kutu: 'bg-brand-100', yazi: 'text-brand-700' },
-  kaynak: { kutu: 'bg-emerald-100', yazi: 'text-emerald-700' },
-  program: { kutu: 'bg-violet-100', yazi: 'text-violet-700' },
-  motivasyon: { kutu: 'bg-rose-100', yazi: 'text-rose-700' },
-  tercih: { kutu: 'bg-sky-100', yazi: 'text-sky-800' },
-}
-
-const VARSAYILAN_ETIKET_TONU = { kutu: 'bg-slate-100', yazi: 'text-slate-700' }
-
-const ETIKET_ADI = Object.fromEntries(ETIKETLER.map((e) => [e.key, e.label]))
+/* Etiket listesi, adları ve renkleri (A düzeni) src/lib/forum.js'te — akış kartıyla ortak. */
 
 /*
   ŞİKAYET SEBEPLERİ — beşi bu ürünün gerçek risklerine birebir karşılık geliyor,
@@ -257,205 +235,6 @@ const ONLEMLER = [
  */
 function iptalMi(err) {
   return err?.name === 'CanceledError' || err?.name === 'AbortError' || err?.code === 'ERR_CANCELED'
-}
-
-/**
- * Sunucudan gelen UTC damgasını milisaniyeye çevirir.
- *
- * ⚠️ ZAMAN DİLİMİ EKİ YOKSA 'Z' EKLENİYOR. .NET, DateTime'ı Kind=Utc iken sonunda 'Z'
- * ile yazıyor; Kind=Unspecified iken YAZMIYOR ve o durumda metin YEREL saat sanılır.
- * Türkiye'de bu üç saatlik bir kayma demek: üç saat önce yazılmış bir gönderi "şimdi"
- * görünür, bir dakika önce yazılan gelecekte kalır. Sütun timestamptz olduğu için EF
- * bugün Utc döndürüyor — ama tek bir DTO'nun Kind'i değiştiğinde hata SESSİZ olur.
- */
-function damgayaCevir(metin) {
-  if (!metin) return null
-  const tamDamga = /(?:[zZ]|[+-]\d{2}:?\d{2})$/.test(metin) ? metin : `${metin}Z`
-  const ms = Date.parse(tamDamga)
-  return Number.isNaN(ms) ? null : ms
-}
-
-/** Damganın kaç dakika önce olduğunu verir; okunamayan damga 0 sayılıyor ("şimdi"). */
-function yasDakika(metin) {
-  const ms = damgayaCevir(metin)
-  if (ms === null) return 0
-  // Negatife düşebilir: sunucu saati istemciden birkaç saniye ileriyse. "-1 dk" yerine
-  // "şimdi" göstermek doğru, çünkü fark saat farkı değil senkron gürültüsü.
-  return Math.max(0, Math.round((Date.now() - ms) / 60000))
-}
-
-/** "22 dk" / "3 sa" / "2 g". Forumda mutlak tarih işe yaramıyor: okuyanın sorduğu şey
-    "ne zaman yazıldı" değil, "hâlâ taze mi". */
-function zamanKisalt(dakika) {
-  // "0 dk" sayı olarak doğru ama okunuşu bozuktu — sıfır birimli bir süre, süre değil.
-  if (dakika < 1) return 'şimdi'
-  if (dakika < 60) return `${dakika} dk`
-  const saat = Math.floor(dakika / 60)
-  if (saat < 24) return `${saat} sa`
-  return `${Math.floor(saat / 24)} g`
-}
-
-function goreliZaman(damga) {
-  return zamanKisalt(yasDakika(damga))
-}
-
-/**
- * OY UYGULAMA — sunucudaki üç durumun istemci aynası (VoteForumContentHandler).
- *
- *   oy yok      → oy ekle
- *   aynı yön    → GERİ AL (sunucu satırı siler, sayaç düşer)
- *   ters yön    → çevir (bir taraftan düş, diğerine ekle)
- *
- * Tek fonksiyon çünkü üç durumun sayaç etkisi birbirine bağlı. Yine de bu yalnızca
- * TAHMİN: yanıt gelince sunucunun sayaçları yazılıyor.
- */
-function oyUygula(icerik, yon) {
-  const onceki = icerik.myVote ?? 0
-  const yeni = onceki === yon ? 0 : yon
-
-  let arti = icerik.upvoteCount
-  let eksi = icerik.downvoteCount
-
-  if (onceki === 1) arti -= 1
-  else if (onceki === -1) eksi -= 1
-
-  if (yeni === 1) arti += 1
-  else if (yeni === -1) eksi += 1
-
-  return { ...icerik, upvoteCount: arti, downvoteCount: eksi, myVote: yeni }
-}
-
-function EtiketPili({ etiket }) {
-  const ton = ETIKET_TONU[etiket] ?? VARSAYILAN_ETIKET_TONU
-  return (
-    <View className={`self-start rounded-full px-2.5 py-0.5 ${ton.kutu}`}>
-      <Text className={`text-xs font-semibold ${ton.yazi}`}>{ETIKET_ADI[etiket] ?? etiket}</Text>
-    </View>
-  )
-}
-
-/**
- * Yazar satırı: avatar + ad + (yönetim rozeti) + seviye + zaman.
- *
- * Gönderide ve yorumda AYNI bileşen: yazarın nasıl gösterildiği iki yerde ayrı
- * yazılsaydı, rozet birine eklenip diğerine eklenmeden kalabilirdi.
- *
- * WEB'DEN FARK: zaman damgası bu satırın İÇİNDE. Web'de etiket + yazar + zaman tek
- * satırdaydı; 360px'te o satır etiket ve şikayet düğmesiyle birlikte üç kez sarıyordu.
- * Etiket ve şikayet yukarı alındı, yazarla zaman birlikte kaldı (ikisi tek bir bilgi:
- * kim, ne zaman).
- *
- * Seviye rozeti ETİKETSİZ: "Seviye" kelimesi bu dar satırda ada yer bırakmıyordu; rozet
- * yalnızca `level` ile besleniyor — puan başkasının verisi ve forum DTO'su göndermiyor.
- */
-function YazarSatiri({ yazar, damga, kucuk = false }) {
-  return (
-    <View className="flex-row flex-wrap items-center gap-x-1.5 gap-y-1">
-      <Avatar userId={yazar?.userId} name={yazar?.displayName ?? 'Kullanıcı'} size="sm" />
-      <Text
-        numberOfLines={1}
-        className={`max-w-[45%] font-medium text-slate-700 ${kucuk ? 'text-[11px]' : 'text-xs'}`}
-      >
-        {yazar?.displayName ?? 'Kullanıcı'}
-      </Text>
-      {/* isStaff SUNUCUDAN gelir, istemci türetmez. */}
-      {yazar?.isStaff ? <YonetimRozeti kucuk /> : null}
-      <SeviyeRozeti kaynak={{ level: yazar?.level }} boyut="sm" ton="acik" etiketli={false} />
-      <Text className="text-xs text-slate-500">· {goreliZaman(damga)}</Text>
-    </View>
-  )
-}
-
-/*
-  OY RAYI.
-
-  Renk oyun yönünü söylüyor: yukarı marka mavisi (bu ürünün "evet" rengi), aşağı rose.
-  Sayı da oyun rengini alıyor — kullanıcı kendi oyunu, okların hangisinin dolu olduğuna
-  bakmadan görebiliyor.
-
-  ⚠️ GÖSTERİLEN SAYI = arti − eksi. Kendi oyu AYRICA EKLENMİYOR: sunucudan gelen
-  upvoteCount/downvoteCount kullanıcının kendi oyunu zaten içeriyor.
-
-  İKİ MOBİL AYRINTI:
-  • Gönderi rayında düğmeler 44px. Yorum rayında 36px + hitSlop: 44'lük iki ok, iki
-    satırlık bir yorumdan uzun bir ray üretiyordu. hitSlop dokunma hedefini kurala
-    getiriyor, aradaki sayı (18px) iki bölgenin çakışmasını engelliyor.
-  • `yatay` yalnızca yorum ipliğinin başındaki gönderi için: orada gövde tam genişlikte
-    akıyor ve solda dikey bir ray okuma genişliğini boşuna daraltırdı.
-*/
-function OyRayi({ arti, eksi, oy = 0, onOy, kucuk = false, yatay = false }) {
-  const olcu = kucuk ? 'h-9 w-9' : 'h-11 w-11'
-  const hedefBuyutme = kucuk ? { top: 4, bottom: 4, left: 6, right: 6 } : undefined
-  const sayiRengi = oy === 1 ? 'text-brand-700' : oy === -1 ? 'text-rose-700' : 'text-slate-800'
-
-  return (
-    <View
-      className={`shrink-0 items-center gap-0.5 ${yatay ? 'flex-row' : 'flex-col'}`}
-    >
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Yukarı oy ver"
-        accessibilityState={{ selected: oy === 1 }}
-        hitSlop={hedefBuyutme}
-        onPress={() => onOy(1)}
-        className={`${olcu} items-center justify-center rounded-lg ${oy === 1 ? 'bg-brand-50' : 'active:bg-slate-100'}`}
-      >
-        {/* Tek çizim, iki yön: OyOkuIkonu YUKARI çizilir, aşağı oy 180° döndürülür.
-            Gövdeli ok (sap + baş) basılabilir bir eylem gibi okunur; çıplak chevron
-            oy düğmesinde "aşağı kaydır" gibi dururdu (bkz. Ikonlar.jsx). */}
-        <OyOkuIkonu renk={oy === 1 ? brand[600] : slate[400]} boy={18} kalinlik={oy === 1 ? 2.6 : 2} />
-      </Pressable>
-
-      <Text
-        className={`text-sm font-bold ${sayiRengi}`}
-        style={{ fontVariant: ['tabular-nums'] }}
-      >
-        {arti - eksi}
-      </Text>
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Aşağı oy ver"
-        accessibilityState={{ selected: oy === -1 }}
-        hitSlop={hedefBuyutme}
-        onPress={() => onOy(-1)}
-        className={`${olcu} items-center justify-center rounded-lg ${oy === -1 ? 'bg-rose-50' : 'active:bg-slate-100'}`}
-      >
-        <View style={{ transform: [{ rotate: '180deg' }] }}>
-          <OyOkuIkonu renk={oy === -1 ? rose[600] : slate[400]} boy={18} kalinlik={oy === -1 ? 2.6 : 2} />
-        </View>
-      </Pressable>
-    </View>
-  )
-}
-
-/*
-  ŞİKAYET DÜĞMESİ — her gönderide ve her yorumda, aynı çizim, aynı yer (sağ üst).
-  Sessiz duruyor (slate-500, küçük metin) ama saklı değil: dikkat çeken bir düğme forumu
-  ihbar hattı gibi gösterir, üç nokta menüsüne gömülen bir şikayet ise ihlali gören
-  kullanıcının vazgeçtiği bir yol olur. Basılınca rose'a dönüyor (hover yok).
-
-  İKON BAYRAK, ÜÇGEN DEĞİL: UyariIkonu (üçgen) bu ekranda "incelemede" perdesini
-  çiziyor — aynı çizimi şikayet düğmesinde de kullanmak, sistemin verdiği uyarı ile
-  kullanıcının verdiği işareti birbirine karıştırırdı (bkz. Ikonlar.jsx BayrakIkonu).
-  Metin her boyutta duruyor: dar ekranda yalnız ikon bırakmak, eylemi tanınmaz yapardı.
-*/
-function SikayetDugmesi({ onPress, kucuk = false }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Şikayet et"
-      onPress={onPress}
-      hitSlop={kucuk ? 8 : undefined}
-      className={`shrink-0 flex-row items-center justify-center gap-1 rounded-lg px-2 active:bg-rose-50
-                  ${kucuk ? 'min-h-[36px]' : 'min-h-[44px]'}`}
-    >
-      <BayrakIkonu renk={slate[500]} boy={kucuk ? 12 : 14} />
-      <Text className={`font-medium text-slate-500 ${kucuk ? 'text-[11px]' : 'text-xs'}`}>
-        Şikayet et
-      </Text>
-    </Pressable>
-  )
 }
 
 /* ─── SAYFA ────────────────────────────────────────────────────────────────── */
@@ -820,26 +599,48 @@ export default function Topluluk() {
   const gonderiOylanabilir = Boolean(acikGonderiCanli)
   const benimUserId = session?.userId
 
+  /*
+    YAZARIN PROFİLİNE GİTMEK — kartın ve ipliğin yazar başlığından.
+
+    İplikten giderken ÖNCE alt sayfa kapanıyor, profil IZIN_KAPANMA_SURESI (350 ms)
+    sonra itiliyor: açık RN Modal ayrı bir yerel pencere ve itilen ekranın ÜSTÜNDE
+    kalırdı; kapanış animasyonu bitmeden itilen ekran da iOS'ta sunulamayabiliyor.
+    Zamanlayıcı ref'te: ekran sökülürse (ör. çıkış) askıdaki gezinme iptal edilir.
+  */
+  const profilZamanlayici = useRef(null)
+  useEffect(() => () => clearTimeout(profilZamanlayici.current), [])
+  const yazaraGit = (userId) => router.push(`/profil/${userId}`)
+  const ipliktenYazaraGit = (userId) => {
+    setAcikGonderiKopya(null)
+    clearTimeout(profilZamanlayici.current)
+    profilZamanlayici.current = setTimeout(() => yazaraGit(userId), IZIN_KAPANMA_SURESI)
+  }
+
   const baslikBolumu = (
-    <View className="gap-3 bg-white px-4 pb-3 pt-3">
-      {/* TANITIM PARAGRAFI BURADAN ALINDI (2026-09-23). Üç satırlık metin akışın en
-          üstünde her kaydırmada yer kaplıyordu ve kartsız tek öğe olduğu için ritmi de
-          bozuyordu. Metin kaybolmadı: "Topluluk hakkında" alt sayfasının başına taşındı
-          (Reddit'in topluluk açıklamasını "Daha fazla" arkasına koyması gibi). */}
-      {bildirim && (
-        <Notice tone="success" onDismiss={() => setBildirim(null)}>
-          {bildirim}
-        </Notice>
-      )}
+    <View>
+      <View className="gap-3 bg-white px-4 pb-3 pt-3">
+        {/* TANITIM PARAGRAFI BURADAN ALINDI (2026-09-23). Üç satırlık metin akışın en
+            üstünde her kaydırmada yer kaplıyordu ve kartsız tek öğe olduğu için ritmi de
+            bozuyordu. Metin kaybolmadı: "Topluluk hakkında" alt sayfasının başına taşındı
+            (Reddit'in topluluk açıklamasını "Daha fazla" arkasına koyması gibi). */}
+        {bildirim && (
+          <Notice tone="success" onDismiss={() => setBildirim(null)}>
+            {bildirim}
+          </Notice>
+        )}
 
-      <GonderiKutusu session={session} onAc={() => setYaziyor(true)} />
+        <GonderiKutusu session={session} onAc={() => setYaziyor(true)} />
 
-      {/* Hata akışın ÜSTÜNDE ve liste yerinde kalıyor: oy verirken düşen bir istek,
-          okunmakta olan listeyi silmemeli. */}
-      <ErrorBox
-        error={hata}
-        onRetry={() => sayfaGetir(basarisizHedef.current ?? 1, kontrolRef.current?.signal)}
-      />
+        {/* Hata akışın ÜSTÜNDE ve liste yerinde kalıyor: oy verirken düşen bir istek,
+            okunmakta olan listeyi silmemeli. */}
+        <ErrorBox
+          error={hata}
+          onRetry={() => sayfaGetir(basarisizHedef.current ?? 1, kontrolRef.current?.signal)}
+        />
+      </View>
+      {/* FlatList ayırıcıyı İLK öğeden önce çizmiyor; beyaz başlıkla ilk kart arasındaki
+          ayraç burada. Liste boşken de duruyor: beyaz başlığı altındaki zeminden ayırıyor. */}
+      <AkisAyraci />
     </View>
   )
 
@@ -900,13 +701,17 @@ export default function Topluluk() {
             benimUserId={benimUserId}
             onOy={gonderiOyla}
             onAc={() => ipligiAc(item)}
+            onYazar={yazaraGit}
             gizliAcik={acilanGizli.includes(item.postId)}
             onGizliAc={() => setAcilanGizli((l) => [...l, item.postId])}
             onSikayet={setSikayetHedefi}
           />
         )}
-        /* Dolgu ve boşluk YOK: gönderiler artık tam genişlik satır ve kendi p-4'ünü
-           taşıyor. Başlık, boş durum ve altbilgi kendi px-4'ünü veriyor. */
+        /* Kartlar arası ayraç etkin tarzdan (GonderiKarti.jsx → AKIS_TARZI): Instagram
+           tarzında 8px bant, Reddit tarzında ince çizgi. */
+        ItemSeparatorComponent={AkisAyraci}
+        /* Dolgu ve boşluk YOK: gönderiler kenardan kenara ve kendi iç boşluğunu taşıyor.
+           Başlık, boş durum ve altbilgi kendi px-4'ünü veriyor. */
         contentContainerClassName=""
         /* Alt dolgu = güvenli alan (home indicator) + nefes payı. Eskiden buraya yüzen
            sekme çubuğunun yüksekliği de giriyordu (sekmeCubugu.js); çubuk kalktı, gezinme
@@ -928,36 +733,41 @@ export default function Topluluk() {
           />
         }
         ListFooterComponent={
-          <View className="gap-4 px-4 pb-2 pt-4">
-            {ekYukleme && (
-              <View className="py-2">
-                <Spinner />
-              </View>
-            )}
-            {/*
-              KURALLAR VE ÖNLEMLER AKIŞTAN ÇIKTI (2026-09-23), yerinde tek satır kaldı.
+          <View>
+            {/* Son karttan sonraki ayraç (FlatList son öğeden sonra çizmiyor). Liste
+                boşken çizilmez: başlığın ayracıyla boş durumun iki yanında çift bant olurdu. */}
+            {gonderiler.length > 0 && <AkisAyraci />}
+            <View className="gap-4 px-4 pb-2 pt-4">
+              {ekYukleme && (
+                <View className="py-2">
+                  <Spinner />
+                </View>
+              )}
+              {/*
+                KURALLAR VE ÖNLEMLER AKIŞTAN ÇIKTI (2026-09-23), yerinde tek satır kaldı.
 
-              Eskiden burada iki tam kart vardı (~530px statik metin) ve ikisi de yanlış
-              anlarda görünüyordu: (a) sonsuz kaydırma yüzünden okumak için aşağı inen
-              kullanıcı her seferinde yeni sayfa tetikliyor, kartlar aşağı kaçıyordu —
-              gönderiler bitene kadar pratikte ULAŞILAMIYORLARDI; (b) FlatList altbilgiyi
-              liste BOŞKEN de çiziyor, yani ilk yüklemede ve filtre boş sonuç verdiğinde
-              ekrandaki ana içerik o iki kart oluyordu.
+                Eskiden burada iki tam kart vardı (~530px statik metin) ve ikisi de yanlış
+                anlarda görünüyordu: (a) sonsuz kaydırma yüzünden okumak için aşağı inen
+                kullanıcı her seferinde yeni sayfa tetikliyor, kartlar aşağı kaçıyordu —
+                gönderiler bitene kadar pratikte ULAŞILAMIYORLARDI; (b) FlatList altbilgiyi
+                liste BOŞKEN de çiziyor, yani ilk yüklemede ve filtre boş sonuç verdiğinde
+                ekrandaki ana içerik o iki kart oluyordu.
 
-              Yerine geçen satır "yine aşağıda" (ürün sahibi böyle istedi) ama akışı
-              tıkamıyor; içerik alt sayfada ve istendiğinde tam olarak okunuyor.
-            */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Topluluk hakkında: kurallar ve alınan önlemler"
-              onPress={() => setKurallarAcik(true)}
-              className="min-h-[44px] flex-row items-center justify-between rounded-xl border border-slate-200 bg-white px-4 active:bg-slate-50"
-            >
-              <Text className="text-sm font-medium text-slate-700">
-                Topluluk kuralları ve alınan önlemler
-              </Text>
-              <Text className="text-base text-slate-400">›</Text>
-            </Pressable>
+                Yerine geçen satır "yine aşağıda" (ürün sahibi böyle istedi) ama akışı
+                tıkamıyor; içerik alt sayfada ve istendiğinde tam olarak okunuyor.
+              */}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Topluluk hakkında: kurallar ve alınan önlemler"
+                onPress={() => setKurallarAcik(true)}
+                className="min-h-[44px] flex-row items-center justify-between rounded-xl border border-slate-200 bg-white px-4 active:bg-slate-50"
+              >
+                <Text className="text-sm font-medium text-slate-700">
+                  Topluluk kuralları ve alınan önlemler
+                </Text>
+                <Text className="text-base text-slate-400">›</Text>
+              </Pressable>
+            </View>
           </View>
         }
       />
@@ -987,6 +797,7 @@ export default function Topluluk() {
           benimUserId={benimUserId}
           durum={yorumlar[acikGonderi.postId]}
           onClose={() => setAcikGonderiKopya(null)}
+          onYazar={ipliktenYazaraGit}
           /* Gönderi listeden düştüyse oy rayı çizilmez: basılan ok ekranda hiçbir şeyi
              değiştiremezken sunucuya oy yazmaya devam ederdi (bkz. gonderiOylanabilir). */
           onGonderiOy={gonderiOylanabilir ? gonderiOyla : null}
@@ -1022,14 +833,19 @@ export default function Topluluk() {
   DOSYA EKLEME DÜĞMESİ YOK ve bu tasarımın kendisi bir önlem: telif ihlalinin bu üründe
   en olası yolu izinsiz PDF paylaşımı; en ucuz çözüm o yolu arayüzde hiç açmamak.
   Kutunun altındaki şerit bunu kural olarak da söylüyor.
+
+  REHBER ÇIPASI 'gonderi-yaz' (avatar + kutu satırı): ürün rehberinin Topluluk adımı
+  burayı işaret ediyor (src/lib/tur.js). Kutu liste başlığında, yani kaydırınca yer
+  değiştiriyor; rehber ölçüyü her adımda tazeliyor (turCipalariniTazele).
 */
 function GonderiKutusu({ session, onAc }) {
+  const cipa = useTurCipasi('gonderi-yaz')
   return (
     /* CARD KALKTI (2026-09-23): başlık bölümü artık beyaz bir yüzey, içine kart koymak
        beyaz üstüne beyaz ikinci katman üretiyordu — ekranın asıl şikâyeti buydu. Kutu
        yalnızca girdiyi taşıyor, kendi kenarı yok. */
     <View>
-      <View className="flex-row items-center gap-3">
+      <View {...cipa} className="flex-row items-center gap-3">
         <Avatar userId={session?.userId} name={session?.displayName} size="sm" />
         <Pressable
           accessibilityRole="button"
@@ -1139,11 +955,15 @@ function FiltreSeridi({ sira, zaman, etiket, onEtiket, onAyarAc, siraAdi, zamanA
   SIRALAMA + TARİH alt sayfası. İkisi AYRI EKSEN (dosya başındaki nota bak): sıralama
   "hangisi önce gelsin", tarih "hangileri hiç görünmesin". Tek listede birleştirmek
   seçenek sayısını 3'ten 12'ye çıkarırdı, o yüzden burada da ayrı duruyorlar.
+
+  Bölüm başlıkları UstEtiket ile BÜYÜK: Tailwind'in büyük harf sınıfı RN'de dil bilgisiz
+  büyütüyor ve cihazda "TARIH" yazıyordu (CLAUDE.md, Web'den bilinçli sapmalar). Sınıfın
+  adı bu dosyada yorumda bile geçmiyor: planın doğrulama grep'i dosyada BOŞ çıkmalı.
 */
 function FiltreAltSayfasi({ sira, onSira, zaman, onZaman, aciklama, sonuc, yukleniyor, onClose }) {
   return (
     <Modal open onClose={onClose} title="Sırala ve filtrele">
-      <Text className="text-xs font-medium uppercase tracking-wide text-slate-500">Sıralama</Text>
+      <UstEtiket className="text-[12px] font-medium tracking-wide text-slate-500">Sıralama</UstEtiket>
       <View className="mt-2 flex-row rounded-xl bg-slate-100 p-1" accessibilityRole="tablist">
         {SIRALAMALAR.map(({ key, label }) => (
           <Pressable
@@ -1173,7 +993,7 @@ function FiltreAltSayfasi({ sira, onSira, zaman, onZaman, aciklama, sonuc, yukle
       </Text>
 
       <View className="mt-5 border-t border-slate-100 pt-5">
-        <Text className="text-xs font-medium uppercase tracking-wide text-slate-500">Tarih</Text>
+        <UstEtiket className="text-[12px] font-medium tracking-wide text-slate-500">Tarih</UstEtiket>
         <View className="mt-2 flex-row flex-wrap gap-2">
           {ZAMAN_ARALIKLARI.map(({ key, label, kisa }) => (
             <Pil key={key} ad={label} aktif={zaman === key} onPress={() => onZaman(key)}>
@@ -1183,147 +1003,6 @@ function FiltreAltSayfasi({ sira, onSira, zaman, onZaman, aciklama, sonuc, yukle
         </View>
       </View>
     </Modal>
-  )
-}
-
-/* ─── GÖNDERİ KARTI ────────────────────────────────────────────────────────── */
-
-/*
-  GÖNDERİ SATIRI — kart DEĞİL (2026-09-23 değişikliği).
-
-  ⚠️ ESKİDEN KARTTI ve "her şey beyaz, karışık duruyor" şikâyetinin kaynağı tam olarak
-  buydu. Ölçüldü: sayfa zemini slate-50 (#F8FAFC), kart beyaz (#FFFFFF) — aradaki
-  kontrast ~1.04:1, yani kartın kenarı fiziksel olarak okunmuyordu. Hiyerarşi tamamen
-  `shadowOpacity 0.05`'e bırakılmıştı ve ekranda aynı anda ALTI beyaz yüzey vardı
-  (üst şerit, gönderi kutusu, filtre kartı, gönderi kartı, kurallar, önlemler).
-
-  Daha kötüsü GÖLGE TERSİNE ÇALIŞIYORDU: gönderiler (asıl içerik) düz ve gölgesizdi,
-  çevre kutular (filtre, kurallar) ui.jsx'in Card'ını kullandığı için yüzüyordu. Görsel
-  ağırlık sırası, içerik hiyerarşisinin tersiydi.
-
-  Çözüm Reddit'in deseni: gönderiler kart değil, ince ayırıcıyla bölünmüş tam genişlik
-  SATIRLAR. Tek sürekli beyaz yüzey — üst üste binen kutu yok, sayılacak kenar yok.
-
-  ⚠️ CLAUDE.md "sayfalar kendi yüzey dilini icat etmez" diyor ve bu haklı bir kural.
-  Burada icat edilen bir yüzey YOK: kart kaldırıldı, geriye zemin + ayırıcı kaldı.
-  Dolgu (p-4) satırın kendisinde çünkü perde şeridi satırın üst kenarına yapışıyor.
-*/
-function GonderiKarti({ gonderi, benimUserId, onOy, onAc, gizliAcik, onGizliAc, onSikayet }) {
-  const etiketAnahtari = ETIKET_ANAHTARI[gonderi.tag] ?? gonderi.tag
-  const benimGonderim = gonderi.author?.userId === benimUserId
-
-  const sikayetEt = () =>
-    onSikayet({
-      tur: 'Gönderi',
-      id: gonderi.postId,
-      baslik: gonderi.title,
-      yazar: gonderi.author?.displayName,
-    })
-
-  /*
-    İNCELEMEDEKİ GÖNDERİ AKIŞTA KAPALI GELİR. Silinmiyor, PERDELENİYOR. Aradaki fark
-    moderasyonun görünürlüğü: sessizce silinen içerik, hem yazarına hem okuyanına hiçbir
-    şey söylemez ve "burada sansür var mı" sorusunu cevaplanamaz hâle getirir. Perde ise
-    sebebi yazıyor, sayıyı veriyor ve kararı okuyana bırakıyor.
-  */
-  if (gonderi.underReview && !gizliAcik) {
-    return (
-      <View className="border-b border-slate-100 bg-amber-50 p-4">
-        <View className="flex-row items-start gap-3">
-          <View className="mt-0.5">
-            <UyariIkonu renk={amber[800]} boy={20} />
-          </View>
-          <View className="min-w-0 flex-1">
-            <Text className="text-sm font-semibold text-slate-900">Bu gönderi incelemede</Text>
-            <Text className="mt-1 text-sm leading-relaxed text-slate-700">
-              {gonderi.reportCount} kişi topluluk kurallarını ihlal ettiğini bildirdi. Moderasyon
-              sonuçlanana kadar akışta kapalı tutuluyor.
-            </Text>
-            <View className="mt-3 flex-row flex-wrap items-center gap-3">
-              <Pressable
-                accessibilityRole="button"
-                onPress={onGizliAc}
-                className="min-h-[44px] justify-center rounded-lg border border-amber-300 bg-white px-3 active:bg-amber-100"
-              >
-                <Text className="text-xs font-semibold text-amber-900">Yine de göster</Text>
-              </Pressable>
-              <Text className="text-xs text-slate-600">
-                Etiket: {ETIKET_ADI[etiketAnahtari] ?? etiketAnahtari}
-              </Text>
-            </View>
-          </View>
-        </View>
-      </View>
-    )
-  }
-
-  return (
-    <View className="border-b border-slate-100 bg-white">
-      {/* Perde açıldıysa uyarı kartın ÜSTÜNDE kalıyor: kullanıcı "yine de göster"e
-          bastığı anı unutabilir, içeriğin durumu unutulmamalı. */}
-      {gonderi.underReview && (
-        <View className="flex-row items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2">
-          <UyariIkonu renk={amber[800]} boy={16} />
-          <Text className="flex-1 text-xs font-medium text-amber-900">
-            İncelemede — {gonderi.reportCount} şikayet aldı, moderasyon sürüyor.
-          </Text>
-        </View>
-      )}
-
-      <View className="flex-row gap-3 p-4">
-        <OyRayi
-          arti={gonderi.upvoteCount}
-          eksi={gonderi.downvoteCount}
-          oy={gonderi.myVote}
-          onOy={(yon) => onOy(gonderi.postId, yon)}
-        />
-
-        <View className="min-w-0 flex-1 gap-2">
-          <View className="flex-row items-center justify-between gap-2">
-            <EtiketPili etiket={etiketAnahtari} />
-            {/* KENDİ GÖNDERİNİ ŞİKAYET EDEMEZSİN: sunucu da reddediyor, ama hatayı
-                göstermektense düğmeyi hiç çizmemek doğru — tıklandığında reddedilen bir
-                düğme, kırık bir düğmedir. */}
-            {!benimGonderim && <SikayetDugmesi onPress={sikayetEt} />}
-          </View>
-
-          <YazarSatiri yazar={gonderi.author} damga={gonderi.createdAtUtc} />
-
-          {/*
-            Başlık ve özet gönderiyi AÇAR. Web'de gönderi sayfası yoktu ve başlık düz
-            metindi; mobilde ipliğin kendisi bir alt sayfa olduğu için kartın gövdesi onu
-            açan doğal hedef — "Yorumlar" düğmesini aramak zorunda kalmadan.
-          */}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`${gonderi.title} — gönderiyi ve yorumları aç`}
-            onPress={onAc}
-            className="active:opacity-70"
-          >
-            <Text numberOfLines={3} className="text-[17px] font-bold leading-snug text-slate-900">
-              {gonderi.title}
-            </Text>
-            {/* Akış TARANABİLİR kalmalı: özet üç satırda kesiliyor, tam metin iplikte.
-                Kullanıcının bıraktığı satır araları korunuyor (RN Text \n'i zaten
-                yutmaz) — madde madde yazılmış bir soru tek paragrafa çökerse okunmaz. */}
-            <Text numberOfLines={3} className="mt-2 text-sm leading-relaxed text-slate-600">
-              {gonderi.body}
-            </Text>
-          </Pressable>
-
-          <Pressable
-            accessibilityRole="button"
-            onPress={onAc}
-            className="min-h-[44px] flex-row items-center gap-2 self-start rounded-lg px-2.5 active:bg-slate-100"
-          >
-            <MesajIkonu renk={slate[600]} boy={16} />
-            <Text className="text-xs font-semibold text-slate-600">
-              {gonderi.commentCount > 0 ? `${gonderi.commentCount} yorum` : 'Yorumlar'}
-            </Text>
-          </Pressable>
-        </View>
-      </View>
-    </View>
   )
 }
 
@@ -1347,6 +1026,7 @@ function YorumAltSayfasi({
   benimUserId,
   durum,
   onClose,
+  onYazar,
   onGonderiOy,
   onYorumOy,
   onYaz,
@@ -1359,7 +1039,6 @@ function YorumAltSayfasi({
   const [yorumSikayeti, setYorumSikayeti] = useState(null)
   const gonderimKilidi = useRef(false)
 
-  const etiketAnahtari = ETIKET_ANAHTARI[gonderi.tag] ?? gonderi.tag
   const liste = durum?.liste
 
   /* Alt sınır 5 karakter (ForumRules.CommentMinLength): "+1" ya da "aynen" gibi tek
@@ -1393,17 +1072,21 @@ function YorumAltSayfasi({
           </Notice>
         )}
 
-        {gonderi.underReview && (
-          <View className="flex-row items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-            <UyariIkonu renk={amber[800]} boy={16} />
-            <Text className="flex-1 text-xs font-medium text-amber-900">
-              İncelemede — {gonderi.reportCount} şikayet aldı, moderasyon sürüyor.
-            </Text>
-          </View>
-        )}
+        {gonderi.underReview && <IncelemeSeridi kutu sikayetSayisi={gonderi.reportCount} />}
 
-        <View className="flex-row items-center justify-between gap-2">
-          <EtiketPili etiket={etiketAnahtari} />
+        {/* Üst kısım akış kartıyla AYNI yazar başlığı (etiket alt satırında); şikayet
+            burada METİNLİ — akış kartında yalnız ikon, kullanıcı eylemin adını iplikte
+            ve yorumlarda okuyor. Yazara dokunmak alt sayfayı kapatıp profile gider. */}
+        <View className="flex-row items-center gap-2">
+          <View className="min-w-0 flex-1">
+            <YazarBasligi
+              yazar={gonderi.author}
+              damga={gonderi.createdAtUtc}
+              etiket={etiketAnahtari(gonderi.tag)}
+              onPress={onYazar}
+              className=""
+            />
+          </View>
           {gonderi.author?.userId !== benimUserId && (
             <SikayetDugmesi
               onPress={() =>
@@ -1417,8 +1100,6 @@ function YorumAltSayfasi({
             />
           )}
         </View>
-
-        <YazarSatiri yazar={gonderi.author} damga={gonderi.createdAtUtc} />
 
         <View>
           <Text className="text-lg font-bold leading-snug text-slate-900">{gonderi.title}</Text>

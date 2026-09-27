@@ -20,10 +20,12 @@
  * söylemesi gerekiyor — uygulama içindeki metin o alanı karşılamıyor.
  *
  * ─── DEĞERLER NEDEN TEK YERDE ───────────────────────────────────────────────
- * Künye birden çok yüzeyde görünüyor (yasal metinlerin künye bloğu, Hakkımızda,
- * Profil altbilgisi). Elle yazılsaydı biri güncellenip diğerleri unutulurdu ve iki
- * farklı kimlik gösteren bir ürün, hiç kimlik göstermeyenden daha kötüdür: hangisinin
- * doğru olduğu belirsizleşir. Aynı gerekçe yasalMetinler.js'te de yazılı.
+ * Künye iki biçimde, dört yüzeyde görünüyor: yasal metinlerin künye bloğu (KunyeBlogu)
+ * ve alt bilginin künye satırı (KunyeSatiri, AltBilgi bileşeninin içinde: Profil,
+ * giriş/kayıt/parola sıfırlama, Hakkımızda). Elle yazılsaydı biri güncellenip diğerleri
+ * unutulurdu ve iki farklı kimlik gösteren bir ürün, hiç kimlik göstermeyenden daha
+ * kötüdür: hangisinin doğru olduğu belirsizleşir. Aynı gerekçe yasalMetinler.js'te de
+ * yazılı.
  *
  * ⚠️ REKLAM DEĞİL, KÜNYE. Buradaki hiçbir değer bir tanıtım yüzeyi beslemiyor.
  * Ürünün içine Corventech'in başka ürünlerini tanıtan bir alan AÇILMADI ve bu bilinçli

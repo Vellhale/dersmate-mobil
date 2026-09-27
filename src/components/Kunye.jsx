@@ -11,14 +11,18 @@ import {
   TESCIL_BILGISI_VAR,
   TICARI_UNVAN,
 } from '../lib/kunye'
-import { MetinBaglantisi } from './MetinBaglantisi'
+import { AltBilgiBaglantisi, MetinBaglantisi } from './MetinBaglantisi'
 
 /*
   KÜNYE — web'deki components/Kunye.jsx'in portu.
 
-  İki varyant, web'dekiyle aynı: KunyeSatiri (altbilgi, tek satır) ve KunyeBlogu
+  İki varyant, web'dekiyle aynı: KunyeSatiri (alt bilginin son kademesi) ve KunyeBlogu
   (yasal metinlerin altındaki kimlik bloğu). Değerler lib/kunye.js'ten; bu dosya
   hiçbir sabiti kendi yazmıyor.
+
+  KunyeSatiri'yi sayfalar DOĞRUDAN çağırmıyor (2026-09-26): AltBilgi bileşeni onu sayfa
+  bağlantılarının altına koyuyor ve Profil, giriş/kayıt/parola sıfırlama ve Hakkımızda
+  aynı AltBilgi'yi kullanıyor. Künye her yerde aynı görünür, elle şerit yazılmaz.
 
   ─── WEB'DEN TEK SAPMA: BAĞLANTILAR CÜMLE DIŞINDA ───────────────────────────
   Web'de "Corventech" ve e-posta cümlenin İÇİNDE birer &lt;a&gt;. Mobilde olmaz ve gerekçe
@@ -37,25 +41,33 @@ import { MetinBaglantisi } from './MetinBaglantisi'
 */
 
 /**
- * ALTBİLGİ VARYANTI — telif + işletmeci, iki satır.
+ * ALT BİLGİ VARYANTI — iki kademe, her zaman ortalı.
  *
- * Web'de tek satır ("© 2026 dersmate · Bir Corventech ürünüdür", Corventech bağlantı).
- * Burada kimlik cümlesi ile dokunulabilir adres ayrıldı; gerekçe dosya başında.
+ *   A: "© 2026 dersmate · Bir Corventech ürünüdür" — DÜZ METİN. Kimlik beyanı
+ *      bağlantıya bağımlı değil (dosya başındaki kural); bağlantı açılmasa da künye tam.
+ *   B: "corventech.tr" — AltBilgiBaglantisi, dış bağlantı oku ve "Tarayıcıda açılır"
+ *      ipucuyla. Alt bilginin sayfa bağlantılarıyla aynı biçim: eskiden burada
+ *      MetinBaglantisi vardı (15px, mavi, altı çizili) ve alt bilginin en büyük, en renkli
+ *      öğesi künyenin kendi bağlantısı oluyordu.
+ *
+ * Boyut px: cihazda rem 14 sayıldığı için text-xs 10.5dp çıkıyor, Apple'ın 11pt alt
+ * sınırının altında. 12px slate-500, slate-50 zeminde 4.55:1 (AA).
+ *
+ * `ortala` prop'u YOK: satır her zaman ortalı.
  */
-export function KunyeSatiri({ className = '', ortala = false }) {
+export function KunyeSatiri({ className = '' }) {
   return (
-    <View className={className}>
-      <Text
-        className={`text-xs leading-relaxed text-slate-500 ${ortala ? 'text-center' : ''}`}
-      >
+    <View className={`items-center ${className}`}>
+      <Text className="text-center text-[12px] leading-[18px] text-slate-500">
         © {TELIF_YILI} {MARKA} · Bir {ISLETMECI} ürünüdür
       </Text>
-      <MetinBaglantisi
+      <AltBilgiBaglantisi
         etiket={ISLETMECI_ALAN_ADI}
-        onPress={() => Linking.openURL(ISLETMECI_ADRESI)}
-        /* Ortalı altbilgide bağlantının kendi self-start'ı satırı sola kaçırırdı;
-           metin ortada, bağlantı solda kalan bir künye kırık görünür. */
-        className={ortala ? 'self-center' : ''}
+        dis
+        accessibilityLabel={`${ISLETMECI} web sitesi: ${ISLETMECI_ALAN_ADI}`}
+        /* .catch: açılamayan adres (tarayıcısı kısıtlanmış cihaz) işlenmemiş bir red
+           bırakmasın. Kullanıcıya gösterilecek bir şey yok; adres metinde zaten yazılı. */
+        onPress={() => Linking.openURL(ISLETMECI_ADRESI).catch(() => {})}
       />
     </View>
   )
@@ -82,7 +94,7 @@ export function KunyeBlogu({ className = '' }) {
       </Text>
       <MetinBaglantisi
         etiket={ISLETMECI_ALAN_ADI}
-        onPress={() => Linking.openURL(ISLETMECI_ADRESI)}
+        onPress={() => Linking.openURL(ISLETMECI_ADRESI).catch(() => {})}
       />
 
       {TESCIL_BILGISI_VAR && (
@@ -101,7 +113,9 @@ export function KunyeBlogu({ className = '' }) {
       </Text>
       <MetinBaglantisi
         etiket={ILETISIM_EPOSTA}
-        onPress={() => Linking.openURL(`mailto:${ILETISIM_EPOSTA}`)}
+        /* .catch: posta uygulaması olmayan bir iPhone'da mailto REDDEDİLİR. Adres
+           hemen üstünde okunuyor; işlenmemiş red yerine sessiz kalmak yeter. */
+        onPress={() => Linking.openURL(`mailto:${ILETISIM_EPOSTA}`).catch(() => {})}
       />
     </View>
   )

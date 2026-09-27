@@ -1,47 +1,67 @@
-import { useEffect, useRef, useState } from 'react'
-import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useCallback, useRef, useState } from 'react'
+import { Pressable, ScrollView } from 'react-native'
+import { useFocusEffect, useRouter } from 'expo-router'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ImagePicker from 'expo-image-picker'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
 import { api } from '../../src/lib/api'
-import { useAsync } from '../../src/state/useAsync'
+import { profilSurumu } from '../../src/lib/profilSurumu'
+import { slate } from '../../src/lib/theme'
 import { useAuth } from '../../src/state/AuthContext'
+import { AltBilgi } from '../../src/components/AltBilgi'
 import { EkranBasligi } from '../../src/components/EkranBasligi'
 import { HamburgerDugmesi } from '../../src/components/Cekmece'
-import { KunyeSatiri } from '../../src/components/Kunye'
+import { AyarlarIkonu } from '../../src/components/Ikonlar'
 import { ProfilGorunumu } from '../../src/components/ProfilGorunumu'
-import { Button, ErrorBox, Field, Girdi, Loading, Modal, Notice } from '../../src/components/ui'
-import { RehberiTekrarIzle } from '../../src/components/UrunTuru'
-import { VeriTercihleriBaglantisi } from '../../src/components/IzinSayfasi'
+import { ErrorBox, Notice } from '../../src/components/ui'
 
 /*
   PROFİLİM — web'deki Profile.jsx'in "kendi profilim" hâli. Başkasının profili
   ayrı rotada (app/profil/[userId].jsx); web'deki "tek bileşen, iki rota" kararının
-  mobil karşılığı: görünüm ProfilGorunumu'nda ortak, fark yalnızca düzenleme
-  düğmelerinin ve çıkışın görünürlüğü.
+  mobil karşılığı: görünüm ProfilGorunumu'nda ortak, fark yalnızca fotoğraf rozetinin
+  ve ayarlar düğmesinin görünürlüğü.
+
+  PROFİL = VİTRİN, AYARLAR AYRI (2026-09-26). Ekranın üstündeki düğme blokları kalktı:
+  • Fotoğrafı değiştir → avatarın kamera rozeti (ProfilGorunumu → ProfilFotografi).
+  • Arkadaşlarım → fotoğrafın altındaki hap (ProfilGorunumu → ArkadasOzeti).
+  • Derslerim, Yönetim paneli → yalnızca çekmecede (zaten oradaydılar).
+  • Profili düzenle, Bildirim ayarları, Veri tercihleri, Rehberi tekrar izle, Çıkış yap,
+    Hesabımı sil → sağ üstteki dişliden açılan Ayarlar ekranı (app/ayarlar.jsx).
+  Alt bilgi yalnızca sayfa bağlantıları ve künye (AltBilgi): ayar ve eylem oraya girmez.
 
   FOTOĞRAF DEĞİŞTİRME web'deki AvatarPicker'ın (canvas kırpma) mobil karşılığı:
   expo-image-picker kare kırpmayı sistem arayüzüyle yapar (allowsEditing) — canvas'a
-  gerek yok. Alan adı web ile aynı: form.append('avatar', …).
+  gerek yok. Alan adı web ile aynı: form.append('avatar', …). Burada kaldı, Ayarlar'a
+  taşınmadı: sonucu bu ekranda görünüyor ve görünümü bu ekran yeniden kuruyor.
 */
 export default function Profil() {
   const guvenli = useSafeAreaInsets()
-  const router = useRouter()
-  /* Büyük yazı ölçeğinde iki düğmeli satırlar alt alta (bkz. kısayol satırları). Sütunda
-     flex-1 verilmez: tabanı 0 olan düğme yüksekliği min-h'ye çökerdi. */
-  const { fontScale } = useWindowDimensions()
-  const buyukYazi = fontScale >= 1.3
-  const satirSinifi = buyukYazi ? 'gap-2' : 'flex-row gap-2'
-  const dugmeSinifi = buyukYazi ? '' : 'flex-1'
-  const { session, logout } = useAuth()
+  const { session } = useAuth()
 
-  const [dialog, setDialog] = useState(null)
   const [notice, setNotice] = useState(null)
   const [avatarBusy, setAvatarBusy] = useState(false)
   const [avatarError, setAvatarError] = useState(null)
   // Alt bileşenleri yeniden kurmak için: avatar/profil değişince taze veri okunsun.
   const [version, setVersion] = useState(0)
+
+  /*
+    AYARLAR'DA DÜZENLENEN PROFİL. Bu ekran kök yığında kurulu kalıyor ve Ayarlar onun
+    üstüne itiliyor; "Profili düzenle"den dönen kullanıcı aksi hâlde eski adı ve eski
+    "hakkında"yı görürdü. Sürüm değiştiyse görünüm yeniden kuruluyor (src/lib/profilSurumu.js);
+    değişmediyse hiçbir şey yapılmıyor. Her odakta yeniden kurmak açık akordeonları
+    kapatır ve beş-altı isteği boşa atardı (arkadaş sayısı kendi kancasında ayrıca
+    tazeleniyor).
+  */
+  const gorulenSurum = useRef(profilSurumu())
+  useFocusEffect(
+    useCallback(() => {
+      const guncel = profilSurumu()
+      if (guncel !== gorulenSurum.current) {
+        gorulenSurum.current = guncel
+        setVersion((v) => v + 1)
+      }
+    }, []),
+  )
 
   async function fotografDegistir() {
     setAvatarError(null)
@@ -104,7 +124,7 @@ export default function Profil() {
 
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
-      <EkranBasligi baslik="Profilim" sol={<HamburgerDugmesi />} />
+      <EkranBasligi baslik="Profilim" sol={<HamburgerDugmesi />} sag={<AyarlarDugmesi />} />
 
       <ScrollView contentContainerClassName="gap-3 p-4"
         /* Alt dolgu = güvenli alan (home indicator) + nefes payı. Eskiden buraya yüzen
@@ -119,366 +139,40 @@ export default function Profil() {
         )}
         <ErrorBox error={avatarError} />
 
-        {/* Büyük yazı ölçeğinde (>= 1.3) iki düğmeli satırlar ALT ALTA: 320 dp'de 140 px'lik
-            düğmeye tek sözcüklü uzun etiket sığmayıp harf ortasından bölünüyordu. */}
-        <View className={satirSinifi}>
-          <Button variant="secondary" className={dugmeSinifi} loading={avatarBusy} onPress={fotografDegistir}>
-            Fotoğrafı değiştir
-          </Button>
-          <Button className={dugmeSinifi} onPress={() => setDialog('edit')}>
-            Profili düzenle
-          </Button>
-        </View>
-
-        {/* Çekmeceden de açılan iki bölümün ikinci girişi: profil, "benimle ilgili
-            her şey"in doğal toplanma yeri. */}
-        {/* ui.jsx Button: hemen üstteki "Fotoğrafı değiştir" ile aynı yüzey. Eskiden elle
-            yazılmış Pressable'lardı (köşe 12, kenar slate-200) ve üstteki satırla (köşe 8,
-            kenar slate-300) alt alta farklı görünüyordu. */}
-        <View className={satirSinifi}>
-          <Button variant="secondary" className={dugmeSinifi} onPress={() => router.push('/dersler')}>
-            Derslerim
-          </Button>
-          {/* "Arkadaşlarım" ARKADAŞ listesini açmalı; parametresiz rota Gelen isteklerle
-              açılıyordu. Çekmecedeki "Arkadaşlar" satırı parametresiz kalıyor: orada niyet
-              isteklerin tamamı. */}
-          <Button variant="secondary" className={dugmeSinifi} onPress={() => router.push('/eslesmeler?sekme=active')}>
-            Arkadaşlarım
-          </Button>
-        </View>
-
-        {/* Bildirim ayarlarının TEK girişi (çekmecede yok: ayar bir gezinme hedefi değil).
-            Adı aydınlatma sorusunun metniyle aynı: "Profil › Bildirim ayarları". */}
-        <Button variant="secondary" onPress={() => router.push('/bildirimler')}>
-          Bildirim ayarları
-        </Button>
-
-        {/* Yönetim girişi YALNIZCA yetkili hesapta çizilir. Asıl kapı sunucuda (403);
-            buradaki koşul, yetkisi olmayana çalışmayan bir düğme göstermemek için. */}
-        {session?.isAdmin && (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push('/yonetim')}
-            className="min-h-[44px] items-center justify-center rounded-lg border border-brand-200 bg-brand-50"
-          >
-            <Text className="text-sm font-medium text-brand-700">Yönetim paneli</Text>
-          </Pressable>
-        )}
-
-        <ProfilGorunumu key={version} userId={session?.userId} kendiProfilim />
-
-        <Button variant="secondary" onPress={logout}>
-          Çıkış yap
-        </Button>
+        <ProfilGorunumu
+          key={version}
+          userId={session?.userId}
+          kendiProfilim
+          fotograf={{ onPress: fotografDegistir, yukleniyor: avatarBusy }}
+        />
 
         {/*
-          ALTBİLGİ — web'deki Layout altbilgisinin karşılığı.
-
-          Yasal metinlere uygulama İÇİNDEN erişim mağaza incelemesinin de beklediği bir
-          şey; ayrıca kayıt ekranındaki onay bağlantıları buraya değil, doğrudan
-          sayfalara gidiyor — kullanıcı sonradan da okuyabilmeli.
+          ALT BİLGİ — Hakkımızda ve yasal metinler + künye. Yasal metinlere uygulama
+          İÇİNDEN erişim mağaza incelemesinin de beklediği bir şey; kayıt ekranındaki onay
+          bağlantıları doğrudan sayfalara gidiyor, kullanıcı sonradan da buradan okuyabilmeli.
+          "Veri tercihleri" oturumlu yüzeyde alt bilgide DEĞİL, Ayarlar'da (AltBilgi.jsx).
         */}
-        <View className="mt-2 items-center gap-1 border-t border-slate-200 pt-4">
-          <View className="flex-row flex-wrap items-center justify-center gap-x-4">
-            <AltBaglanti onPress={() => router.push('/hakkimizda')}>Hakkımızda</AltBaglanti>
-            <AltBaglanti onPress={() => router.push('/kosullar')}>Kullanım koşulları</AltBaglanti>
-            <AltBaglanti onPress={() => router.push('/gizlilik')}>Gizlilik</AltBaglanti>
-          </View>
-          <View className="flex-row flex-wrap items-center justify-center gap-x-4">
-            <VeriTercihleriBaglantisi />
-            <RehberiTekrarIzle />
-          </View>
-
-          {/*
-            KÜNYE (2026-09-21). Web'de Layout altbilgisinde; burası onun karşılığı.
-
-            Şeridin İÇİNE konmadı, altına ayrı satır: künye bir gezinme bağlantısı değil,
-            kimlik beyanı. "Gizlilik" ve "Hesap silme"nin arasında eşit ağırlıkta bir
-            bağlantı gibi dururdu ve dar ekranda şerit sarıldığında ikisinin ortasında
-            kalırdı.
-
-            Yasal metinlerin altındaki KunyeBlogu'nun özeti sayılır: oraya girmeden de
-            ürünü kimin işlettiği görünsün diye.
-          */}
-          <KunyeSatiri className="mt-3" ortala />
-
-          {/*
-            HESABI SİL — Google Play, hesap açtıran uygulamalarda silmeyi UYGULAMA İÇİNDE
-            zorunlu tutuyor, yani bu bağlantı bulunabilir olmak ZORUNDA. Ama öne de
-            çıkmamalı: geri alınamaz bir işlem, "Çıkış yap"ın yanında eşit ağırlıkta
-            durursa yanlışlıkla dokunulur. Çözüm: altbilginin en dibinde, ayrı bir
-            satırda ve sönük — arayan bulur, aramayan çarpmaz.
-
-            Sönüklük RENKTEN değil punto ve konumdan geliyor: slate-400 (2.56:1), aradığı
-            işlemi bulan kullanıcının okuyamayacağı kadar soluktu. slate-500 AA'yı geçiyor;
-            12px ve en dipteki ayrı satır "öne çıkmasın" işini tek başına görüyor.
-          */}
-          <View className="mt-2 items-center border-t border-slate-100 pt-3">
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setDialog('sil')}
-              className="min-h-[44px] justify-center px-2"
-            >
-              <Text className="text-xs text-slate-500">Hesabımı sil</Text>
-            </Pressable>
-          </View>
-        </View>
+        <AltBilgi className="mt-6" />
       </ScrollView>
-
-      <HesabiSilModali open={dialog === 'sil'} onClose={() => setDialog(null)} onDeleted={logout} />
-
-      <ProfilDuzenleModali
-        open={dialog === 'edit'}
-        userId={session?.userId}
-        onClose={() => setDialog(null)}
-        onSaved={() => {
-          setDialog(null)
-          setVersion((v) => v + 1)
-          setNotice('Profilin güncellendi.')
-        }}
-      />
     </SafeAreaView>
   )
 }
 
-/** Altbilgi bağlantısı — 44px dokunma hedefi, ikincil ton. */
 /*
-  HESABI SİL — geri alınamaz, bu yüzden iki kapı var: ne olacağını AÇIKÇA yazan bir metin
-  ve parolanın yeniden girilmesi. Parola sunucuda da doğrulanıyor; buradaki alan onay
-  niyetini kanıtlıyor, güvenliği tek başına buraya bırakmıyor.
-
-  METİN NEYİN KALDIĞINI DA SÖYLÜYOR. "Her şey silinecek" demek yanlış olurdu: ders
-  geçmişi, verilen puanlar ve değerlendirmeler KARŞI TARAFA ait ve duruyor — orada
-  "Silinmiş kullanıcı" olarak görünüyorsun. Kullanıcıya olmayan bir şey vaat etmek,
-  silme hakkını yanlış anlatmaktır.
+  AYARLAR DÜĞMESİ — başlığın sağ yuvasında dişli. Hamburger düğmesinin aynası (-mr-2:
+  ikon, başlığın px-4 kenarıyla optik olarak hizalansın). Boy px ile: h-11 rem ve cihazda
+  38.5dp çizerdi (CLAUDE.md → "Dokunma ve yüzey dili").
 */
-function HesabiSilModali({ open, onClose, onDeleted }) {
-  const [sifre, setSifre] = useState('')
-  const [error, setError] = useState(null)
-  const [busy, setBusy] = useState(false)
-  const kilit = useRef(false)
-
-  useEffect(() => {
-    if (open) {
-      setSifre('')
-      setError(null)
-      kilit.current = false
-    }
-  }, [open])
-
-  async function sil() {
-    // Geri alınamaz işlemde çift gönderim koruması: ikinci istek 404 ile dönerdi ve
-    // kullanıcı hesabı silindiği hâlde hata görürdü.
-    if (kilit.current) return
-    if (!sifre) {
-      setError({ message: 'Devam etmek için parolanı yaz.' })
-      return
-    }
-
-    kilit.current = true
-    setBusy(true)
-    setError(null)
-    try {
-      await api.deleteAccount(sifre)
-      // Oturumu düşürmek yeterli: kök guard'lar giriş ekranına kendisi geçiyor.
-      onDeleted()
-    } catch (err) {
-      kilit.current = false
-      setError(err)
-    } finally {
-      setBusy(false)
-    }
-  }
-
+function AyarlarDugmesi() {
+  const router = useRouter()
   return (
-    <Modal
-      open={open}
-      onClose={busy ? () => {} : onClose}
-      title="Hesabımı sil"
-      footer={
-        <>
-          <Button variant="secondary" onPress={onClose} disabled={busy}>
-            Vazgeç
-          </Button>
-          <Button variant="danger" loading={busy} onPress={sil}>
-            Hesabımı kalıcı olarak sil
-          </Button>
-        </>
-      }
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Ayarlar"
+      onPress={() => router.push('/ayarlar')}
+      className="-mr-2 h-[44px] w-[44px] items-center justify-center rounded-lg active:bg-slate-100"
     >
-      <View className="gap-4 pb-2">
-        <Notice tone="danger">
-          Bu işlem geri alınamaz. Hesabına bir daha giriş yapamazsın.
-        </Notice>
-
-        <View className="gap-1.5">
-          <Text className="text-sm font-semibold text-slate-900">Silinecekler</Text>
-          {[
-            'Adın, e-postan ve profil fotoğrafın',
-            'Biyografin, üniversite ve bölüm bilgin',
-            'Açtığın ders ilanları',
-            'Veri tercihlerin ve cihaz kaydın',
-            // Sunucu hesap silmede cihaz kayıtlarını, tercihleri ve bildirim defterini siliyor.
-            'Bildirim ayarların, bildirim kayıtların ve bildirim alan cihazların',
-          ].map((madde) => (
-            <View key={madde} className="flex-row gap-2">
-              <Text className="text-xs text-slate-400">•</Text>
-              <Text className="flex-1 text-sm leading-relaxed text-slate-600">{madde}</Text>
-            </View>
-          ))}
-        </View>
-
-        <View className="gap-1.5">
-          <Text className="text-sm font-semibold text-slate-900">Kalacaklar</Text>
-          <Text className="text-sm leading-relaxed text-slate-600">
-            Yaptığın dersler, kazandırdığın puanlar ve yazdığın değerlendirmeler karşı
-            tarafın geçmişine ait olduğu için siliniyor değil — orada adın yerine
-            "Silinmiş kullanıcı" görünecek.
-          </Text>
-        </View>
-
-        <Field label="Parolan" hint="Onay için parolanı yeniden yaz.">
-          <Girdi
-            value={sifre}
-            onChangeText={setSifre}
-            secureTextEntry
-            autoComplete="current-password"
-            textContentType="password"
-            returnKeyType="done"
-            onSubmitEditing={sil}
-          />
-        </Field>
-
-        <ErrorBox error={error} />
-      </View>
-    </Modal>
-  )
-}
-
-function AltBaglanti({ onPress, children }) {
-  return (
-    // min-w: kısa etiketli bağlantı ('Gizlilik') 44 px genişliğin altında kalıyordu.
-    <Pressable accessibilityRole="link" onPress={onPress} className="min-h-[44px] min-w-[44px] items-center justify-center">
-      <Text className="text-sm text-slate-500">{children}</Text>
+      <AyarlarIkonu renk={slate[700]} boy={24} />
     </Pressable>
-  )
-}
-
-/* Web'deki EditProfileModal'ın portu: form yalnızca veri geldiğinde bir kez doldurulur,
-   sonrası kullanıcının. Boş metinler null'a çevrilerek gönderilir (web ile aynı). */
-function ProfilDuzenleModali({ open, userId, onClose, onSaved }) {
-  const profile = useAsync(
-    () => (open ? api.userProfile(userId) : Promise.resolve(null)),
-    [open, userId],
-  )
-  const [form, setForm] = useState(null)
-  const [error, setError] = useState(null)
-  const [busy, setBusy] = useState(false)
-
-  /*
-    VAZGEÇ GERÇEKTEN VAZGEÇSİN.
-
-    `form` state'i modal kapandığında duruyordu ve `values = form ?? sunucuVerisi`
-    her zaman taslağı tercih ettiği için modal, VAZGEÇİLEN metinlerle yeniden
-    açılıyordu. Kullanıcı bunu sunucudaki kayıtlı bilgisi sanıp başka bir alanı
-    düzeltip "Kaydet"e bastığında, iptal ettiğini sandığı değişiklik de kaydediliyordu.
-
-    Açılışta sıfırlanıyor: her açılış sunucudaki gerçek veriden başlar.
-  */
-  useEffect(() => {
-    if (open) {
-      setForm(null)
-      setError(null)
-    }
-  }, [open])
-
-  const values = form ?? {
-    displayName: profile.data?.displayName ?? '',
-    bio: profile.data?.bio ?? '',
-    university: profile.data?.university ?? '',
-    department: profile.data?.department ?? '',
-  }
-
-  const set = (patch) => setForm({ ...values, ...patch })
-
-  async function submit() {
-    setBusy(true)
-    setError(null)
-    try {
-      await api.updateProfile({
-        displayName: values.displayName.trim(),
-        bio: values.bio.trim() || null,
-        university: values.university.trim() || null,
-        department: values.department.trim() || null,
-      })
-      setForm(null)
-      onSaved()
-    } catch (err) {
-      setError(err)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="Profili düzenle"
-      footer={
-        <>
-          <Button variant="secondary" onPress={onClose}>
-            Vazgeç
-          </Button>
-          <Button
-            loading={busy}
-            // Profil daha yüklenmeden kaydetmek, boş formu gerçek değerlerin üstüne
-            // (bio/üniversite → null) ezerdi — veri gelene kadar kapalı.
-            disabled={profile.loading || Boolean(profile.error) || values.displayName.trim().length < 2}
-            onPress={submit}
-          >
-            Kaydet
-          </Button>
-        </>
-      }
-    >
-      {/* Sessiz boş form YOK: çekim sürerken spinner, hata verdiyse yeniden denenebilir
-          hata kutusu — kullanıcı bilgilerinin silinmediğini görmeli. */}
-      {profile.loading ? (
-        <Loading label="Profil yükleniyor…" />
-      ) : profile.error ? (
-        <View className="pb-2">
-          <ErrorBox error={profile.error} onRetry={profile.reload} />
-        </View>
-      ) : (
-      <View className="gap-4 pb-2">
-        <Field label="Görünen ad">
-          <Girdi value={values.displayName} onChangeText={(v) => set({ displayName: v })} maxLength={100} />
-        </Field>
-
-        <Field label="Hakkında" hint="Kendini birkaç cümleyle anlat — resmi olmasına gerek yok.">
-          <Girdi
-            value={values.bio}
-            onChangeText={(v) => set({ bio: v })}
-            maxLength={1000}
-            multiline
-            textAlignVertical="top"
-            className="h-28"
-            placeholder="Merhaba! Matematikte iyiyim, kimyada desteğe ihtiyacım var…"
-          />
-        </Field>
-
-        <Field label="Üniversite / Lise">
-          <Girdi value={values.university} onChangeText={(v) => set({ university: v })} maxLength={150} />
-        </Field>
-
-        <Field label="Bölüm / Alan">
-          <Girdi value={values.department} onChangeText={(v) => set({ department: v })} maxLength={150} />
-        </Field>
-
-        <ErrorBox error={error} />
-      </View>
-      )}
-    </Modal>
   )
 }

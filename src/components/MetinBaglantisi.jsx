@@ -1,4 +1,6 @@
-import { Pressable, Text } from 'react-native'
+import { Pressable, Text, View } from 'react-native'
+import { slate } from '../lib/theme'
+import { DisBaglantiIkonu } from './Ikonlar'
 
 /**
  * Metin içinden çıkarılmış bağlantı.
@@ -39,6 +41,54 @@ export function MetinBaglantisi({ etiket, onPress, className = '' }) {
       <Text importantForAccessibility="no" accessibilityElementsHidden className="text-brand-700">
         →
       </Text>
+    </Pressable>
+  )
+}
+
+/**
+ * ALT BİLGİ BAĞLANTISI — alt bilginin (AltBilgi) ve künye satırının (KunyeSatiri) tek
+ * bağlantı biçimi (2026-09-26).
+ *
+ * MetinBaglantisi'ndan AYRI bir görünüm, çünkü işi ayrı: o, uzun metnin içinden çıkarılmış
+ * ve okurun asıl hedefi olan bağlantı (15px, mavi, altı çizili, oklu). Alt bilgi ise sayfanın
+ * dibindeki ikincil gezinme; mavi ve altı çizili olsaydı ekranın en dikkat çeken satırı
+ * künye olurdu. Burada slate-600, 13px, altı çizgisiz; bağlantı olduğunu rolü ve konumu
+ * söylüyor.
+ *
+ * ⚠️ BU DOSYADA DURMASININ SEBEBİ yukarıdaki döngü dersiyle aynı: Kunye.jsx bunu kullanıyor
+ * ve AltBilgi.jsx de Kunye'yi içe aktarıyor. AltBilgi.jsx'e konsaydı ikisi birbirini içe
+ * aktarırdı. Yaprak ilkel yaprak modülde kalır.
+ *
+ * Boyutlar BİLEREK px: NativeWind cihazda rem'i 14 sayıyor, `text-xs` telefonda 10.5dp
+ * çıkıyordu. Alt bilgi web önizlemesinde ve cihazda aynı ölçüde görünmeli.
+ *
+ * min-w-[44px]: "Gizlilik" gibi kısa bir etiket bile 44×44 dokunma hedefi taşır.
+ *
+ * @param rol  'link' (sayfaya gider) ya da 'button' (alt sayfa açar: Veri tercihleri).
+ * @param dis  Uygulamadan çıkıp tarayıcıda açılıyorsa true: yanına 12px çapraz ok çizilir
+ *             ve ekran okuyucuya "Tarayıcıda açılır" ipucu verilir. Ok süstür, gizlenir.
+ */
+export function AltBilgiBaglantisi({
+  etiket,
+  onPress,
+  rol = 'link',
+  dis = false,
+  accessibilityLabel,
+}) {
+  return (
+    <Pressable
+      accessibilityRole={rol}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={dis ? 'Tarayıcıda açılır' : undefined}
+      onPress={onPress}
+      className="min-h-[44px] min-w-[44px] flex-row items-center justify-center gap-1 px-1 active:opacity-60"
+    >
+      <Text className="text-[13px] font-medium text-slate-600">{etiket}</Text>
+      {dis ? (
+        <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+          <DisBaglantiIkonu boy={12} renk={slate[400]} />
+        </View>
+      ) : null}
     </Pressable>
   )
 }

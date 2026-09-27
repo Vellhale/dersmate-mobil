@@ -2,7 +2,7 @@ import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-na
 import { LinearGradient } from 'expo-linear-gradient'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { brand, ink } from '../lib/theme'
-import { KunyeSatiri } from './Kunye'
+import { AltBilgi } from './AltBilgi'
 import { Logo } from './Logo'
 
 /*
@@ -93,19 +93,32 @@ export function AuthKabuk({ title, subtitle, children, altBilgi = true }) {
             )}
 
             {/*
-              KÜNYE (2026-09-21). Web'de aynı yerde (AuthShell altbilgisi) ve gerekçesi
-              aynı: hesabı OLMAYAN biri de bu ürünü kimin işlettiğini görebilmeli — kayıt
-              kararı tam burada veriliyor.
+              ALT BİLGİ (2026-09-26; öncesinde 2026-09-21'den beri yalnızca künye). Web'de
+              aynı yerde (AuthShell altbilgisi) ve gerekçesi aynı: hesabı OLMAYAN biri de bu
+              ürünü kimin işlettiğini görebilmeli, kayıt kararı tam burada veriliyor. Artık
+              künyenin üstünde Hakkımızda, Kullanım koşulları, Gizlilik ve Veri tercihleri
+              de var: oturumsuz kullanıcının ayarlar menüsü yok ve rıza giriş ekranından da
+              geri alınabilmeli (IzinProvider iki dalı da sarıyor, app/_layout.jsx).
 
-              `altBilgi` bayrağına BAĞLANMADI: o not yalnızca kayıt ekranında görünen bir
-              ürün açıklaması, künye ise kabuğu kullanan üç ekranda da (giriş, kayıt,
-              parola sıfırlama) görünmeli. Kimlik beyanını bir tanıtım cümlesinin
-              varlığına bağlamak, onu tanıtımın yan ürünü yapardı.
+              `altBilgi` bayrağına BAĞLANMADI (adları benziyor, işleri değil): o bayrak
+              yukarıdaki ürün notunu açıp kapatıyor (giriş ve kayıt formunda açık, kodu
+              doğrulama adımında ve parola sıfırlamada kapalı); alt bilgi ise kabuğu
+              kullanan her ekranda ve her adımda görünmeli.
+              Kimlik beyanını bir tanıtım cümlesinin varlığına bağlamak, onu tanıtımın yan
+              ürünü yapardı.
 
-              mt-auto: içerik kısa olduğunda (parola sıfırlama) künye ekranın ortasında
-              asılı kalmasın, dibe insin. contentContainer zaten flex-grow.
+              mt-auto: içerik kısa olduğunda (parola sıfırlama) alt bilgi ekranın ortasında
+              asılı kalmasın, dibe insin; contentContainer zaten flex-grow. pt-6 uzun
+              içerikte en az boşluğu garanti ediyor.
+
+              ⚠️ "TEK EKRAN" İLKESİ: 44px'lik bağlantı kademesi formu uzatıyor; küçük
+              ekranda (iPhone SE, 320dp) kaydırma formun İÇİNDE daha erken başlar. Bu
+              bilinçli ve yukarıdaki ilkeyle uyumlu (kaydırma kilitlenmiyor); cihazda ölçülür,
+              web önizlemesi rem 16 ile çizdiği için yanıltır.
             */}
-            <KunyeSatiri className="mt-auto pt-8" ortala />
+            <View className="mt-auto pt-6">
+              <AltBilgi veriTercihleri />
+            </View>
 
           </ScrollView>
         </KeyboardAvoidingView>

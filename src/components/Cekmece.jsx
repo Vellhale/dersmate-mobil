@@ -69,13 +69,28 @@ import {
    hedef, uygulamada ulaşılamaz hâle gelir — web'de sol raydan düşürmekle aynı şey. */
 /* `rozet`: satırdaki sayacın kaynağı (Cekmece içinde çözülüyor). Üç sayaç da AYNI dil —
    rose-600 hap, beyaz rakam (renk rolleri: sayaç = rose) — ve erişilebilir adda cümle
-   olarak okunuyor; çıplak "2" bağlamsız kalırdı. */
-const OGELER = [
+   olarak okunuyor; çıplak "2" bağlamsız kalırdı.
+
+   `rozetliYol`: satırda sayaç VARKEN gidilecek adres. Derslerim'de sayaç "senden iş
+   bekleyen ders" demek ve o dersler "Senden aksiyon bekleyenler" sekmesinde; ekran
+   ?sekme= değerini okuyup adresten siliyor (app/dersler.jsx), yani tekil ekranda aynı
+   komut ikinci kez de çalışıyor. `yol` DEĞİŞMEZ: aktif satır karşılaştırması
+   (usePathname sorgusuz yol döndürür) ve rehberin yer çipi ona bakıyor.
+
+   DIŞA AÇIK: ürün rehberinin yer çipi (UrunTuru → YerCipi) etiketi ve ikonu buradan
+   okuyor — menüde yazan ad ile rehberin gösterdiği ad ayrışamasın. */
+export const OGELER = [
   { yol: '/kesfet', etiket: 'Keşfet', Ikon: AramaIkonu },
   { yol: '/olustur', etiket: 'Ders Portföyü', Ikon: KitapIkonu },
   { yol: '/eslesmeler', etiket: 'Arkadaşlar', Ikon: KisilerIkonu, rozet: 'gelenIstek' },
   { yol: '/mesajlar', etiket: 'Sohbet', Ikon: MesajIkonu, rozet: 'okunmamis' },
-  { yol: '/dersler', etiket: 'Derslerim', Ikon: KepIkonu, rozet: 'dersEylem' },
+  {
+    yol: '/dersler',
+    etiket: 'Derslerim',
+    Ikon: KepIkonu,
+    rozet: 'dersEylem',
+    rozetliYol: '/dersler?sekme=aksiyon',
+  },
   /* Web sol rayının son satırı Topluluk (Layout.jsx:89) — çekmece artık o rayın
      BİREBİR karşılığı. Yol '/akis' değil '/': Topluluk aynı zamanda ana ekran, ayrı
      bir /topluluk adresine gitmek aynı ekranı yığına ikinci kez iterdi. */
@@ -277,17 +292,20 @@ export function Cekmece({ acik, onKapat, aktifYol }) {
 
             <View className="my-2 h-px bg-white/10" />
 
-            {OGELER.map(({ yol, etiket, Ikon, rozet }) => (
-              <Oge
-                key={yol}
-                Ikon={Ikon}
-                etiket={etiket}
-                aktif={aktifYol === yol}
-                rozet={rozet && sayaclar[rozet] > 0 ? sayaclar[rozet] : null}
-                rozetTuru={rozet}
-                onPress={() => git(yol)}
-              />
-            ))}
+            {OGELER.map(({ yol, etiket, Ikon, rozet, rozetliYol }) => {
+              const sayi = rozet && sayaclar[rozet] > 0 ? sayaclar[rozet] : null
+              return (
+                <Oge
+                  key={yol}
+                  Ikon={Ikon}
+                  etiket={etiket}
+                  aktif={aktifYol === yol}
+                  rozet={sayi}
+                  rozetTuru={rozet}
+                  onPress={() => git(sayi && rozetliYol ? rozetliYol : yol)}
+                />
+              )
+            })}
 
             {/* Yönetim YALNIZCA yetkili hesapta çizilir. Asıl kapı sunucuda (403);
                 buradaki koşul, yetkisi olmayana çalışmayan bir satır göstermemek için. */}
@@ -400,14 +418,16 @@ export function HamburgerDugmesi() {
     [bekleyen.dersEylem, 'ders işlem bekliyor'],
   ].filter(([n]) => n > 0)
   const toplam = parcalar.reduce((t, [n]) => t + n, 0)
-  /* TUR ÇIPASI: 'matches' ve 'sessions' adımları eskiden Akış başlığındaki iki ikona
-     ışık tutuyordu. O ikonlar kalktı (hedefleri çekmeceye taşındı), çıpa da buraya
-     geldi. İki adım da aynı öğeyi gösteriyor ve bu doğru: ikisinin de yolu menüden
-     geçiyor.
+  /* TUR ÇIPASI 'menu': rehberin menü adımı (2) buraya ışık tutuyor. Menü satırlarını
+     anlatan adımlar (Keşfet…Derslerim) ÇIPASIZ, ortada kart + yer çipi: beş adımı bu
+     tek kutuya bağlamak aynı 44px'i beş kez göstermek olurdu (2026-09-26'ya kadar
+     'matches' ve 'sessions' buraya bağlıydı).
 
      ⚠️ AYNI ÇIPA ADI BEŞ EKRANDA BİRDEN kayıtlı: bu düğme her kabuk ekranında ayrı
      bir örnek ve kök yığın alttakini monte tutuyor. tur.js'in defteri bu yüzden
-     sayaçlı — biri sökülünce çıpa ölmesin (gerekçe turCipasiSil'de). */
+     sayaçlı — biri sökülünce çıpa ölmesin (gerekçe turCipasiSil'de). Adım yalnızca
+     kabuk ekranındayken okunur (tur.js → KABUK_EKRANLARI): üstte bir yığın ekranı
+     varken alttaki hamburgerin ölçüsü onun geri düğmesine delik açardı. */
   const cipa = useTurCipasi('menu')
   return (
     <Pressable

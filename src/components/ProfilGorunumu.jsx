@@ -1,18 +1,28 @@
 import { useEffect, useState } from 'react'
 import { Pressable, Text, View } from 'react-native'
+import { useRouter } from 'expo-router'
 import { api } from '../lib/api'
 import { useAsync } from '../state/useAsync'
+import { useProfilArkadaslari } from '../state/useProfilArkadaslari'
 import { formatDateTime } from '../lib/format'
 import { seviyeEtiketi, seviyeHesapla, seviyeIlerlemeMetni } from '../lib/seviye'
-import { brand } from '../lib/theme'
+import { beyaz, brand } from '../lib/theme'
 import { ArkadaslarBolumu } from './ArkadaslarBolumu'
 import { Avatar } from './Avatar'
 import { SubjectBadges } from './SubjectBadges'
 import { UniversiteRozetleri } from './UniversiteRozetleri'
 import { ToplulukRozetleri } from './ToplulukRozetleri'
 import { YonetimRozeti } from './YonetimRozeti'
-import { GrafikIkonu, KepIkonu, TakvimIkonu, YildizIkonu } from './Ikonlar'
-import { Badge, Button, Card, EmptyState, ErrorBox, Loading } from './ui'
+import {
+  GrafikIkonu,
+  KameraIkonu,
+  KepIkonu,
+  KisilerIkonu,
+  SagOkIkonu,
+  TakvimIkonu,
+  YildizIkonu,
+} from './Ikonlar'
+import { Badge, Button, Card, EmptyState, ErrorBox, Loading, Spinner } from './ui'
 
 /*
   KOMPAKT PROFİL — web'deki UserProfileView'ın portu (iş kuralı 2).
@@ -47,13 +57,23 @@ import { Badge, Button, Card, EmptyState, ErrorBox, Loading } from './ui'
 
   ARKADAŞLAR (web #31) konu panelleri ile değerlendirmeler arasında ve AYRI UÇTAN
   (api.userFriends) geliyor — profil yanıtına alan eklenmedi. Kurallar bileşenin kendi
-  başında (ArkadaslarBolumu.jsx).
+  başında (ArkadaslarBolumu.jsx). Sayı 2026-09-26'dan beri başlıkta da var (fotoğrafın
+  altındaki hap ya da "N arkadaş · M ortak" satırı); ikisi aynı çekimden beslenir
+  (useProfilArkadaslari), uç bir kez çağrılır.
+
+  FOTOĞRAF (`fotograf` = { onPress, yukleniyor }): yalnızca Profilim veriyor ve yalnızca
+  kendi profilinde çiziliyor. Başkasının profili rotası (profil/[userId]) prop geçmiyor:
+  kullanıcı oradan kendi kimliğine gelse de düzenleme Profilim'de kalıyor (o dosyanın
+  başındaki kural). Yükleme işi çağıranın; burada yalnızca dokunma hedefi ve durum.
 */
 
-export function ProfilGorunumu({ userId, kendiProfilim = false, onYuklendi, onHata }) {
+export function ProfilGorunumu({ userId, kendiProfilim = false, fotograf, onYuklendi, onHata }) {
   const profile = useAsync(() => api.userProfile(userId), [userId])
   const [reviewPage, setReviewPage] = useState(1)
   const reviews = useAsync(() => api.userReviews(userId, reviewPage), [userId, reviewPage])
+  /* Arkadaş verisi başlık ve bölüm için TEK çekim; kanca erken dönüşlerden ÖNCE (koşullu
+     kanca olmasın) ve profil isteğiyle paralel başlıyor. */
+  const arkadaslar = useProfilArkadaslari(userId)
 
   /* Profil verisi gelince çağırana verilir: başkasının profilindeki eylem düğmeleri
      (arkadaş ekle / engelle) kişinin ADINA ihtiyaç duyuyor ve o ad yalnızca bu istekte
@@ -87,7 +107,12 @@ export function ProfilGorunumu({ userId, kendiProfilim = false, onYuklendi, onHa
 
   return (
     <View className="gap-3">
-      <ProfilBasligi profile={p} />
+      <ProfilBasligi
+        profile={p}
+        benimProfilim={benimProfilim}
+        arkadaslar={arkadaslar}
+        fotograf={benimProfilim ? fotograf : null}
+      />
 
       {/* Branş rozetleri istatistiklerin hemen altında: ikisi de "bu kişi ne yapmış"
           sorusunu yanıtlıyor, konu panellerinden ("ne yapabilir") önce gelmeli.
@@ -133,9 +158,10 @@ export function ProfilGorunumu({ userId, kendiProfilim = false, onYuklendi, onHa
         Sayfa "kim → ne yapmış → ne yapabilir → başkaları ne diyor" diye okunuyor;
         arkadaş listesi yetenek beyanı değil sosyal kanıt ve en yakın akrabası
         değerlendirmeler. Sayaç şeridine beşinci kutu olarak KONMADI: 2×2 şerit
-        2+2+1 öksüz bir satır bırakırdı. Sayı bölümün kendi başlığında.
+        2+2+1 öksüz bir satır bırakırdı. Sayı bölümün kendi başlığında ve profil
+        başlığındaki arkadaş satırında (aynı veri).
       */}
-      <ArkadaslarBolumu userId={userId} kendiProfilim={benimProfilim} ad={p.displayName} />
+      <ArkadaslarBolumu veri={arkadaslar} kendiProfilim={benimProfilim} ad={p.displayName} />
 
       <Degerlendirmeler reviews={reviews} page={reviewPage} onPage={setReviewPage} />
     </View>
@@ -144,19 +170,19 @@ export function ProfilGorunumu({ userId, kendiProfilim = false, onYuklendi, onHa
 
 /*
   PROFİL BAŞLIĞI — Instagram düzeni (web'in üçüncü hâli): ÖNCE KİŞİ, sonra sayılar.
-  Avatar 112px ve tek başına duran ilk şey; ad sayfanın en büyük metni; sayaçlar aynı
-  kartın içinde 2×2 şerit. Mobil daima "dar ekran" olduğundan web'in sm-altı düzeni
-  (ortalı portre) tek düzen olarak kalır — Instagram da öyle yapıyor.
+  Avatar (xl) tek başına duran ilk şey; ad sayfanın en büyük metni; okulun altında
+  arkadaş satırı; sayaçlar aynı kartın içinde 2×2 şerit. Mobil daima "dar ekran"
+  olduğundan web'in sm-altı düzeni (ortalı portre) tek düzen olarak kalır — Instagram da
+  öyle yapıyor.
+
+  Kendi profilinde (Profilim) fotoğrafın köşesinde kamera rozeti var ve fotoğrafa dokunmak
+  onu değiştiriyor: Profilim'in üstündeki "Fotoğrafı değiştir" düğmesinin yerine geldi
+  (2026-09-26, bütün ayarlar Ayarlar ekranına taşındı).
 */
-function ProfilBasligi({ profile }) {
+function ProfilBasligi({ profile, benimProfilim, arkadaslar, fotograf }) {
   return (
     <Card dolgu="p-7" className="items-center">
-      <Avatar
-        userId={profile.userId}
-        name={profile.displayName}
-        size="xl"
-        className="border-4 border-brand-200"
-      />
+      <ProfilFotografi profile={profile} fotograf={fotograf} />
 
       {/*
         YÖNETİM ROZETİ ADIN YANINDA, altında değil: forumda rozetli bir yorum görüp
@@ -186,6 +212,8 @@ function ProfilBasligi({ profile }) {
         </Text>
       )}
 
+      <ArkadasOzeti benimProfilim={benimProfilim} veri={arkadaslar} />
+
       {profile.bio ? (
         <Text className="mt-4 text-center text-[15px] leading-relaxed text-slate-700">
           {profile.bio}
@@ -194,6 +222,114 @@ function ProfilBasligi({ profile }) {
 
       <SayacSeridi profile={profile} />
     </Card>
+  )
+}
+
+/*
+  PROFİL FOTOĞRAFI — `fotograf` verilmediyse düz avatar (başkasının profili, ya da
+  [userId] rotasından açılan kendi profil). Verildiyse avatarın TAMAMI dokunma hedefi
+  (cihazda ~98dp); köşedeki kamera rozeti yalnızca görsel işaret, ayrı bir durak değil.
+
+  Avatar'ın yer tutucusu kendisi `accessible` (Avatar.jsx): basılabilir sarmalayıcının
+  içinde Android'de ikinci bir durak olup adı ikinci kez okuyordu. İç görünüm ekran
+  okuyucudan gizleniyor (ArkadaslarBolumu satırlarındaki çözüm); ad ve durum düğmenin
+  kendi etiketinde.
+
+  Rozet boyu px ile: rem cihazda 14 sayılıyor (h-9 → 31.5dp). Yüklenirken avatarın
+  üstünde yarı saydam örtü ve beyaz spinner, düğme kapalı: ikinci bir seçici açılsaydı
+  ilk yüklemenin sonucu ikincisinin altında kalırdı.
+*/
+function ProfilFotografi({ profile, fotograf }) {
+  const avatar = (
+    <Avatar
+      userId={profile.userId}
+      name={profile.displayName}
+      size="xl"
+      className="border-4 border-brand-200"
+    />
+  )
+  if (!fotograf) return avatar
+
+  const yukleniyor = Boolean(fotograf.yukleniyor)
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={yukleniyor ? 'Profil fotoğrafı yükleniyor' : 'Profil fotoğrafını değiştir'}
+      accessibilityState={{ busy: yukleniyor, disabled: yukleniyor }}
+      disabled={yukleniyor}
+      onPress={fotograf.onPress}
+      className="relative self-center rounded-full active:opacity-80"
+    >
+      <View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
+        {avatar}
+        {yukleniyor ? (
+          <View className="absolute inset-0 items-center justify-center rounded-full bg-slate-900/40">
+            <Spinner renk={beyaz} />
+          </View>
+        ) : null}
+        <View className="absolute bottom-0 right-0 h-[34px] w-[34px] items-center justify-center rounded-full border-[3px] border-white bg-brand-600">
+          <KameraIkonu renk={beyaz} boy={16} />
+        </View>
+      </View>
+    </Pressable>
+  )
+}
+
+/*
+  ARKADAŞ SATIRI — okulun altında, "hakkında"nın üstünde. Sayaç şeridine beşinci kutu
+  olarak girmedi (ProfilGorunumu'ndaki ARKADAŞLAR notu); sayının yeri kimlik bloğu.
+
+  • Kendi profilin: HAP DÜĞME, arkadaş listesini açar (/eslesmeler?sekme=active; 0
+    arkadaşta oradaki boş durum "Arkadaş bul" düğmesini taşıyor). Profilim'in üstündeki
+    "Arkadaşlarım" düğmesinin yeni yeri. Veri gelmeden ya da hata verdiyse de SAYISIZ
+    çiziliyor: giriş her zaman var ve sayı gelince kart zıplamıyor.
+  • Başkasının profili: düz bilgi satırı, eylem yok ("12 arkadaş · 3 ortak"). Tam ya da
+    ortak liste aşağıdaki Arkadaşlar bölümünde kalıyor. Yüklenirken aynı yükseklikte boş
+    satır (min-h-[20px]). "0 arkadaş" da yazılıyor: sayının bazen görünüp bazen
+    görünmemesi, bölümün her profilde aynı çizilmesi kuralını bozardı (ArkadaslarBolumu).
+
+  Kendi profil mi: profil yanıtının isSelf'i (benimProfilim); bölüm de aynı cevabı
+  arkadaş yanıtının isSelf'inden alıyor, ikisi sunucudan.
+*/
+function ArkadasOzeti({ benimProfilim, veri }) {
+  const router = useRouter()
+  const d = veri.data
+  const sayi = d ? (d.friendCount ?? 0) : null
+
+  if (benimProfilim) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={
+          sayi == null ? 'Arkadaşlarım. Listeyi aç' : `Arkadaşlarım, ${sayi} arkadaş. Listeyi aç`
+        }
+        onPress={() => router.push('/eslesmeler?sekme=active')}
+        className="mt-4 min-h-[44px] flex-row items-center gap-2 self-center rounded-full bg-brand-50 px-4 active:bg-brand-100"
+      >
+        <KisilerIkonu renk={brand[600]} boy={18} />
+        <Text className="text-sm font-semibold text-brand-800">
+          {sayi == null ? 'Arkadaşlarım' : `Arkadaşlarım · ${sayi}`}
+        </Text>
+        <SagOkIkonu renk={brand[600]} boy={16} />
+      </Pressable>
+    )
+  }
+
+  const ortak = d?.mutualCount ?? 0
+  return (
+    <View className="mt-3 min-h-[20px] justify-center">
+      {d ? (
+        <Text className="text-center text-sm text-slate-600">
+          <Text className="font-semibold text-slate-800">{sayi}</Text> arkadaş
+          {ortak > 0 ? (
+            <>
+              {' · '}
+              <Text className="font-semibold text-slate-800">{ortak}</Text> ortak
+            </>
+          ) : null}
+        </Text>
+      ) : null}
+    </View>
   )
 }
 

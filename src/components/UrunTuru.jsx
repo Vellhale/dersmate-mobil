@@ -1,11 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { BackHandler, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
-import { useRouter, usePathname } from 'expo-router'
+import {
+  AccessibilityInfo,
+  BackHandler,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native'
+import { usePathname } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Defs, Mask, Rect } from 'react-native-svg'
 import { api } from '../lib/api'
-import { brand, ink } from '../lib/theme'
+import { brand, ink, slate } from '../lib/theme'
 import { Button, Card } from './ui'
+import { OGELER } from './Cekmece'
+import { AyarlarIkonu } from './Ikonlar'
 import {
   TUR_ADIMLARI,
   TUR_ADIM_SAYISI,
@@ -15,7 +26,6 @@ import {
   turGecildiIsaretle,
   turGecildiMi,
   turYenidenBaslatmayiDinle,
-  turuYenidenBaslat,
 } from '../lib/tur'
 import { useIzin } from '../state/IzinContext'
 // Tur, izin sayfası kapanırken üstüne binmesin (süre animasyona bağlı, orada tanımlı).
@@ -24,22 +34,23 @@ import { IZIN_KAPANMA_SURESI } from './IzinSayfasi'
 /**
  * İnteraktif ürün rehberi — web'deki ProductTour.jsx'in mobil UYARLAMASI.
  *
- * NEDEN HAZIR KÜTÜPHANE DEĞİL (web kararı, mobilde de geçerli): altı adımlık bir spot
+ * NEDEN HAZIR KÜTÜPHANE DEĞİL (web kararı, mobilde de geçerli): dokuz adımlık bir spot
  * ışığı için yeni bir bağımlılık, bakım yükünü kazanılan koddan daha çok artırıyordu.
  * Karşılığında Türkçe metin ve 44px dokunma kuralı bizde.
  *
  * İLERLEME SUNUCUDA (api.myPreferences / api.saveOnboarding), cihazda değil: rehber
  * yalnızca giriş yapmış kullanıcıya gösteriliyor, dolayısıyla hesaba yazmak cihazlar
- * arası taşınır — kullanıcı turu telefonunda yarıda bırakıp webde tamamlayabilir.
- * lastStep / completed / suppressed sözleşmesi web ile birebir aynı.
+ * arası taşınır. lastStep / completed / suppressed sözleşmesi web ile birebir aynı,
+ * ama ADIM DİZİLERİ farklı (mobil 9, web 8, sıra farklı): aynı lastStep iki platformda
+ * başka adımı gösterir — bilinen, düşük etkili sınır (bkz. tur.js başlığı).
  *
  * ─── WEB MEKANİZMASININ HİÇBİRİ TAŞINMADI ────────────────────────────────────────
  *   querySelector + getBoundingClientRect → ölçüm defteri (src/lib/tur.js): çıpalar
  *     kendini measureInWindow ile kaydeder.
- *   scrollIntoView + scroll/resize dinleyicileri → YOK. Web'de çıpalar uzun bir sol
- *     rayda ve sayfa kaydırmasına bağlıydı; mobilde tur, başlığı sabit olan Topluluk
- *     ya da Keşfet ekranında açılıyor — kaydırılacak bir şey yok. Ölçü tazeleme adım
- *     başına bir kez (turCipalariniTazele).
+ *   scrollIntoView + scroll/resize dinleyicileri → YOK. Tur kaydırma YAPMAZ: 'menu'
+ *     çıpası sabit başlıkta; 'gonderi-yaz' Topluluk'un liste başlığında ve liste
+ *     kaydırılmışsa ekran dışında kalır — o zaman delik düşer, kart ortada çıkar
+ *     (bkz. gorunurDelik). Ölçü tazeleme adım başına bir kez (turCipalariniTazele).
  *   box-shadow "delik" → react-native-svg maskesi. Dört kenar View'ı da olurdu ama
  *     ondalıklı ölçülerde komşu View'lar arasında saç teli kadar boşluk kalıyor;
  *     maske tek parça çizdiği için o dikiş hiç oluşmuyor.
@@ -80,6 +91,106 @@ const ACILIS_EKRANLARI = ['/', '/kesfet']
 
 /** Çıpanın etrafında bırakılan nefes payı (web'deki padding=8 ile aynı). */
 const BOSLUK = 8
+
+/*
+  HALKA PENCERENİN İÇİNDE (2026-09-26, web `ceb18de`'nin karşılığı). Delik = çıpa + BOSLUK
+  ve kenara yapışık çıpada pencerenin DIŞINA taşıyor: hamburger (-ml-2) cihazda x≈7dp'de,
+  delik x≈-1'de başlıyordu. SVG çizgisi (2) kenarın iki yanına 1'er yayıldığı için halkanın
+  sol kenarı tamamen, önizlemede (x=0, y=0) sol ve üst kenarı yarı yarıya görünmüyordu —
+  menü adımında hangi öğenin gösterildiği okunmuyordu (önizlemede ölçüldü). Kutu pencerenin
+  HALKA_PAYI içine kırpılıyor: çıpa kesilmiyor, yalnızca o kenardaki nefes payı daralıyor.
+*/
+const HALKA_PAYI = 2
+
+function pencereIcinde(kutu, genislik, yukseklik) {
+  const sol = Math.max(HALKA_PAYI, kutu.x)
+  const ust = Math.max(HALKA_PAYI, kutu.y)
+  const sag = Math.min(genislik - HALKA_PAYI, kutu.x + kutu.w)
+  const alt = Math.min(yukseklik - HALKA_PAYI, kutu.y + kutu.h)
+  return { x: sol, y: ust, w: Math.max(0, sag - sol), h: Math.max(0, alt - ust) }
+}
+
+/*
+  ÇIPA EKRANI — adımın `cipaEkrani` alanı varsa çıpa YALNIZCA o adresteyken okunur
+  (tur.js'teki kural; gerekçe orada: monte kalan alttaki ekranın ölçüsü öndekine yanlış
+  delik açardı). Alan yoksa ada bakılır; bugün her çıpalı adımda alan var.
+*/
+function cipaEkrandaMi(adim, pathname) {
+  if (!adim?.cipa) return false
+  const ekran = adim.cipaEkrani
+  if (!ekran) return true
+  return Array.isArray(ekran) ? ekran.includes(pathname) : ekran === pathname
+}
+
+/*
+  YER ÇİPİ — çıpasız adımda "bunu nerede bulacağım"ın görsel cevabı: menüdeki satırın
+  küçük bir kopyası. Kaynak Cekmece.jsx → OGELER (menü yolu) ya da aşağıdaki EK_YERLER;
+  bulunamazsa çip çizilmez (adım metni zaten yeri söylüyor) ve geliştirmede uyarı basılır.
+*/
+const EK_YERLER = {
+  ayarlar: { onEk: 'Profilim’de', etiket: 'Ayarlar', tur: 'ayarlar' },
+}
+
+function yerBul(yer) {
+  if (!yer) return null
+  const oge = OGELER.find((o) => o.yol === yer)
+  if (oge) return { onEk: 'Menüde', etiket: oge.etiket, Ikon: oge.Ikon, tur: 'menu' }
+  return EK_YERLER[yer] ?? null
+}
+
+/*
+  Çip BASILABİLİR DEĞİL ve DEKORATİF: ekran okuyucudan gizli (yer adı gövde cümlesinde
+  zaten geçiyor) ve 44 kuralı dışında — dokunulabilir görünmemeli, o yüzden gölgesiz,
+  basınç rengi yok.
+
+  • Menü çipi çekmecenin AKTİF satırını taklit ediyor: ink zemin + brand-300/10 kaplama,
+    kalın (2.4) brand-300 ikon ve kalın etiket. brand-300'ün ink üstünde 8.19:1 olduğu
+    web'de ölçülmüş (Cekmece.jsx başlığı). Kullanıcı menüyü açınca AYNI görüntüyü arıyor.
+  • Ayarlar çipi Profilim başlığındaki dişliyi gösteriyor (AyarlarDugmesi, app/profil/
+    index.jsx): açık zeminde slate-700 dişli, yanında düğmenin erişilebilir adı "Ayarlar".
+*/
+function YerCipi({ yer }) {
+  const bilgi = yerBul(yer)
+  const bulunamadi = Boolean(yer) && !bilgi
+
+  useEffect(() => {
+    if (bulunamadi && __DEV__) {
+      console.warn(`[UrunTuru] Rehber yeri bulunamadı: "${yer}" — OGELER ya da EK_YERLER'e bak.`)
+    }
+  }, [yer, bulunamadi])
+
+  if (!bilgi) return null
+
+  return (
+    <View
+      className="mt-3 flex-row items-center gap-2"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <Text className="text-[12px] leading-[16px] text-slate-500">{bilgi.onEk}</Text>
+
+      {bilgi.tur === 'menu' ? (
+        <View className="overflow-hidden rounded-xl" style={{ backgroundColor: ink }}>
+          <View className="flex-row items-center gap-2 bg-brand-300/10 px-3 py-2">
+            <bilgi.Ikon renk={brand[300]} boy={20} kalinlik={2.4} />
+            <Text numberOfLines={1} className="text-sm font-bold text-brand-300">
+              {bilgi.etiket}
+            </Text>
+          </View>
+        </View>
+      ) : (
+        <View className="flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white py-1.5 pl-1.5 pr-3">
+          <View className="h-[28px] w-[28px] items-center justify-center rounded-full bg-slate-100">
+            <AyarlarIkonu renk={slate[700]} boy={18} />
+          </View>
+          <Text numberOfLines={1} className="text-sm font-semibold text-slate-700">
+            {bilgi.etiket}
+          </Text>
+        </View>
+      )}
+    </View>
+  )
+}
 
 /*
   TUR AÇIK MI — bildirim aydınlatma sorusu (state/BildirimSaglayici) tur ekrandayken
@@ -213,11 +324,14 @@ export function UrunTuru() {
   }, [pathname, durum.yukleniyor, durum.aktif, mutlakaSor])
 
   const adim = TUR_ADIMLARI[durum.adim]
+  // Çıpa bu ekranda okunabilir mi (tur.js → cipaEkrani). Adres değişince efekt yeniden
+  // koşar: tur açıkken bildirime dokunulup başka ekrana geçilirse delik kalkar.
+  const cipaOkunur = cipaEkrandaMi(adim, pathname)
 
   // Adımın çıpasını defterden izle. Çıpa sonradan kaydolabilir (ekran henüz
   // yerleşmemiş olabilir), o yüzden tek seferlik okuma yetmez.
   useEffect(() => {
-    if (!durum.aktif || !adim) {
+    if (!durum.aktif || !adim || !cipaOkunur) {
       setCipa(null)
       return
     }
@@ -225,8 +339,27 @@ export function UrunTuru() {
     const oku = () => setCipa(turCipasiOku(adim.cipa))
     oku()
     turCipalariniTazele()
-    return turCipalariniDinle(oku)
-  }, [durum.aktif, adim])
+    /* İkinci ölçüm geçiş BİTTİKTEN sonra: "Rehberi tekrar izle" Ayarlar'dan Topluluk'a
+       geçerken turu hemen başlatıyor ve ilk ölçüm kayan ekrandan alınabilir. Ölçü
+       değişmediyse defter kimseyi uyandırmıyor, yani fazladan çizim yok. */
+    const gecisSonrasi = setTimeout(turCipalariniTazele, IZIN_KAPANMA_SURESI)
+    const vazgec = turCipalariniDinle(oku)
+    return () => {
+      clearTimeout(gecisSonrasi)
+      vazgec()
+    }
+  }, [durum.aktif, adim, cipaOkunur])
+
+  /*
+    ADIM DUYURUSU — ekran okuyucu yeni adımın başlığını okur. Duyuru olmadan odak "Devam"
+    düğmesinde kalıyordu ve kart değiştiği hâlde yeni adım hiç okunmuyordu. Açılışta da
+    duyuruluyor (ilk adım da bir "değişim"). İzin sayfası öndeyken tur çizilmediği için
+    orada duyurulmaz; sayfa kapanınca aynı adım duyurulur.
+  */
+  const cizili = durum.aktif && !durum.yukleniyor && !mutlakaSor
+  useEffect(() => {
+    if (cizili && adim?.title) AccessibilityInfo.announceForAccessibility(adim.title)
+  }, [cizili, adim])
 
   const kaydet = useCallback((adimNo, tamamlandi, susturuldu) => {
     // Ateşle-unut: turun akışı ağ yanıtını beklemez. Kaydedilemezse en fazla tur bir
@@ -299,13 +432,26 @@ export function UrunTuru() {
 
   const sonAdim = durum.adim === TUR_ADIM_SAYISI - 1
 
-  const delik = cipa
-    ? {
-        x: cipa.x - BOSLUK,
-        y: cipa.y - BOSLUK,
-        w: cipa.width + BOSLUK * 2,
-        h: cipa.height + BOSLUK * 2,
-      }
+  /*
+    Görünür delik: merkezi ekranın dikey sınırları [0, height] DIŞINDA kalan çıpa yok
+    sayılır. 'gonderi-yaz' liste başlığında; tur açılmadan liste kaydırıldıysa ölçü
+    negatif y ile gelir. Koşul olmasaydı ekranda delik görünmez ama yerleşim onu "üst
+    yarıda" sayar ve kartı boş bir yere doğru iterdi.
+  */
+  const gorunurDelik =
+    cipa && cipa.y + cipa.height / 2 >= 0 && cipa.y + cipa.height / 2 <= height ? cipa : null
+
+  const delik = gorunurDelik
+    ? pencereIcinde(
+        {
+          x: gorunurDelik.x - BOSLUK,
+          y: gorunurDelik.y - BOSLUK,
+          w: gorunurDelik.width + BOSLUK * 2,
+          h: gorunurDelik.height + BOSLUK * 2,
+        },
+        width,
+        height,
+      )
     : null
 
   /*
@@ -315,8 +461,22 @@ export function UrunTuru() {
     Web'de kartın YÜKSEKLİĞİ ölçülüp "altına sığar mı" hesaplanıyordu. Burada gerek
     yok: kart tam genişlik ve tek sütun, hizalamayı flexbox yapıyor — metin uzayınca
     kimsenin bir sayıyı güncellemesi gerekmiyor.
+
+    KART DELİĞİN ÜSTÜNE BİNMEZ (2026-09-26): yerleşim yalnızca hizalamaydı ve kart
+    uzunsa deliği örtüyordu — 320×568'de Topluluk adımının kartı (yer çipiyle) yazma
+    kutusunun üstüne çıktı (ölçüldü). Kartın durduğu bölge artık deliğin karşı tarafıyla
+    sınırlı; sığmazsa kart küçülür ve metin kısmı kendi içinde kayar (aşağıda). Sayaç ve
+    düğmeler her zaman görünür kalır.
   */
   const yerlesim = !delik ? 'center' : delik.y + delik.h / 2 > height / 2 ? 'flex-start' : 'flex-end'
+  const ustBosluk = Math.max(
+    insets.top + 12,
+    yerlesim === 'flex-end' ? delik.y + delik.h + 12 : 0,
+  )
+  const altBosluk = Math.max(
+    insets.bottom + 12,
+    yerlesim === 'flex-start' ? height - delik.y + 12 : 0,
+  )
 
   return (
     <View
@@ -324,6 +484,9 @@ export function UrunTuru() {
       // (elevation'lı) gezinme yüzeyleri sıradan kardeşin üstüne çıkabiliyor.
       style={[StyleSheet.absoluteFill, { zIndex: 60, elevation: 60 }]}
       accessibilityViewIsModal
+      // Web'deki aria-label'ın karşılığı. `accessible` VERİLMEDİ: kök tek bir durak olursa
+      // içindeki düğmelere ekran okuyucuyla ulaşılamazdı; ad yalnızca kapsayıcıyı adlandırır.
+      accessibilityLabel="Ürün rehberi"
     >
       {/*
         DOKUNMAYI YUTAN KATMAN. RN'de arkaplansız bir View dokunmayı geçirir; tur
@@ -385,51 +548,73 @@ export function UrunTuru() {
         pointerEvents="box-none"
         style={{
           justifyContent: yerlesim,
-          paddingTop: insets.top + 12,
-          paddingBottom: insets.bottom + 12,
+          paddingTop: ustBosluk,
+          paddingBottom: altBosluk,
         }}
       >
-        <Card>
+        {/* shrink: bölge kartın doğal boyundan kısaysa kart küçülür (bkz. yerleşim). */}
+        <Card className="shrink">
           <View className="flex-row items-center justify-between gap-3">
-            <Text className="text-xs font-medium text-brand-600">
+            <Text className="shrink-0 text-xs font-medium text-brand-600">
               Adım {durum.adim + 1} / {TUR_ADIM_SAYISI}
             </Text>
 
             {/* İlerleme çubukları görsel tekrar: sayıyı zaten yazdık, ekran okuyucuya
-                ikinci kez okutmuyoruz. */}
+                ikinci kez okutmuyoruz.
+
+                ESNEK (2026-09-26): dokuz sabit çubuk (w-6 = cihazda 21dp, gap 3.5dp →
+                ~217dp) 320dp telefonda sayaç metniyle birlikte kartın iç genişliğini
+                aşıyordu. Çubuklar kalan yeri paylaşıyor, en fazla 24px; sayaç küçülmüyor
+                (shrink-0). Web aynı düzeltmeyi aldı (max-w-6 flex-1). */}
             <View
-              className="flex-row gap-1"
+              className="min-w-0 flex-1 flex-row justify-end gap-1"
               accessibilityElementsHidden
               importantForAccessibility="no-hide-descendants"
             >
               {TUR_ADIMLARI.map((a, i) => (
                 <View
                   key={a.id}
-                  className={`h-1.5 w-6 rounded-full ${i <= durum.adim ? 'bg-brand-500' : 'bg-slate-200'}`}
+                  className={`h-1.5 max-w-[24px] flex-1 rounded-full ${i <= durum.adim ? 'bg-brand-500' : 'bg-slate-200'}`}
                 />
               ))}
             </View>
           </View>
 
-          <Text className="mt-2 text-lg font-semibold text-slate-900">{adim.title}</Text>
+          {/* Metin kısmı KAYABİLİR: kart deliğin karşısındaki bölgeye sığmadığında (küçük
+              ekran, büyük yazı) küçülen yalnızca bu kısım. flexGrow 0: sığdığında kart
+              doğal boyunda kalır, boş alan doğmaz. Adım değişince key ile tepeden açılır. */}
+          <ScrollView
+            key={adim.id}
+            style={{ flexGrow: 0, flexShrink: 1 }}
+            bounces={false}
+          >
+            <Text accessibilityRole="header" className="mt-2 text-lg font-semibold text-slate-900">
+              {adim.title}
+            </Text>
 
-          {/* Tek cümlelik özet biraz daha koyu (slate-700): maddelerden önce okunması
-              gereken satır o. Ayrıntı maddelerde ve bir ton açık — hiyerarşi puntoyla
-              değil renkle kuruluyor (web kararı). */}
-          <Text className="mt-1.5 text-sm leading-relaxed text-slate-700">{adim.body}</Text>
+            {/* Tek cümlelik özet biraz daha koyu (slate-700): maddelerden önce okunması
+                gereken satır o. Ayrıntı maddelerde ve bir ton açık — hiyerarşi puntoyla
+                değil renkle kuruluyor (web kararı). */}
+            <Text className="mt-1.5 text-sm leading-relaxed text-slate-700">{adim.body}</Text>
 
-          {adim.points?.length > 0 && (
-            <View className="mt-3 gap-1.5">
-              {adim.points.map((madde) => (
-                /* Madde imi sabit boyutlu bir nokta ve üstten hizalı: iki satıra taşan
-                   maddede imin metnin ortasına kaymaması için (web kararı). */
-                <View key={madde} className="flex-row items-start gap-2">
-                  <View className="mt-[7px] h-1 w-1 rounded-full bg-brand-400" />
-                  <Text className="flex-1 text-sm leading-relaxed text-slate-600">{madde}</Text>
-                </View>
-              ))}
-            </View>
-          )}
+            {/* Yer çipi gövde cümlesiyle maddeler arasında: önce "ne", sonra "nerede"
+                (görsel), sonra ayrıntı. Çıpalı adımlarda da duruyor (Topluluk): delik
+                ekran dışındaysa çip tek yön gösteren şey olur. */}
+            <YerCipi yer={adim.yer} />
+
+            {adim.points?.length > 0 && (
+              <View className="mt-3 gap-1.5">
+                {adim.points.map((madde) => (
+                  /* Madde imi sabit boyutlu bir nokta ve üstten hizalı: iki satıra taşan
+                     maddede imin metnin ortasına kaymaması için (web kararı). */
+                  <View key={madde} className="flex-row items-start gap-2">
+                    <View className="mt-[7px] h-1 w-1 rounded-full bg-brand-400" />
+                    <Text className="flex-1 text-sm leading-relaxed text-slate-600">{madde}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </ScrollView>
 
           <View className="mt-4 flex-row items-center justify-between gap-2">
             <Pressable
@@ -466,28 +651,15 @@ export function UrunTuru() {
   )
 }
 
-/**
- * "Rehberi tekrar izle" bağlantısı (web'deki RestartTourLink). Profil gibi bir
- * ayarlar yüzeyine konur.
- *
- * Kendiliğinden açılırken yönlendirme YAPILMIYOR ama burada yapılıyor: niyet
- * kullanıcının kendisinden geliyor ve turun açılış ekranı '/' (Topluluk). navigate
- * (push değil) + kök yığındaki `dangerouslySingular`: yığına ikinci bir kopya
- * konmuyor, zaten açık olan ekran en üste taşınıyor.
- */
-export function RehberiTekrarIzle({ className = '' }) {
-  const router = useRouter()
+/*
+  "REHBERİ TEKRAR İZLE" — tek girişi Ayarlar ekranındaki satır (app/ayarlar.jsx →
+  rehberiBaslat). Web'deki RestartTourLink'in karşılığı olan bağlantı bileşeni burada
+  duruyordu; tek kullanıcısı Profil'in eski alt bilgisiydi ve Ayarlar ekranı gelince
+  (2026-09-26) silindi.
 
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={() => {
-        router.navigate('/')
-        turuYenidenBaslat()
-      }}
-      className={`min-h-[44px] justify-center ${className}`}
-    >
-      <Text className="text-xs text-slate-500 underline">Rehberi tekrar izle</Text>
-    </Pressable>
-  )
-}
+  Kendiliğinden açılırken yönlendirme YAPILMIYOR ama elle başlatmada yapılıyor: niyet
+  kullanıcının kendisinden geliyor ve rehberin ilk adımı Topluluk'ta ('/'). Ayarlar önce
+  kendini yığından çıkarır (back), sonra navigate('/') + turuYenidenBaslat(): geri tuşu
+  turdan sonra Ayarlar'a değil Profil'e döner. navigate (push değil) + kök yığındaki
+  `dangerouslySingular`: yığına ikinci bir Topluluk konmuyor, açık olan en üste taşınıyor.
+*/

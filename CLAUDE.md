@@ -5,7 +5,7 @@ Web sürümü ve backend `C:\projeler\dersmate` içinde; backend .NET 8 + Postgr
 ve **değişmez** — mobil yalnızca istemcidir. **İletişim dili Türkçe** — kod yorumları,
 commit mesajları ve kullanıcıya görünen her metin Türkçe.
 
-⚠️ **Tek bilinçli istisna: push bildirimleri (2026-09-25, kullanıcı onayıyla).** Push
+⚠️ **İlk bilinçli istisna: push bildirimleri (2026-09-25, kullanıcı onayıyla).** Push
 sunucusuz yapılamazdı; sunucu + web + mobil aynı iş olarak, aynı adlı dalda
 (`ozellik/push-bildirimleri`) değişti. Sunucuya eklenenler: `comms` şemasında
 `PushDevices`, `Notifications` (defter + outbox), `PushTickets`,
@@ -13,6 +13,20 @@ sunucusuz yapılamazdı; sunucu + web + mobil aynı iş olarak, aynı adlı dald
 noktalarında deftere yazım; çıkış/ban/hesap silmede cihaz silme; gönderim işleri. Ayrıntı
 "Push bildirimleri" bölümünde. Bu istisna kuralı gevşetmiyor — sıradaki mobil iş yine
 yalnızca istemci.
+
+⚠️ **İkinci istisna: iki küçük ekleme (2026-09-26, kullanıcı onayıyla, dal
+`tasarim/profil-dersler-topluluk`, iki depoda aynı adla).** İkisi de EKLEMELİ ve geri
+uyumlu: parametresiz istek ve eski istemci bugünkü yanıtı birebir alıyor. Sunucu PR'ı
+istemcilerden ÖNCE birleşip dağıtılır. Sunucu tarafının tuzakları web/sunucu deposunun
+CLAUDE.md'sinde ("Mobil uygulamayla ortak sözleşme").
+
+| ek | neden | mobilde |
+|---|---|---|
+| `GET /api/v1/sessions?pastStatus=Completed\|Cancelled\|Expired` (başka değer → 400 `VALIDATION_FAILED`) | "Geçmiş dersler = yalnızca tamamlananlar" istemcide süzülünce sayfalama bozuluyordu: `past.totalCount` üç durumun toplamı, beşerli sayfa 0–5 karta düşüyor ve kart eklemeyen sayfa `VirtualizedList`'in `onEndReached`'ini bir daha tetiklemiyor | `api.mySessions(p, 5, 'Completed')` → `src/state/useGecmisSayfalari.js` (iç kip). Eski sunucu parametreyi YOK SAYAR: kanca `status === 'Completed'` süzgecini ayrıca tutuyor ve art arda boş sayfada durup "Daha eski dersleri yükle" düğmesine geçiyor — "gereksiz" diye kaldırma |
+| `ForumPostDto.FirstComment` (kaydın SONUNDA, varsayılan `null`) | Topluluk kartında ilk yorumun iki satırlık önizlemesi + "{n} yorumun tümünü gör" | `GonderiKarti.jsx` → `YorumOnizlemesi` yalnızca ÇİZİYOR; hangi yorumun seçileceği sunucuda (`ForumOnizleme`: yalnızca `Visible`, iki yönlü engel süzgeci, perdeli gönderide `null`, gövde tek satıra inip 200 grafemde "…"). Akış ve iplik engele göre süzmüyor: önizleme ile ipliğin ilk yorumu farklı olabilir |
+
+Bu da kuralı gevşetmiyor: istisna, yalnızca istemcide DOĞRU yapılamayan bir iş için ve
+kullanıcı onayıyla açılır.
 
 Expo SDK 57 / expo-router / NativeWind 4 / JavaScript (TS değil — web projesiyle aynı dil,
 kod çevirisi birebir kalsın diye).
@@ -422,7 +436,7 @@ Bunlar kontrol edildi (2026-09-21), yeniden araştırma gerekmiyor:
 | Kullanılmayan izin metinleri | ✅ yok — `expo-image-picker` kamera/mikrofon `false`, yalnızca foto izni üretiliyor |
 | İkon alfa kanalı (App Store reddeder) | ✅ `assets/icon.png` 1024×1024, alfasız (colorType=2) |
 | Privacy manifest (`PrivacyInfo.xcprivacy`) | ✅ `app.json` → `ios.privacyManifests` (2026-09-22) |
-| 4.5.4 push bildirimleri | ✅ (2026-09-25) zorunlu değil — izin vermeyen kullanıcıda uygulama aynı çalışır, bekleyen iş çekmece sayaçlarından görünür; reklam/pazarlama için kullanılmıyor; türler Profil › Bildirim ayarları'ndan tek tek kapatılır |
+| 4.5.4 push bildirimleri | ✅ (2026-09-25) zorunlu değil — izin vermeyen kullanıcıda uygulama aynı çalışır, bekleyen iş çekmece sayaçlarından görünür; reklam/pazarlama için kullanılmıyor; türler Profil › Ayarlar › Bildirim ayarları'ndan tek tek kapatılır |
 | İzin öncesi ekran (HIG, 5.1.1) | ✅ iOS'ta izin hiç sorulmamışken aydınlatma modalında TEK düğme "Devam" ve modal kapatılamıyor; karar sistem isteminde verilir (`BildirimIzniSorusu.jsx`). Android'de "Şimdi değil" duruyor |
 | Gizlilik "nutrition label" formu | ⬜ App Store Connect'te elle doldurulacak — manifestteki 7 türle tutarlı olmalı |
 | Ekran görüntüleri (6.7" ve 6.5") | ⬜ üretilecek — Android'inkiler kullanılamaz |
@@ -475,6 +489,24 @@ bileşeninin kurulum numarası/adresi; kayıt bayrağı ve çevrimdışı çık�
 işareti) izne tabi değil, "zorunlu" kategoride. Kural `IzinContext.jsx`'te: sürüm izne TABİ kapsam değişince
 artar.
 
+#### ⛔ Birleşme sırası: push PR'ları tasarım dalından önce TEK BAŞINA yayına çıkmaz
+
+`2026-09-25` iki dalda İKİ AYRI METNE karşılık geliyor. `tasarim/profil-dersler-topluluk`
+sürümün içinde, yayından önce düzeltildi (Koşullar §3 puan kaynakları ve hoş geldin puanı,
+Gizlilik §2/§6/§7 Topluluk içeriği, §4/§7 ve HesapSilme yol metinleri); açık push PR'ları
+(mobil #20, sunucu + web #38, ikisi de `main`'e hedefli) aynı sürümü ESKİ metinle taşıyor
+("puan yalnızca ders anlatana", "30 günde yanar", Topluluk yok, "Profil ekranının en
+altı"). Push dalı tek başına birleşip sunucu ya da web yayına çıkarsa, o arada kayıt
+olanın `TermsVersion`'ı `2026-09-25` olur ve tasarım dalı gelince aynı dizge başka bir
+metni anlatır: onayın kanıt değeri kaybolur.
+
+Kural: #20 ve #38 TEK BAŞINA `main`'e alınmaz, dağıtılmaz. Tasarım dalı push dalının
+üstünde, yani onun PR'ı push işini de taşıyor: iki iş aynı birleştirmede ve aynı dağıtımda
+çıkar. Push ayrı çıkarsa tasarım dalı birleşmeden ÖNCE `SOZLESME_SURUMU`'nu üç yerde
+artırır; "sürüm içi düzeltme" gerekçesi o andan itibaren geçersizdir. Tarihçe ve gerekçe
+`src/lib/yasalMetinler.js`'te; aynı kural web `lib/yasalMetinler.js`, sunucu
+`LegalDocuments.cs` notu ve web/sunucu CLAUDE.md'sinde. PR açıklamalarına da eklenmeli.
+
 ### ⛔ App Store Connect gizlilik politikası ADRESİ istiyor — uygulama içi metin saymaz
 
 `app/gizlilik.jsx` mobil gerçeğe göre yazılmış durumda (canvas yerine `hwid.js`, çerez
@@ -512,7 +544,7 @@ Kimlik bilgileri ve profil başına durum `docs/eas-profilleri.md` → "Push bil
 | `src/lib/bildirimler.js` | expo-notifications'ı içe aktaran TEK modül: kanallar, izin, token kaydı (tek uçuş), dinleyiciler, rota beyaz listesi, sunulan bildirimleri kapatma, unutma işareti |
 | `src/state/BildirimSaglayici.jsx` | oturumlu yarı: tercihler, aydınlatma bayrağı, kayıt, dokunuş yönlendirmesi, ön plan tazelemeleri, aktif sohbet, rozet, aydınlatma sorusunun kuralları → `useBildirim()` |
 | `src/components/BildirimIzniSorusu.jsx` | `BildirimIzniModali` (kökte tek örnek), `BildirimIzniKarti` (satır içi), `TASIYICI_METNI` |
-| `app/bildirimler.jsx` | Bildirim ayarları — tek girişi Profil › "Bildirim ayarları" (çekmecede YOK: ayar bir gezinme hedefi değil) |
+| `app/bildirimler.jsx` | Bildirim ayarları — tek elle girişi Profil › Ayarlar › "Bildirim ayarları" (çekmecede YOK: ayar bir gezinme hedefi değil); bildirim dokunuşu `/bildirimler`'e de getirir. Geri yedeği `/ayarlar` |
 | `src/lib/bekleyenIsler.js` | çekmece sayaçlarının deposu (bkz. "Gezinme → Rozetler") |
 | `src/lib/iliskiSurumu.js`, `src/lib/dersSurumu.js` | sürüm sayaçları: `engelSurumu` deseni + abone listesi |
 | `plugins/firebase-otomatik-baslatma.js`, `assets/bildirim-ikonu.png`, `app.config.js` | yerel yapılandırma; `googleServicesFile` yalnızca kökte `google-services.json` VARSA |
@@ -730,7 +762,27 @@ dosyasız pakette ayarlar ekranı "kaydedilemedi" diyor.
   web tarafı; palet değişirse iki dosya birden güncellenir. #0088CC bilerek 500'de:
   buton zeminleri 600/700'den gelir (WCAG ölçümleri web dosyasındaki yorumda).
 - **`format.js`, `seviye.js`, `useAsync.js`, `useDebounced.js` birebir kopya** — saf JS,
-  platform bağımsız. Web'de değişirlerse buraya da taşı.
+  platform bağımsız. Web'de değişirlerse buraya da taşı. (`format.js`'te iki depo arasında
+  yalnızca bir yorum farklı: rapor sebeplerinin hangi formlarda kullanıldığını anlatan
+  satırlar.)
+
+  ⚠️ `format.js` → `TRANSACTION_LABELS` sunucunun BÜTÜN `CreditTransactionType`
+  değerlerini karşılamalı: sunucu `StatementEntryDto.Type`'ı `ToString()` ile gönderiyor
+  ve tabloda olmayan tür Puan geçmişinde ham enum adıyla görünüyor. `CommunityReward`
+  2026-09-26'ya kadar eksikti ("CommunityReward" yazıyordu; mobil `a138d97`, web
+  `058b53c`). Sunucuya yeni bir tür eklenirse etiketi AYNI GÜN iki istemcide yazılır.
+  `Expiry` "(eski)" DEĞİL (2026-09-27): hoş geldin puanı 14 günde yanıyor ve bu türle
+  yazılıyor, etiket "Süresi dolan puan". "(eski)" yalnızca gerçekten artık yazılmayan
+  `LessonSpending`'de.
+- **BAYT BAYT aynı dosyalar** (2026-09-26; KAYNAK web, mobil `src/lib/` altına kopyalar,
+  `diff` / git blob boş fark vermeli, biri değişirse öteki AYNI GÜN):
+  - `hakkimizdaMetni.js` — Hakkımızda'nın bütün metni (özet, misyon/vizyon/topluluk, altı
+    adım, güvenceler, kapanış); ikon ve düzen platforma özgü, metin değil.
+  - `dersDurumu.js` — hangi ders hangi Derslerim sekmesinde (`dersSekmesi`), aksiyon
+    sayacı (`eylemBekliyor`, çekmece rozeti de bu), sıralama ve Rezerve geçmişi birleşimi.
+  (İlk kez hangi depoda yazıldıkları fark etmez: ikisi de artık web'den kopyalanır. Kaynak
+  kararı iki depoda da böyle yazılı; web/sunucu deposunun CLAUDE.md'si "Mobil
+  uygulamayla ortak sözleşme".) `kunye.js`'in DEĞERLERİ de iki depoda aynı; yorumları farklı olabilir.
 - **HWID mobilde AYRI üretilir** (`src/lib/hwid.js`): canvas yok, cihaz kimliği
   expo-application/device sinyallerinden gelir. Web'in `canvasSignal()` sabitleri web'de
   dokunulmazdır ve buraya TAŞINMAZ — HWID cihazı tanımlar, kullanıcıyı değil; aynı
@@ -767,19 +819,85 @@ guard'lar doğru ekranı bırakıyor. `anchor: 'index'` eklemek her derin bağla
 oturumsuzsa → giriş). Sabit hedef veremez: korunan ekranlar guard kapalıyken rota
 ağacında hiç yok, koşulsuz `/kesfet` sonsuz döngü olurdu.
 
-### Tur çıpaları
+### Profil ve Ayarlar (2026-09-26)
 
-`rutbe`, `kesfet`, `portfoy`, `sohbet` çıpalarının TEK kaydı sekme düğmeleriydi; çubuk
-gidince dördü de düştü ve o adımlar **çıpasız** bırakıldı — `tur.js` bunu zaten KURAL
-sayıyor (çıpasız adım ortada kart). `menu`ya yığmak beş adımı aynı 44px kutuya
-işaret ettirirdi. Adım metinleri "sekmesinde" demekten "sol üstteki menüde"ye çevrildi.
+Profilim bir VİTRİN: üstünde düğme bloğu yok. Sağ üstte dişli (`AyarlarDugmesi`,
+`app/profil/index.jsx`, erişilebilir adı "Ayarlar") → **`/ayarlar`** (`app/ayarlar.jsx`):
+ayrı bir yığın ekranı, `Stack.Protected` listesinde ve `dangerouslySingular`. Web'de aynı
+iş dişli AÇILIR MENÜ; mobilde ayrı ekran (kullanıcı kararı). Menü bir RN Modal olsaydı
+satırlarının açtığı katmanlar (izin sayfası, alt sayfalar) Modal üstünde Modal olurdu ve
+iOS ikincisini göstermeyebiliyor.
+
+- Ayarlar grupları: Hesap (Profili düzenle, Bildirim ayarları) · Gizlilik ve veri (Veri
+  tercihleri) · Yardım (Rehberi tekrar izle) · Oturum (Çıkış yap) · ayrı kart Hesabımı sil;
+  en altta "Sürüm x" (Expo Go'da ve web'de çizilmez).
+- Profil fotoğrafı avatara dokunarak değişir (kamera rozeti); arkadaş listesi fotoğrafın
+  altındaki "Arkadaşlarım · N" hapından (`/eslesmeler?sekme=active`).
+- Derslerim ve Yönetim kısayolları Profil'de YOK, yalnızca çekmecede.
+- "Rehberi tekrar izle" önce Ayarlar'ı yığından çıkarır (`back`), sonra `navigate('/')` +
+  `turuYenidenBaslat()`: turdan sonra geri tuşu Ayarlar'a değil Profil'e döner.
+- Bu yollar KULLANICI METNİNDE yazılı ("Profil › Ayarlar › …": gizlilik §4/§7, bildirim
+  sorusu, izin sayfası; web'de Gizlilik §7 ve `HesapSilme.jsx` mağazaların silme tarifi).
+  Ayarlar düzeni değişirse bu metinler AYNI GÜN, iki depoda değişir.
+- Bilinen sınır: çekmecedeki ad `session.displayName`'den geliyor ve profil düzenlendikten
+  sonra tazelenmiyor (`AuthContext`'te güncelleme yolu yok).
+
+### Tur çıpaları ve rehber (2026-09-26: 9 adım)
+
+Rehber `src/lib/tur.js` → `TUR_ADIMLARI`: community · menu · free · discover · portfolio ·
+matches · chat · sessions · settings. Tur Topluluk'ta açıldığı için anlatım kullanıcının
+baktığı ekrandan başlıyor, sonra menü, sonra ders akışı, en sonda Ayarlar ve bildirimler.
+Adım şeması `{ id, title, body, points, cipa?, cipaEkrani?, yer? }`.
+
+İKİ çıpa var: `gonderi-yaz` (Topluluk'un yazma kutusu, `app/index.jsx` → `GonderiKutusu`)
+ve `menu` (hamburger). Menü satırlarını anlatan beş adım (discover…sessions) ve settings
+**çıpasız**: ortada kart + **yer çipi**.
+
+⛔ **Ekrana özgü çıpada `cipaEkrani` ZORUNLU.** Kök yığın kabuk ekranlarını MONTE tutuyor
+ve ölçüm defteri yalnızca ada bakıyor: tur `/kesfet`'te açıldığında ya da tur açıkken
+bildirime dokunulup başka ekrana geçildiğinde, altta kalan Topluluk'un ölçüsü öndeki
+ekrana YANLIŞ bir delik açardı. `gonderi-yaz` yalnızca `/`, `menu` yalnızca beş kabuk
+ekranında (`KABUK_EKRANLARI`) okunuyor; adres tutmazsa kart ortada. Yeni bir kabuk ekranı
+hamburger alırsa listeye eklenir. (Önizlemede ölçüldü: `/kesfet` ve `/dersler`'e geçince
+delik kalkıyor, `/`'e dönünce geri geliyor.)
+
+⚠️ Ekran dışındaki çıpa (liste kaydırılmış, `y` negatif) yok sayılır; kart deliğin
+karşısındaki bölgeyle sınırlı ve sığmazsa metin kısmı kendi içinde kayar (320×568'de kart
+yazma kutusunu örtüyordu, ölçüldü). Tur kaydırma YAPMAZ.
+
+⚠️ Delik ve halkası pencerenin 2px İÇİNE kırpılır (`pencereIcinde`, web `halkaKutusu`
+ile aynı kural). Kenara yapışık çıpada delik = çıpa + 8 pencereden taşıyor ve SVG
+çizgisi kenarın iki yanına yayıldığı için o kenar görünmüyordu: hamburgerin halkası
+önizlemede (0, 0)'da yarım, cihazda (x≈-1) sol kenarsızdı.
+
+**Yer çipi** (`UrunTuru.jsx` → `YerCipi`): gövde cümlesiyle maddeler arasında, çekmecenin
+AKTİF satırının küçük kopyası ("Menüde" + ink zeminde brand-300 ikon ve etiket) ya da
+"Profilim'de" + dişli + "Ayarlar". Etiket ve ikon `Cekmece.jsx` → `OGELER`'den (dışa açık)
+okunuyor, Ayarlar için `EK_YERLER`: menüde yazan ad ile rehberin gösterdiği ad
+AYRIŞAMAZ. Bulunamazsa çip çizilmez ve `__DEV__` uyarısı basılır. Dekoratif, ekran
+okuyucudan gizli, basılamaz.
+
+Adım metinleri ekrandaki adlara bağlı (menü etiketleri, Derslerim sekme adları, dişlinin
+"Ayarlar" adı): biri yeniden adlandırılırsa `tur.js` AYNI değişiklikte güncellenir.
+Rehber izin İSTEMEZ: settings adımında "Bildirimleri aç" düğmesi BİLEREK yok (aydınlatma
+akışını atlardı; App Review 4.5.4).
 
 ⛔ **Çekmecenin İÇİNE çıpa konulamaz:** RNModal ayrı pencere, kapalıyken satırlar takılı
-değil ve tur örtüsü açıkken kullanıcı çekmeceyi açamıyor.
+değil ve tur örtüsü açıkken kullanıcı çekmeceyi açamıyor. Beş adımı `menu`ya yığmak da
+aynı 44px kutuyu beş kez göstermek olurdu — menü TEK adımda.
 
 ⚠️ `menu` çıpası **her kabuk ekranında** kayıtlı (hamburger her birinde ayrı örnek) ve
 kök yığın alttakini monte tutuyor. `tur.js`'in ölçüm defteri bu yüzden **sayaçlı**:
 sahiplerden biri sökülünce çıpa ölmüyor, son sahip çıkınca düşüyor.
+
+Erişilebilirlik: kök "Ürün rehberi" adını taşıyor, başlık `header` rolünde ve adım
+değişince `announceForAccessibility(başlık)` (önceden odak "Devam"da kalıyor, yeni adım
+okunmuyordu). İlerleme şeridi esnek (`max-w-[24px] flex-1`): dokuz sabit çubuk 320dp'de
+taşıyordu.
+
+`lastStep` sunucuda tek satır ve web dizisi farklı (8 adım, sıra farklı): aynı indeks iki
+platformda başka adımı gösterir — bilinen, düşük etkili sınır. Rehber sürümü tutulmuyor;
+eski rehberi bitiren yenisini "Rehberi tekrar izle" ile görür.
 
 ### Rozetler: hamburger ve çekmece satırları
 
@@ -801,6 +919,12 @@ gelen istek", "Derslerim, 2 ders işlem bekliyor", "Sohbet, 2 okunmamış").
 Veri `src/lib/bekleyenIsler.js` → `useBekleyenIsler()`: kanca DEĞİL, modül düzeyinde depo
 ve tek uçuş. Hamburger her kabuk ekranında ayrı örnek; kanca olsaydı her örnek aynı iki
 isteği ayrı atardı. Son abone ayrılınca sıfırlanıyor, hesap değişimi de sınanıyor.
+
+Derslerim satırı sayaç VARKEN `/dersler?sekme=aksiyon` açıyor (`OGELER` → `rozetliYol`;
+aksiyon sayısı ile rozet aynı tanımdan, `dersDurumu.js` → `eylemBekliyor`). `yol` yine
+`/dersler`: aktif satır karşılaştırması ve rehberin yer çipi ona bakıyor. `?sekme=` ekranda
+bir KOMUT (okunur ve silinir), tekil ekranda aynı komut ikinci kez de çalışıyor (önizlemede
+ölçüldü: başka sekmeye geçip dönünce yine aksiyon).
 
 
 ## Web'den bilinçli sapmalar
@@ -908,7 +1032,8 @@ isteği ayrı atardı. Son abone ayrılınca sıfırlanıyor, hesap değişimi d
   yeniden adlandırma: çekmecedeki satır (`src/components/Cekmece.jsx` → OGELER),
   `dersmate://eslesmeler` derin bağlantısı ve kök `Stack.Protected` listesi ona bağlı —
   listeye eklenmeyen yeni ad OTURUMSUZ da açılır. (Tur çıpası artık `eslesmeler` DEĞİL:
-  2026-09-23'te `menu`ya taşındı, bkz. "Gezinme".) Algoritma anlamındaki "eşleşme" ise "öneri" oldu ("Şimdilik öneri yok"), metin
+  2026-09-23'te `menu`ya taşındı, 2026-09-26'dan beri Arkadaşlar adımı çıpasız ve yer
+  çipi OGELER'deki `yol`a bakıyor, bkz. "Gezinme → Tur çıpaları".) Algoritma anlamındaki "eşleşme" ise "öneri" oldu ("Şimdilik öneri yok"), metin
   eşleşmesi gibi teknik anlamlar olduğu gibi kaldı.
 - **Başka ekranda değişen veri ODAKTA tazelenir**, yeniden kurulumla değil. Web rota
   değişiminde sayfayı söküp yeniden kuruyor ve sorgular kendiliğinden baştan koşuyor.
@@ -916,9 +1041,17 @@ isteği ayrı atardı. Son abone ayrılınca sıfırlanıyor, hesap değişimi d
   odak dinlemiyor. Tazelenmeyen ekran geri dönülünce eski veriyi gösterir; bu hata iki
   yerde yaşandı (profilde engellenen kişi Keşfet'te kaldı, Arkadaşlar ekranında kabul
   edilen istek profildeki sayıya yansımadı).
-  - `ArkadaslarBolumu` her odakta sessizce tazeleniyor: değişikliklerin bir kısmı cihazda
-    olmuyor (karşı taraf kabul ediyor) ve kaybedilecek kaydırma yok. İlişki sürümü
-    artınca da (`src/lib/iliskiSurumu.js`, yalnızca odaktayken) tazeleniyor.
+  - Profildeki arkadaş verisi (`src/state/useProfilArkadaslari.js`, 2026-09-26) odakta ve
+    ön plana dönüşte (`useOnePlanaGelince`) sessizce tazeleniyor: değişikliklerin bir kısmı
+    cihazda olmuyor (karşı taraf kabul ediyor) ve kaybedilecek kaydırma yok. İlişki sürümü
+    artınca da (`src/lib/iliskiSurumu.js`, yalnızca odaktayken). Kanca `ProfilGorunumu`'nda
+    BİR kez çağrılıyor ve sonucu hem "Arkadaşlarım · N" hapına hem `ArkadaslarBolumu`'na
+    gidiyor; `ArkadaslarBolumu` artık yalnızca çiziyor (veri prop'la). Açılışta `userFriends`
+    TEK kez (önizlemede ölçüldü).
+  - Profil düzenlemesi `src/lib/profilSurumu.js` → `profilDegisti()` ile duyuruluyor
+    (düzenleme Ayarlar ekranında, gösterim Profilim'de). `api.updateProfile` çağıran her
+    yeni yer başarıdan sonra `profilDegisti()` çağırmalı; Profilim odakta sürümü görünce
+    profili yeniden kuruyor.
   - Arkadaşlar (`app/eslesmeler.jsx`) ve Derslerim (`app/dersler.jsx`) odakta, ön plana
     dönüşte (`useOnePlanaGelince`) ve ilişki / ders sürümü artınca (yalnızca odaktayken,
     ekranın KENDİ değişikliği hariç) sessizce tazeleniyor (2026-09-25, push). Sürümü
@@ -931,7 +1064,12 @@ isteği ayrı atardı. Son abone ayrılınca sıfırlanıyor, hesap değişimi d
     Derslerim'in biriken geçmiş sayfaları yalnızca geçmiş TOPLAMI (`past.totalCount`)
     değişince sıfırlanıyor, `sessions.data` her değiştiğinde değil: geçmişe yalnızca ekleme
     olduğu için toplam aynıysa ofsetler geçerli. Eskisi olsaydı her odak tazelemesi
-    kullanıcının kaydırarak yüklediği sayfaları silerdi.
+    kullanıcının kaydırarak yüklediği sayfaları silerdi. Kural 2026-09-26'dan beri
+    `src/state/useGecmisSayfalari.js`'te ve İKİ örnekte geçerli: Rezerve geçmişi (dış kip,
+    ilk sayfa açılış isteğinden) ve Geçmiş dersler (iç kip, `?pastStatus=Completed`, kendi
+    isteği). Geçmiş dersler'in 1. sayfası SÜZGEÇSİZ geçmiş toplamı değişince yeniden
+    çekiliyor (yeni tamamlanan ders süzülmüş toplamı da değiştirir ama o toplam açılış
+    isteğinde yok).
   - Keşfet YALNIZCA engel sürümü değiştiyse tazeleniyor (`src/lib/engelSurumu.js`).
     `yenile()` listeyi 1. sayfadan kuruyor; her odakta çalışsaydı karta dokunup geri
     dönen kullanıcının biriktirdiği sayfaları silerdi. `blockUser`/`unblockUser` çağıran
@@ -950,10 +1088,9 @@ isteği ayrı atardı. Son abone ayrılınca sıfırlanıyor, hesap değişimi d
     bayrağı bunu YAPAMIYOR: expo-router'ın `useFocusEffect`'i ilk çağrıyı bir render
     geciktiriyor (`useOptionalNavigation`) ve bayrağı inmiş buluyor. Yeni ekranlar
     `src/state/useOnePlanaGelince.js`'i kullanmalı (kurulum anındaki `isFocused()`'a
-    bakıyor). `ArkadaslarBolumu` hâlâ eski kalıpta; önizlemede açılışta `userFriends` iki
-    kez çağrılıyor (2026-09-14 ölçümü). `eslesmeler.jsx` 2026-09-25'te
-    `useOnePlanaGelince`'ye geçti (çift `myMatches` çağrısı kalktı, öne dönüşte de
-    tazeleniyor).
+    bakıyor). `eslesmeler.jsx` 2026-09-25'te, profildeki arkadaş verisi 2026-09-26'da
+    (`useProfilArkadaslari`) `useOnePlanaGelince`'ye geçti; iki çift çağrı da kalktı
+    (`myMatches`, `userFriends`).
 - **Çekmecede bekleyen iş sayaçları mobilde var, web'de yok.** Web `Layout.jsx`
   yalnızca okunmamış mesaj rozeti taşıyor. Mobilde çekmecenin Arkadaşlar satırı gelen
   istek sayısını (`myMatches().incoming`), Derslerim satırı kullanıcının kapatabileceği
@@ -965,8 +1102,10 @@ isteği ayrı atardı. Son abone ayrılınca sıfırlanıyor, hesap değişimi d
   onaylanan dersi haber veren tek şey hâlâ bu sayaçlar — push varken de kaldırılmaz.
   "İşlem bekliyor" tanımı TEK yerde (`src/lib/dersDurumu.js` → `eylemBekliyor`) ve
   Derslerim'in aksiyon grubu da onu kullanıyor. Aynı turda Derslerim'de itirazdaki
-  (`Disputed`) dersler aksiyon grubundan "İtirazda, karar yönetimde" başlığına çıktı; web
-  onları hâlâ aksiyonda gösteriyor. Sayaçlar ön plana dönüşte, çekmece açılırken
+  (`Disputed`) dersler aksiyon grubundan "İtirazda, karar yönetimde" başlığına çıktı.
+  2026-09-26'dan beri web de aynı tanımı kullanıyor: `dersDurumu.js` iki depoda BAYT BAYT
+  aynı (bkz. "Web projesiyle ilişki") ve web'in aksiyon sekmesi de itirazı ayrı başlıkta
+  gösteriyor — bu konuda iki istemci arasında fark KALMADI. Sayaçlar ön plana dönüşte, çekmece açılırken
   (`bekleyenIsleriTazele`) ve ilişki / ders sürümü artınca tazeleniyor
   (`src/lib/bekleyenIsler.js`); çekmece navigatörün dışında olduğu için odak olayı orada
   YOK ve `useOnePlanaGelince` kullanılamıyor.
@@ -975,8 +1114,60 @@ isteği ayrı atardı. Son abone ayrılınca sıfırlanıyor, hesap değişimi d
   dönülür ve eski görsel ağa hiç çıkmadan sunulur.
 - Giriş sonrası `navigate` ÇAĞRILMAZ: kök `Stack.Protected` guard'ları oturum durumuna
   göre kendisi geçiş yapar (`app/_layout.jsx`).
-- Ders geçmişi sayfa boyutu **5** ve FlatList `onEndReached` ile yüklenir (mobil iş
-  kuralı); web 20 kullanıyor.
+- Ders geçmişi sayfa boyutu **5** ve FlatList `onEndReached` ile BİRİKİR (mobil iş
+  kuralı; Geçmiş dersler ve Rezerve geçmişi sekmeleri); web 20'lik NUMARALI sayfa
+  kullanıyor ("Daha eski rezervasyonlar (x/y)").
+
+  ⚠️ **Ekranı doldurmayan birikintide `onEndReached` bir daha GELMEZ** (2026-09-26,
+  `09527dc`). Veri büyüdüğü anda `VirtualizedList` hücre penceresini eski uzunlukta
+  bırakıyor (`_constrainToItemCount`), içerik boyu değişince yapılan uç kontrolü "son hücre
+  çizildi mi" koşuluna takılıyor ve pencere güncellenince kontrol tekrarlanmıyor. Liste
+  ekrandan kısaysa kaydırma da olmadığı için zincir kopuyor. Web önizlemesi ve yerel RN
+  aynı hesabı yapıyor. Görüldüğü yer: Geçmiş dersler eski sunucuya çarpıp (`?pastStatus`
+  yok sayılır, istemci süzer) ilk sayfadan 1-4 kart çıkınca liste orada kalıyor, "Daha
+  eski dersleri yükle" de çıkmıyordu. Derslerim bunu `kisaListeyseDevamEt` ile karşılıyor
+  (`onLayout` + `onContentSizeChange`, ölçüt `SONA_ESIK` = `onEndReachedThreshold`); boş
+  sayfa sınırı ve uçuş kilidi aynı kalıyor. `onEndReached`'le biriken YENİ bir liste de
+  aynı önlemi almalı. Topluluk ve Keşfet'in birikintileri bu açıdan İNCELENMEDİ; ilk sayfa
+  ekranı doldurduğu sürece sorun çıkmaz.
+- **Derslerim beş sekmede** (2026-09-26; adlar kullanıcının, iki platformda aynı: Senden
+  aksiyon bekleyenler · Planlanmış · Geçmiş dersler · Puan geçmişi · Rezerve geçmişi).
+  Sekme çubuğu `HapSekmeCubugu` (ui.jsx). Mobilde üç fark:
+  - `?sekme=` bir KOMUT: efektle okunur ve `navigation.setParams({ sekme: '' })` ile
+    adresten silinir. Web onu adreste TUTUYOR (yenileme ve paylaşılan bağlantı sekmeyi
+    korusun). Mobilde ekran tekil ve kurulu; adres kalsaydı aynı değerle ikinci gelişte
+    parametre DEĞİŞMEZ ve sekme seçilmezdi. Çekmecedeki Derslerim satırı ve `?ders=`
+    bildirim dokunuşu bu komutu kullanıyor.
+  - Rezerve geçmişi satırı `Card` + `TarihBlogu`, basılmaz ve tek erişilebilirlik durağı;
+    web'de defter satırı ve kişi adı `PersonLink`.
+  - Varsayılan sekme ilk veride BİR KEZ seçiliyor (senden iş bekleyen ders varsa aksiyon,
+    yoksa planlanmış); web de aynı kuralı adres boşken uyguluyor.
+- **Topluluk akış kartı** (2026-09-26, `src/components/GonderiKarti.jsx`):
+  - Tarz TEK anahtardan: `AKIS_TARZI` ('instagram' | 'reddit'); önizlemede
+    `?akis=instagram|reddit` (açılışta bir kez okunur, `onizlemeAkisTarzi()`). Web'de aynı
+    yapı (`AKIS_TARZI`, `TARZLAR`, `GonderiKarti`) var; tarz değişecekse iki depoda aynı gün.
+  - Forum etiket tonları A düzeninde (`src/lib/forum.js` → `ETIKET_TONU`: `bg-brand-50
+    text-brand-800` ile `bg-slate-100 text-slate-700` sırayla). Web renkli (emerald,
+    violet, sky, amber, rose); port ederken o sınıflar GERİ TAŞINMAZ.
+  - Akış kartında şikayet YALNIZ İKON (bayrak, erişilebilir adı "Şikayet et"); iplikte ve
+    yorumlarda metinli. Web'de dar ekranda ikon, `sm` ve üstünde metinli.
+  - Yazar başlığı profile gidiyor. İplikten (alt sayfa, RN Modal) giderken önce modal
+    kapanıyor, `IZIN_KAPANMA_SURESI` (350 ms) sonra `push`: açık RN Modal ayrı bir yerel
+    pencere ve itilen ekranın ÜSTÜNDE kalırdı; kapanış bitmeden itilen ekran da iOS'ta
+    sunulamayabiliyor. Başlığın erişilebilir adı mobilde uzun ("{ad} —
+    profilini aç. [Yönetim, resmi hesap, ]{zaman}, Etiket: {etiket}."): tek Pressable ve iOS
+    iç öğeleri okumuyor. Web'de yalnızca ad bağlantı.
+  - İlk yorum önizlemesini istemci yalnızca ÇİZİYOR; seçim kuralları sunucuda
+    (`ForumOnizleme`, bkz. en baştaki ikinci istisna). Kullanıcı ipliğe ilk yorumu yazınca
+    kartın önizlemesi istemcide güncellenmiyor, yenilemeyle geliyor (engel kuralı
+    istemcide uygulanamadığı için bilinçli).
+- **Rehber metinleri ve sırası web'den farklı** (2026-09-26): mobil 9 adım (Topluluk ve
+  menü başta, Ayarlar ve bildirimler sonda), web 8 (yeni adımlar sona eklendi, push yok).
+  Ortak altı adımın (free, discover, portfolio, matches, chat, sessions) metni ve Topluluk
+  adımının maddeleri iki platformda BİREBİR; biri değişirse öteki aynı gün. Ayrıntı
+  "Gezinme → Tur çıpaları ve rehber".
+- **Ayarlar mobilde ayrı ekran** (`/ayarlar`), web'de dişli açılır menü. Bkz. "Gezinme →
+  Profil ve Ayarlar".
 - **"Yeni kod gönder" beklemesi damgadan hesaplanır**, web'deki gibi sayaçtan
   düşülmez (`src/lib/dogrulamaKodu.js`). Web'de doğrulama sayfasına yalnızca kayıt
   ekranından geliniyor, o yüzden "sayacı 60'tan başlat" doğru cevabı veriyor.
@@ -995,8 +1186,16 @@ isteği ayrı atardı. Son abone ayrılınca sıfırlanıyor, hesap değişimi d
 
 ## Korunan iş kuralları (backend'de yaşar, arayüz ihlal etmez)
 
-1. **Ders almak ücretsiz** — kredi düşme/harcama arayüzü YOK. Puan yalnızca anlatana
-   basılır (30 dk = 50, 60 dk = 100) ve harcanmaz; seviye unvanıdır.
+1. **Ders almak ücretsiz** — kredi düşme/harcama arayüzü YOK. Ders puanı yalnızca anlatana
+   basılır (30 dk = 50, 60 dk = 100); ders alan tarafa puan yok. Puanın ikinci kaynağı
+   Topluluk: yeterli net oy toplayan katkı da puan getirir (sunucuda
+   `CommunityRewardRules`, Kullanım koşulları §3 — 2026-09-26'ya kadar metin "yalnızca
+   ders anlatana" diyordu ve yanlıştı). Puan harcanmaz; ders ve Topluluk puanı yanmaz
+   (`CreditLedgerService`: `ExpiresAtUtc = null`; vadeli olan yalnızca hoş geldin puanı);
+   seviye unvanıdır. Arayüz metni puanın kaynağını "yalnızca ders" diye DARALTMAZ
+   (rehberin portfolio adımı "asıl kaynak" der, "tek yol" değil; Puan geçmişinin girişi
+   iki kaynağı da sayar). Hoş geldin puanı (1) 14 gün sonra `Expiry` satırıyla yanar ve
+   seviyeye sayılmaz — Koşullar §3 bunu ayrı maddede söylüyor.
 2. **Seviye/rozet hesabı SUNUCUDA.** `seviye.js` eşik taşımaz; `level`/`nextLevelAt`
    hazır gelir. Branş rozetleri (Öğretici 8 sa / Üstad 15 sa) de sunucudan.
 3. **SignalR tek bağlantı** — `InboxProvider` kök kabukta kurulur, sohbet ekranı kendi
@@ -1014,6 +1213,11 @@ isteği ayrı atardı. Son abone ayrılınca sıfırlanıyor, hesap değişimi d
   ⚠️ 44 px ile yazılır: `h-[44px]` / `min-h-[44px]`. Boşluk ve boy sınıfları rem ve NativeWind
   cihazda rem'i **14** sayıyor (`inlineRem`): `h-11` telefonda 38.5dp, `h-9` 31.5, `p-1` 3.5.
   Web önizlemesi rem 16 ile 44 gösterdiği için bu fark ancak cihazda görünür.
+
+  Aynı sebeple **küçük yazı px ile**: `text-xs` cihazda 10.5dp. Yeni yazılan ikincil satır,
+  zaman ve etiket `text-[12px] leading-[16px]` (en küçük punto 12), açıklama satırı
+  `text-[13px] leading-[18px]` (2026-09-26 turunda Ayarlar, alt bilgi, akış kartı,
+  Derslerim bu kuralla yazıldı; eski `text-xs`'ler toplu çevrilmedi).
 - Yüzey dili `src/components/ui.jsx`'te tek yerde: kart = beyaz + `border-slate-100` +
   hafif gölge + `rounded-2xl`; sayfa zemini `bg-slate-50`. Sayfalar kendi yüzey dilini
   icat etmez: kart yüzeyi elle kurulmaz, bölünmüş dolgulu kart `<Card dolgu="p-0"
@@ -1036,6 +1240,23 @@ isteği ayrı atardı. Son abone ayrılınca sıfırlanıyor, hesap değişimi d
   (`EkranBasligi`) ve içeriğin `p-4` kenarıyla aynı hizada. Sohbet başlığı gap-2 (şeritte
   dört-beş öğe var). Dönüş hedefi `onPress` ile verilir; nereye döndüğü önemliyse
   `accessibilityLabel` ("Sohbet listesine dön").
+- **Kabuk ekranı başlığı** `EkranBasligi` (sol: hamburger, sağ: `sag` yuvası — Profilim'de
+  dişli, Mesajlar'da bağlantı rozeti). Başlık metni `header` rolünde (2026-09-26).
+- **Alt bilgi `AltBilgi`'den gelir** (`src/components/AltBilgi.jsx`): Hakkımızda ·
+  Kullanım koşulları · Gizlilik (+ giriş ekranlarında "Veri tercihleri") ve künye satırı.
+  Elle bağlantı şeridi YAZILMAZ; bulunduğu sayfanın bağlantısı `gizle` ile düşürülür.
+  Yaprak bağlantı `AltBilgiBaglantisi` `MetinBaglantisi.jsx`'te (AltBilgi'de dursa
+  Kunye → AltBilgi → Kunye döngüsü olurdu). Künye DEĞERLERİ `src/lib/kunye.js`'te.
+- **Topluluk akış kartı kenardan kenara**: `Card` ve `KART_GOLGESI` KULLANILMAZ; kartlar
+  arasında 8px bant (`KalinAyrac`: `h-[8px] border-y border-slate-200 bg-slate-100`).
+  Kartın tarzı `GonderiKarti.jsx`'te TEK yerde (`AKIS_TARZI`); ekran kart çizmez, dağıtıcıyı
+  çağırır. Oy, yorum ve bayrak düğmeleri 44×44.
+- **Çok sekmeli ekranda hap çubuğu** `HapSekmeCubugu` (ui.jsx; Derslerim): sabit şeritte
+  yatay kayan haplar, seçili dolu brand-600, diğerleri brand-50 + brand-200 kenar; seçili
+  hap görünür alanın dışındaysa çubuk kayar. ⚠️ Hap konumu `onLayout`'tan SAKLANMAZ,
+  kaydırma anında `measureLayout` ile ölçülür: RN Web `onLayout`'u ResizeObserver'la
+  üretiyor ve yalnızca boyutu değişen öğeyi bildiriyor — sayaç gelince kayan haplar yeni
+  konumu bildirmedi, seçili hap kesik kaldı (ölçüldü).
 - Renk DEĞERİ gereken yerler (tab bar, SVG, StatusBar) `src/lib/theme.js`'ten okur —
   hex'i elle yazma, palet tek kaynaktan gelsin.
 - **Renk rolleri (A düzeni)** — renk anlam taşır, süs değildir:
@@ -1049,6 +1270,10 @@ isteği ayrı atardı. Son abone ayrılınca sıfırlanıyor, hesap değişimi d
   - Anlamsız etiket / kategori (yön, forum kategorisi): `bg-brand-50 text-brand-800` ile
     `bg-slate-100 text-slate-700` sırayla.
   - Yeşil, mor (violet) ve gök mavisi (sky) YOK — kategori ya da avatar rengi olarak da.
+    **Bekçi:** `grep -rnE "emerald|violet|sky-" app src` BOŞ çıkmalı. Bu yüzden o adlar
+    YORUMDA da yazılmaz, Türkçesi yazılır ("yeşil", "mor", "gök mavisi"): yorumda geçen bir
+    ad grep'i gürültüyle doldurur ve yeni bir sınıf kullanımı onun arasında görünmez olur
+    (2026-09-26, `d06b5d4`; gerekçe `src/lib/forum.js`'te).
   - İstisna, malzeme rengi: değerlendirme yıldızları ve madalya/rozet altın-bronzu amber kalır.
 
 ## Adım planı
@@ -1067,8 +1292,9 @@ isteği ayrı atardı. Son abone ayrılınca sıfırlanıyor, hesap değişimi d
   son basamak aranabilir); Derslerim (`app/dersler.jsx`: 5'erli infinite scroll geçmiş,
   rezervasyon + DateTimePicker, ImagePicker kanıt yükleme, onay→değerlendirme zinciri,
   şikayet/iptal, puan geçmişi); Eşleşmeler (`app/eslesmeler.jsx` — kabul/ret/sonlandır).
-  Derslerim ve Eşleşmeler kabuk ekranı DEĞİL: çekmeceden ve Profil kısayollarından
-  açılan, kendi geri şeridini taşıyan yığın ekranları.
+  Derslerim ve Eşleşmeler kabuk ekranı DEĞİL: çekmeceden açılan, kendi geri şeridini
+  taşıyan yığın ekranları. (Profil kısayolları 2026-09-26'da kalktı; Arkadaşlar'a
+  Profilim'deki "Arkadaşlarım" hapı da götürür.)
 - **ADIM 5 (tamam):** web'in `7f140a9` sonrası tüm işi mobile taşındı — Topluluk forumu
   (`app/topluluk.jsx`), yönetim kuyrukları (`app/yonetim.jsx`), yasal metinler
   (hakkimizda/gizlilik/kosullar + `yasalMetinler.js`), parola sıfırlama, kayıt onayı,
@@ -1080,7 +1306,25 @@ isteği ayrı atardı. Son abone ayrılınca sıfırlanıyor, hesap değişimi d
 - **ADIM 8 (push bildirimleri — kod tamam, cihaz doğrulaması bekliyor):** M1–M8,
   `ozellik/push-bildirimleri` dalında (main'e birleşmedi). Sunucu + web aynı adlı dalda.
   ⬜ M9: kullanıcı adımları ve cihaz senaryoları (bkz. "Push bildirimleri"). Sunucu PR'ı
-  mobil PR'dan önce birleşir.
+  mobil PR'dan önce birleşir. ⛔ Ama push PR'ları tasarım dalından ÖNCE tek başına yayına
+  çıkmaz (sözleşme metni; bkz. "Birleşme sırası").
+- **ADIM 9 (yedi madde — kod tamam, cihaz doğrulaması bekliyor):**
+  `tasarim/profil-dersler-topluluk` dalında (push dalının ÜSTÜNDE; web + sunucu aynı adlı
+  dalda). M1 ikonlar · M2 önizleme verisi + `mySessions` süzgeci · M3 `AltBilgi` + künye ·
+  M4 Hakkımızda yeni metin (`hakkimizdaMetni.js`) + Koşullar §3 · M5 Profil vitrin +
+  `/ayarlar` · M6 Topluluk Instagram tarzı kart + ilk yorum önizlemesi · M7 Derslerim beş
+  sekme (+ `09527dc` kısa liste devamı) · M8 rehber 9 adım + yer çipleri · M9 bu belge. İki sunucu eki en baştaki "İkinci
+  istisna"da. `SOZLESME_SURUMU` (2026-09-25) ve `IZIN_SURUMU` ARTMADI: Koşullar §3 ve
+  gizlilik §4/§7 yol metinleri henüz yayınlanmamış sürümün içinde düzeltildi (tarihçe
+  `yasalMetinler.js`'te).
+  ⬜ Cihazda: 44dp hedefler ve 12/13px yazılar (web önizlemesi rem'i 16 sayıyor), TalkBack/
+  VoiceOver (avatar tek durak, rehber adım duyurusu, yazar başlığı), Fabric'te
+  `HapSekmeCubugu` kaydırması, büyük yazıda (1.3) haplar ve rehber kartı, rehber açıkken
+  bildirim dokunuşu (delik kalkmalı), menü adımında halkanın dört kenarı (cihazda
+  hamburger x≈7dp), Ayarlar'dan rehber → geri tuşu Profil'e, eski
+  sunucuya karşı Geçmiş dersler yedek yolu (VirtualizedList boş sayfa davranışı), iplikten
+  profile geçişin iOS'ta çakışmaması, kart ekleyip ekranı doldurmayan sayfada
+  `kisaListeyseDevamEt`'in yerel RN'de de zinciri sürdürmesi (web önizlemesinde ölçüldü).
 
 ## Web ile senkron tutma
 
@@ -1129,6 +1373,28 @@ ama o da incelenmeden değil.)
 Baseline'a bu üçü yüzünden dokunulmaz: ileri çekmek yukarıdaki iki ⬜'yi diff'ten
 düşürürdü.
 
+⚠️ `tasarim/profil-dersler-topluluk` (2026-09-26, push dalının ÜSTÜNDE) birleşince
+`frontend/src`'ye dokunan on bir commit daha görünecek. Bu iş İKİ DEPODA AYNI DALDA ve aynı
+tasarımla yapıldı (plan ve ortak metinler tek); hiçbiri tek yönlü bir port değil, mobile
+taşınacak bir şey YOK (web'in `a21f3f3` ve `524b12d` commit'leri yalnızca CLAUDE.md):
+
+| commit | iş | mobil karşılığı |
+|---|---|---|
+| `e5ff733` | Hakkımızda yeni metin, Koşullar §3 | `686ca95` (`hakkimizdaMetni.js` bayt bayt aynı) |
+| `b17942a` | Topluluk Instagram tarzı kart, ilk yorum önizlemesi | `fb2a9f7` |
+| `dc4affc` | Derslerim beş sekme | `103b50c` (`dersDurumu.js` bayt bayt aynı) |
+| `991c5ad` | rehber 8 adım (mobil 9 — bilinçli fark) | `60ff7ba` |
+| `acf6479` | Profil: dişli menü, kamera rozeti, Arkadaşlarım hapı, silme yolu metinleri | `9b2e546` |
+| `738f10c` | alt bilgi tek bileşende | `a8bf7bf` |
+| `ceb18de` | rehber halkası hiç çizilmiyordu (satır içi `boxShadow` `ring`'i eziyordu) ve pencere dışına taşıyordu | ezilme web'e özgü (mobilde halka ayrı bir SVG `Rect`); taşma mobilde de vardı → `UrunTuru.jsx` → `pencereIcinde` (aynı dal) |
+| `058b53c` | Puan geçmişi: `CommunityReward` etiketi (`format.js` → `TRANSACTION_LABELS`) | `a138d97` (aynı satır, aynı gün) |
+| `7c48468` | Puanın iki kaynağı (Puan geçmişi girişi, boş durum, alt satır), Koşullar §3 hoş geldin puanı, `Expiry` etiketi | `f64aa3b` (aynı cümleler; `format.js` yorumu web'den bayt bayt) |
+| `1266b31` | Gizlilik §2/§6/§7 ve silme penceresinde Topluluk içeriği, birleştirme sırası kuralı | `f64aa3b` (aynı cümleler); web'e özgü: §4 çerez yolu, HesapSilme §3 |
+| `f2e66b2` | kesik TEK ilk yorumda "Yorumun tamamını gör", iplikte yazar adı 44px | karşılığı yok: mobilde önizlemenin kendisi basılabilir ve ipliği açıyor; `YazarSatiri` basılabilir değil |
+
+(Sunucu commit'leri `473680b` `pastStatus`, `d479327` `FirstComment` — en baştaki "İkinci
+istisna".) BASELINE'A DOKUNULMAZ: yukarıdaki iki ⬜ (`ac0a6bf`, `8dfad75`) hâlâ açık.
+
 `b93422a..6aafac7` aralığında `frontend/src`'ye dokunan her PR ya taşındı ya da mobilde
 karşılığı yok: #21 → mobil PR #6 (`fe8e875`); #26, #29, #30, #31, #33 →
 `ozellik/web-esitleme-26-33` dalı; #24 ve #25 → aşağıdaki "bilerek taşınmayanlar".
@@ -1154,9 +1420,9 @@ baseline ileri kalırsa gerçek bir fark hiç görünmez.
   artık tam tersi (bkz. "Gezinme").
 
 ⚠️ `api.js` yüzeyini karşılaştırmak için metot adlarını çıkarıp kümeleri karşılaştır
-(`export const api = {` nesnesinin birinci düzey anahtarları). Son ölçüm **2026-09-25,
-iki depo da `ozellik/push-bildirimleri` dalında: web 85, mobil 86 metot**; fark **5 web ↔
-6 mobil**:
+(`export const api = {` nesnesinin birinci düzey anahtarları). Son ölçüm **2026-09-26,
+iki depo da `tasarim/profil-dersler-topluluk` dalında: web 85, mobil 86 metot**; fark **5
+web ↔ 6 mobil** (2026-09-25 ölçümüyle aynı: bu turda yeni metot EKLENMEDİ):
 
 | web | mobil |
 |---|---|
@@ -1174,6 +1440,13 @@ TEK nesne parametresi, `forgetPushDevice` iki tarafta da ham istek, başlıksız
 Web bu metotları ÇAĞIRMIYOR (web'de push yok); sözleşme iki istemcide aynı kalsın diye
 duruyorlar. Bu dal main'e birleşmeden web'in main'i ölçülürse 79 metot görünür ve altısı
 "yalnız mobil" çıkar — o fark dalın birleşmesiyle kapanır, senkron hatası değildir.
+
+**Aynı ad, değişen imza (2026-09-26):** `mySessions(pastPage, pastPageSize, pastStatus)` iki
+depoda aynı imza ve aynı sorgu biçimi (`pastStatus` boşsa adrese hiç yazılmaz, doluysa
+`&pastStatus=<ad>`); yalnızca sayfa boyu varsayılanı farklı (web 20, mobil 5). Derslerim'in
+Geçmiş dersler sekmesi `mySessions(p, 5, 'Completed')`, açılış isteği ve Rezerve geçmişi
+parametresiz. Önizleme taklidi (`onizleme.js`) sunucunun 400'ünü aynı metinle veriyor.
+`ForumPostDto.firstComment` bir yanıt alanı; api yüzeyini değiştirmiyor.
 
 (Önceki ölçümler: 2026-09-11 web 78, mobil 80. 2026-09-25 W1'den önce web 79, mobil 86.
 `logout` web'e 2026-09-19'da `03dc360`'la geldi; 2026-09-21 portu onu api nesnesinin

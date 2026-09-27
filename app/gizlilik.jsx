@@ -202,9 +202,14 @@ export default function Gizlilik() {
           <Kalin>Kullanım verileri:</Kalin> anlattığın ders sayısı ve süresi, kazandığın puan,
           aldığın değerlendirmeler, son giriş zamanın.
         </Paragraf>
+        {/* Topluluk (2026-09-27, 2026-09-25 içinde, yayından önce; web Gizlilik.jsx aynı
+            olgular). Forum 2026-08-27'den beri var ama bu satır yalnızca mesaj ve kanıtı
+            sayıyordu. Kaynak: Domain/Community/Forum.cs (CommunityPost, CommunityComment,
+            CommunityVote) ve Features/Moderation/Reports.cs (şikayet). */}
         <Paragraf>
-          <Kalin>İçerik:</Kalin> arkadaşlarınla yazıştığın mesajlar ve dersin yapıldığını
-          gösteren kanıt görselleri.
+          <Kalin>İçerik:</Kalin> arkadaşlarınla yazıştığın mesajlar, dersin yapıldığını
+          gösteren kanıt görselleri ve Topluluk’ta yazdığın gönderiler ve yorumlar, verdiğin
+          oylar ve yaptığın şikayetler.
         </Paragraf>
         <Paragraf>
           <Kalin>Fotoğraflarına erişim:</Kalin> profil fotoğrafı ya da ders kanıtı yüklerken
@@ -322,7 +327,7 @@ export default function Gizlilik() {
             uygulamada hiç bulunmuyor.
           </Madde>
           <Madde>
-            <Kalin>Veri tercihin hesabına ait:</Kalin> Profil ekranındaki “Veri
+            <Kalin>Veri tercihin hesabına ait:</Kalin> Profil › Ayarlar › “Veri
             tercihleri”nde yaptığın analitik seçimi dersmate <Kalin>hesabına</Kalin>{' '}
             kaydedilir ve web sitesinde de geçerli olur. Mobil uygulama bugün hiçbir ölçüm
             yapmadığı için bu tercih burada bir şeyi açıp kapatmaz; ileride ölçüm
@@ -417,6 +422,22 @@ export default function Gizlilik() {
             sayısında duruyor. Metin gerçeğe daraltıldı, uç süzülmedi: Sonlandır düğmesi
             YALNIZCA o ekranda ve kişiyi oradan gizlemek o arkadaşlığı bitirmenin tek
             yolunu kaldırırdı. */}
+        {/* Topluluk görünürlüğü (2026-09-27). Kaynak: CommunityController [Authorize] (giriş
+            yapmamış kimse okuyamıyor), ForumAuthorDto (ad, seviye, yönetim işareti; fotoğraf
+            kullanıcı kimliğiyle ayrıca çekiliyor), ForumPostDto yalnızca oy TOPLAMLARI ve
+            isteyenin kendi oyu (MyVote) — kimin oy verdiği hiçbir uçta yok. Profil ucu katkı
+            sayılarını veriyor (ProfileQueries: gönderi, yorum, aldığı net oy); başkasının
+            profilinde ToplulukRozetleri onları ilk kademeden sonra çiziyor, metin bu yüzden
+            "görünebilir". Şikayeti yapanın kimliği yalnızca yönetim kuyruğunda (Reports.cs).
+            Web Gizlilik.jsx §6 ile BİREBİR aynı cümleler. */}
+        <Paragraf>
+          <Kalin>Topluluk’ta yazdığın gönderiler ve yorumlar</Kalin> adın, fotoğrafın ve
+          seviyenle birlikte platformdaki diğer kullanıcılara açıktır; Topluluk’u yalnızca
+          giriş yapmış kullanıcılar görür. Profilinde de Topluluk rozetin ve katkı sayıların
+          (gönderi, yorum ve aldığın net oy) görünebilir. Verdiğin oyların yalnızca toplamı
+          görünür, kimin oy verdiği gösterilmez. Şikayetlerini yalnızca yönetim görür; incelemeye alınan
+          içerikte kimin şikayet ettiği değil, yalnızca kaç şikayet aldığı yazar.
+        </Paragraf>
         <Paragraf>
           Görünen adınla <Kalin>aranabilirsin</Kalin>: Keşfet’teki “Arkadaş Ekle”
           bölümünde adını bilen bir kullanıcı seni bulup istek gönderebilir. Bu, profilini
@@ -509,25 +530,36 @@ export default function Gizlilik() {
         </Paragraf>
         <Maddeler>
           <Madde>
-            <Kalin>Düzeltme:</Kalin> profil bilgilerinin çoğunu doğrudan “Profili düzenle”
-            ekranından değiştirebilirsin.
+            <Kalin>Düzeltme:</Kalin> profil bilgilerinin çoğunu Profil › Ayarlar › “Profili
+            düzenle”den değiştirebilirsin; profil fotoğrafını Profil ekranında fotoğrafına
+            dokunarak değiştirirsin.
           </Madde>
-          {/* "Profil sekmesi" 2026-09-23'te bayatladı: sekme çubuğu kalktı, Profil'e sol
-              üstteki menüden (çekmece başlığındaki ad) gidiliyor. Silinenler listesi
-              profil/index.jsx → "Silinecekler" ile aynı olmalı. */}
+          {/* YOL (2026-09-26): ayarlar Profil ekranından Ayarlar ekranına taşındı; Profil'e
+              sol üstteki menüden (çekmece başlığındaki ad), Ayarlar'a Profil'in sağ
+              üstündeki dişliden gidiliyor. "Profil sekmesi" 2026-09-23'te, "Profil ekranının
+              en altı" 2026-09-26'da bayatladı. Web HesapSilme §1 aynı yolu anlatıyor; biri
+              değişirse ikisi birlikte. Silinenler listesi app/ayarlar.jsx → HesabiSilModali
+              "Silinecekler" ile, kalanlar "Kalacaklar" ile aynı olmalı.
+              Topluluk içeriği KALIYOR (2026-09-27'de yazıldı): DeleteAccount forum
+              tablolarına dokunmuyor, yalnızca adı "Silinmiş kullanıcı" yapıyor ve fotoğrafı
+              siliyor; akış yazarın durumuna bakmıyor, yani gönderi ve yorum o adla görünmeye
+              devam ediyor. Sunucu davranışı değişirse bu cümle, Kalacaklar ve web HesapSilme
+              §3 birlikte değişir. */}
           <Madde>
-            <Kalin>Silme:</Kalin> hesabını <Kalin>kendin silebilirsin</Kalin> — Profil
-            ekranının en altındaki “Hesabımı sil” (Profil’e sol üstteki menüden, adına
-            dokunarak gidersin). Onay için parolan yeniden sorulur ve işlem geri alınamaz.
+            <Kalin>Silme:</Kalin> hesabını <Kalin>kendin silebilirsin</Kalin> — Profil ›
+            Ayarlar › “Hesabımı sil” (Profil’e sol üstteki menüden adına dokunarak, Ayarlar’a
+            Profil ekranının sağ üstündeki dişli simgesiyle gidersin). Onay için parolan
+            yeniden sorulur ve işlem geri alınamaz.
             Kimlik bilgilerin siliniyor; bildirim ayarların, bildirim kayıtların ve bildirim
             alan cihazların da siliniyor. Ders geçmişi, kazandırdığın puanlar ve
             değerlendirmeler karşı tarafa ait olduğu için kalıyor ve orada adın yerine
-            “Silinmiş kullanıcı” görünüyor. Yedeklerdeki kopyaların ne zaman düştüğü §5’te
-            yazılı.
+            “Silinmiş kullanıcı” görünüyor. Topluluk’taki gönderilerin, yorumların ve oyların
+            da kalıyor; gönderi ve yorumlarında adın yerine “Silinmiş kullanıcı” görünüyor.
+            Yedeklerdeki kopyaların ne zaman düştüğü §5’te yazılı.
           </Madde>
           <Madde>
-            <Kalin>Bildirimleri kapatma:</Kalin> Profil › Bildirim ayarları’ndan bildirim
-            türlerini tek tek kapatabilirsin; kapattığın türler sana hiç gönderilmez.
+            <Kalin>Bildirimleri kapatma:</Kalin> Profil › Ayarlar › Bildirim ayarları’ndan
+            bildirim türlerini tek tek kapatabilirsin; kapattığın türler sana hiç gönderilmez.
             Bildirimleri telefonunun ayarlarından da tamamen kapatabilirsin. Bu telefonun
             bildirim kaydını sunucudan kaldırmak için çıkış yapman yeterli (bkz. §5).
           </Madde>
@@ -539,7 +571,8 @@ export default function Gizlilik() {
         </Maddeler>
         <MetinBaglantisi
           etiket={ILETISIM_EPOSTA}
-          onPress={() => Linking.openURL(`mailto:${ILETISIM_EPOSTA}`)}
+          /* .catch: posta uygulaması olmayan iPhone'da mailto reddedilir; adres metinde yazılı. */
+          onPress={() => Linking.openURL(`mailto:${ILETISIM_EPOSTA}`).catch(() => {})}
         />
       </Bolum>
 
