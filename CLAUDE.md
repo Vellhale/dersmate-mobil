@@ -711,9 +711,12 @@ geçersiz karar 400, 10 dakikada 4. deneme 429 — hata kodu üçünde de sunucu
 
 ### Kullanıcı adımları (cihaz doğrulamasından önce, elle)
 
-1. Firebase projesi → Android uygulaması `com.dersmate.app` → `google-services.json`
-   kökte (depoya girer). Yoksa derleme kırılmaz ama Android token alamaz.
-2. FCM V1 hizmet hesabı anahtarı (GİZLİ) → `eas credentials` ile EAS'e; sonra
+1. ✅ (2026-10-02) Firebase projesi `dersmate` (kimlik `dersmate-app`, Arda ile ortak
+   hesapta) → Android uygulaması `com.dersmate.app` → `google-services.json` kökte ve
+   depoda. Ayrıntı `docs/eas-profilleri.md` → "Kimlik bilgileri". Dosya olmasa derleme
+   kırılmaz ama Android token alamaz.
+2. FCM V1 hizmet hesabı anahtarı (GİZLİ): Firebase konsolu → Proje ayarları → Service
+   accounts → "Generate new private key" → `eas credentials` ile EAS'e; sonra
    bilgisayardan kaldırılır.
 3. API anahtarı kısıtlanacaksa SHA-1, upload anahtarının DEĞİL Play App Signing
    anahtarınınki; yanlışı token alınamaması demek.
@@ -754,7 +757,8 @@ Firebase ağ ölçümü (yukarıda) · ilk push'lu `.ipa`'da privacy manifest ko
 açılışta sunucu günlüğünde TEK `PUT /push/devices` (dinleyici döngüsü) · uçak modunda
 aç → çıkış → internetle aç → `forget` geliyor · çıkıştan sonraki soğuk açılışta
 exp.host'a `updateDeviceToken` GİTMİYOR (iOS dahil: yedek kapatma yolu) · Firebase
-dosyasız pakette ayarlar ekranı "kaydedilemedi" diyor.
+dosyasız pakette ayarlar ekranı "kaydedilemedi" diyor (dosya 2026-10-02'den beri depoda:
+bu senaryo için dosya geçici olarak kaldırılıp derlenir).
 
 ---
 

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1010730878895",
+    "project_id": "dersmate-app",
+    "storage_bucket": "dersmate-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1010730878895:android:854247df23dafc682d115a",
+        "android_client_info": {
+          "package_name": "com.dersmate.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAz4rE2mXubkeYi3TUKj_Vp8b38DBalbnM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
