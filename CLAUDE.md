@@ -223,6 +223,30 @@ Derleme logunda `env: export ...` satırları hangi değişkenlerin gömüldüğ
 demo bayrağının orada OLMADIĞINI doğrula. (Paketin içinde demo metinleri yine görünür;
 Metro `onizleme.js`'i budamıyor, bayrak çalışma anında karar veriyor.)
 
+#### ⛔ Android 7.0 (API 24) DESTEKLENMİYOR — minSdk 25 (2026-10-03, kullanıcı kararı)
+
+`api.dersmate.com` Let's Encrypt sertifikası taşıyor; zincirin kökü **ISRG Root X1** ve o
+kök Android'in güven deposuna ancak **7.1.1**'de girdi. Eski DST Root CA X3 çapraz imzası
+2024'te bittiği için 7.0'da HİÇBİR zincir doğrulanmıyor. Belirti yanıltıcıydı: uygulama
+açılıyor, her istek TLS'te düşüyor, ekranda `api.js`'in ağ hatası yedeği "Sunucuya
+ulaşılamadı" çıkıyor — kullanıcı interneti suçluyor. (Ölçüm 2026-10-03, `openssl
+s_client`: `dersmate.com ← YE2 ← Root YE ← ISRG Root X2 ← ISRG Root X1`; yalnızca X1
+güven çapasıyla `OK`. Cihazda/API 24 emülatöründe ölçülmedi.)
+
+Çözüm `app.config.js` → `expo-build-properties` → `android.minSdkVersion: 25`: 7.0 cihaz
+paketi hiç kuramıyor. Pay TR'de ~%0.41 (Statcounter, Eylül 2026, web trafiği).
+
+- Reddedilen: kökü Network Security Config ile pakete gömmek. NSC varken
+  `android:usesCleartextTraffic` YOK SAYILIYOR, yani yukarıdaki koşullu şifresiz HTTP
+  ayarı NSC'ye ayrıca (debug varyantı dahil) yazılmak zorunda kalır; kök değişikliklerinin
+  de izlenmesi gerekir. Kazanç bu bakıma değmedi.
+- Doğrulama: `aapt2 dump badging <apk>` → `minSdkVersion:'25'` (eskiler `'24'`). Prebuild
+  sonrası `android/gradle.properties` → `android.minSdkVersion=25`. Yerel `C:\dmb` yolunda
+  değişiklik önce COMMIT edilmeli; `git archive` commit'lenmemiş ağacı almaz ve paket
+  sessizce 24 kalır.
+- ⚠️ Sunucu tarafı: certbot `preferred_chain` "ISRG Root X2" ya da "Root YE" YAPILMAMALI —
+  X2 Android'e ancak 14'te girdi, 7.1.1–13 de kırılır. "ISRG Root X1" zararsız.
+
 ---
 
 ## iOS ve App Store
@@ -1239,7 +1263,7 @@ bir KOMUT (okunur ve silinir), tekil ekranda aynı komut ikinci kez de çalış�
   olduğu için küçük karelerde yarıçap bir basamak düşürülür: 28dp ve altındaki kutuda lg ve
   üstü daireye döner (`Avatar` tablosu web'den bir basamak aşağıda).
 - **Kart gölgesi `boxShadow: 0px 4px 16px rgba(15,23,42,0.06)`** — yayvan ve hafif, tek tanım
-  `KART_GOLGESI` (ui.jsx). Android 9 (API 28) altında RN dış `boxShadow` çizmiyor (minSdk 24),
+  `KART_GOLGESI` (ui.jsx). Android 9 (API 28) altında RN dış `boxShadow` çizmiyor (minSdk 25),
   orada eski `elevation: 1`'e düşülüyor; ikisi birlikte verilmez (API 28+'da çift gölge).
   `overflow-hidden` gölgeyi kırpmıyor.
 - **Yığın ekranı başlığı**: geri düğmesi `GeriDugmesi` (ui.jsx; slate-100 daire içinde

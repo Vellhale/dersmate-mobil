@@ -121,6 +121,15 @@ module.exports = ({ config }) => ({
       'expo-build-properties',
       {
         android: {
+          // En düşük Android 7.1 (API 25). Android 7.0 (API 24) api.dersmate.com'un
+          // sertifika zincirinin kökü ISRG Root X1'i tanımıyor (Android'e 7.1.1'de girdi;
+          // Let's Encrypt'in eski çapraz imzası 2024'te bitti). 7.0'da uygulama açılıyor ama
+          // HER istek TLS'te düşüyor ve ekranda yanıltıcı "Sunucuya ulaşılamadı" çıkıyor.
+          // Kökü pakete gömmek (Network Security Config) değerlendirildi, REDDEDİLDİ: NSC
+          // varken usesCleartextTraffic yok sayılıyor (geliştirme yapılandırması da
+          // yeniden yazılmalı) ve kök değişikliklerinin izlenmesi gerekiyor; kazanç TR'de
+          // ~%0.4 (2026-10-03, kullanıcı kararı). Ayrıntı: CLAUDE.md → "Bağımsız APK".
+          minSdkVersion: 25,
           usesCleartextTraffic: sifresizGerekli,
           // TLS sertifika sabitleme (certificate pinning) burada BİLEREK yapılandırılmadı.
           // Gerekçe ve doğru yol src/lib/api.js'teki axios istemcisi yorumunda. Özet:
