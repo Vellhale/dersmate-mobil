@@ -111,7 +111,7 @@ export function Card({ className = '', dolgu = 'p-5', children }) {
 
   ⚠️ ANDROID 9 (API 28) ALTINDA boxShadow ÇİZİLMİYOR: RN dış gölgeyi yalnızca
   MIN_OUTSET_BOX_SHADOW_SDK_VERSION = 28 ve üstünde ekliyor (OutsetBoxShadowDrawable.kt), minSdk
-  ise 24. Orada eski elevation 1'e düşülüyor; yoksa kart zeminden yalnızca slate-100 kenarla
+  ise 25 (app.config.js). Orada eski elevation 1'e düşülüyor; yoksa kart zeminden yalnızca slate-100 kenarla
   (~1.05:1) ayrılır, pratikte görünmezdi. İkisi BİRLİKTE verilmez: API 28+'da çift gölge çizilir.
 */
 export const KART_GOLGESI =
