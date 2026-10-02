@@ -239,8 +239,19 @@ yeniden derleme şart**; Metro üzerinden gelen yeni JS eski kabuğa native mod�
   `com.dersmate.app`): gizli DEĞİL, kökte durur ve **depoya işlenir** — EAS derlemesine
   gitmesi gerekiyor. `app.config.js` onu yalnızca dosya VARSA `googleServicesFile` olarak
   veriyor; dosyasız derleme kırılmaz, yalnızca token alınamaz.
+
+  **2026-10-02'den beri depoda.** Firebase projesi `dersmate`, kimlik `dersmate-app`
+  (proje numarası = FCM gönderen kimliği `1010730878895`), Spark planı; Arda ile ortak
+  Google hesabında, ayrı üye eklenmedi. Konsolda Firebase Cloud Messaging API (V1) açık,
+  eski API kapalı; Gemini ve Google Developer Program kapalı. Projeye bağlı Google
+  Analytics mülkü YENİ bir Analytics hesabında (konum Türkiye, Google'a dört veri
+  paylaşımı da kapalı). Bağlı olması toplama demek değil: uygulamada Analytics SDK'sı
+  yok ve manifest `firebase_analytics_collection_enabled=false` yazıyor (aşağıda).
+  Firebase'de yalnızca Android uygulaması kayıtlı; iOS push APNs'e doğrudan gittiği
+  için `GoogleService-Info.plist` push'a gerekmiyor (analitik işi gelirse eklenir).
 - **FCM V1 hizmet hesabı anahtarı** (`<proje>-firebase-adminsdk-<kimlik>.json`): GİZLİ.
-  `eas credentials` → Android → production → Google Service Account → "Manage your Google
+  Firebase konsolu → Proje ayarları → Service accounts → "Generate new private key" ile
+  üretilir. `eas credentials` → Android → production → Google Service Account → "Manage your Google
   Service Account Key for Push Notifications (FCM V1)" ile EAS'e yüklenir, sonra
   bilgisayardan kaldırılır. `.gitignore`'da ayrı kalıbı var: varsayılan adı
   `*-service-account.json` kalıbına uymuyor.
